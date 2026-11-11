@@ -35,3 +35,8 @@ Read this fully before starting. Plan: docs/ROADMAP-NEXT.md. Look: docs/PLAN.md 
   others' lines).
 - Final report: short. What works, what's verified how, files touched outside
   your area, what is untested. No code dumps.
+
+## Git
+- The tree is a git repo now (branch main). Do NOT commit, push, branch or
+  rewrite history; the coordinator reviews and commits. `git diff` / `git status`
+  are fine and useful to check your own changes.
