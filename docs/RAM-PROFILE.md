@@ -135,3 +135,11 @@ which links Mesa for the dmabuf/GL path; not itemised here). flcomp is the singl
 
 `free -m`: used 107 MB, buff/cache 227 MB, available 854 MB; at the desktop with Files, Store, etc. closed
 about the same. FreeBWS with one page: 263-355 MB PSS in total (docs/m7/freebws-*-1G.png, logs/m8-freebws-1G.log).
+
+## After animations and Themes (2026-11-11)
+
+Same tool (`build/iso-test.py --mem 1G --profile`, twin ISO with console=ttyS0 last), idle live desktop: **flcomp 11 544 kB PSS** (11 565 before),
+flpanel 9 909 kB (9 955), all processes 61.3 MB (61.6), MemTotal - MemAvailable **84.3 MB** (84.7). Raw output: docs/m7/fltheme-ram-profile-1G.txt.
+The animations add no resident memory at idle: a closing window's picture, a hiding menu's picture and the overview's off-screen picture exist for
+at most about 200 ms and are freed (headless, 1280x800: anon 13 220 kB with the old binary, 13 240 kB with the new one after three rounds of every
+motion). `tests/pss.sh` in src/flcomp does that comparison.

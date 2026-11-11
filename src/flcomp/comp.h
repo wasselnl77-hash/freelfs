@@ -95,6 +95,8 @@ struct window {
 	int snap;			/* -1 left half, 1 right half of the work area, 0 not snapped (restore has the old place) */
 	int min_w, min_h, max_w, max_h;
 	int cfg_w, cfg_h;		/* last size we configured */
+	struct rect entry;		/* its entry in the panel (fl_shell set_window_entry), panel surface coordinates */
+	bool has_entry;
 	struct rect restore;		/* geometry before maximize */
 	bool have_restore;
 	unsigned edges;
@@ -304,14 +306,19 @@ void anim_surface_show(struct surface *s);			/* menu, flyout, notification surfa
 void anim_surface_hide(struct surface *s);			/* ... about to be hidden: keep a picture */
 void anim_surface_gone(struct surface *s);
 /* the compositing side (render.c) */
-struct anim_xf { struct rect dst; int alpha; };			/* where a window's bounds go and how opaque (0..255) */
+struct anim_xf { struct rect dst; int alpha; };			/* where a window's geometry goes and how opaque (0..255) */
 bool anim_window_xf(struct window *w, struct anim_xf *xf);	/* the window is animating: draw it this way */
 bool anim_window_drawn_hidden(struct window *w);		/* not window_visible, but still drawn (minimizing, sliding out) */
-bool anim_surface_xf(struct surface *s, struct anim_xf *xf);
-void anim_draw_ghosts(struct rect clip);			/* pictures of surfaces that are gone, drawn above the windows */
-bool anim_overview_xf(struct anim_xf *xf, bool *hold);		/* the overview is zooming: it is drawn off screen, then this way */
-void anim_overview_done(void);
+bool anim_draw_window(struct window *w, struct rect clip);	/* draws it through its animation; false: no animation */
+void anim_draw_win_ghosts(struct rect clip);			/* the last picture of windows that were closed, fading */
+bool anim_draw_overview(struct rect clip);			/* the zooming overview; false: draw it the plain way */
+bool anim_overview_busy(void);
+bool anim_draw_surface(struct surface *s, struct rect clip);	/* menu, flyout, cards while they come in; false: plain */
+void anim_draw_surf_ghosts(struct rect clip);			/* ... and while they leave */
 bool anim_ws_active(void);
+void anim_draw_begin(void);					/* FLCOMP_ANIM_LOG: the cost of a frame that has motion in it */
+void anim_draw_end(void);
+void overview_draw_snapshot(struct rect clip);			/* the overview as it is now, open or not (anim.c draws it off screen) */
 
 /* render.c */
 void damage_add(struct rect r);
@@ -375,6 +382,7 @@ struct conf {
 	int perf;			/* performance=auto|on|off (PERF_*, perf.c); 0 is auto */
 	int anim;			/* animations=on|reduced|off (ANIM_*, anim.c) */
 	int anim_speed;			/* animation_speed= in percent: 100 is normal, 200 twice as fast */
+	bool anim_log;			/* anim_log=1: log the frames of every burst of motion (same as FLCOMP_ANIM_LOG) */
 	bool panel_top;			/* panel_position=top: the panel is at the top edge */
 	int title_h;			/* titlebar=normal|compact: 34 or 28 (the frame of X windows) */
 	bool buttons_left;		/* buttons=left: window buttons at the left (X window frames) */

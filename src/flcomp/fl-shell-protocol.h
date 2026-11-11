@@ -318,6 +318,25 @@ struct fl_shell_interface {
 			    struct wl_resource *surface,
 			    int32_t x,
 			    int32_t y);
+	/**
+	 * where the panel shows a window
+	 *
+	 * The rectangle of the window's entry in the panel surface
+	 * (surface coordinates, the panel's top left is 0, 0). The
+	 * compositor shrinks a minimised window towards it and grows a
+	 * restored one from it. It is only a hint for animations: without
+	 * it (or with animations off) the window just appears and
+	 * disappears. Send it again when the entry moves; w = 0 forgets
+	 * it.
+	 * @since 7
+	 */
+	void (*set_window_entry)(struct wl_client *client,
+				 struct wl_resource *resource,
+				 uint32_t id,
+				 int32_t x,
+				 int32_t y,
+				 int32_t w,
+				 int32_t h);
 };
 
 #define FL_SHELL_WINDOW_ADDED 0
@@ -472,6 +491,10 @@ struct fl_shell_interface {
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_SET_DESKTOP_SINCE_VERSION 6
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_WINDOW_ENTRY_SINCE_VERSION 7
 
 /**
  * @ingroup iface_fl_shell

@@ -95,6 +95,22 @@ When someone tries to delete a vital system folder (`/sysflfs`, `/sysflfs/bin`,
 
 ---------------------------------------------------------------------------
 
+### A11 Animations and Themes (2026-11-11, rootfs-owner round "animations and themes")
+**Built into the image and exercised in QEMU (1 GB) and headless; not on the laptop.**
+- Animations (src/flcomp anim.c, desktop.conf `animations=on|reduced|off`, `animation_speed=`): window open (fade, 96 to 100 %) and
+  close (a picture of the last frame fades), minimize and restore towards the panel entry (fl_shell 7 `set_window_entry`),
+  maximize, snap and restore (geometry), workspace slide, overview zoom, start menu / flyouts / notification cards (fade and a
+  short slide). 100 to 200 ms, ease-out, no bounce, no wobble; `reduced` = fades only. CPU compositing only (there is no
+  GLES compositing path in flcomp; GLES imports dmabufs): drawn only while moving, driven by the page flip, no timers and no
+  wakeups at idle. Not animated: X11 windows, fullscreen (performance mode), the lock screen. `make check-anim`.
+- Themes (src/fltheme, recipe fltheme, Settings > General > "More in Themes"): colour scheme dark/light, accent, UI font family
+  and size, window buttons left/right, title bar normal/compact, panel top/bottom, height and icon size, animations and speed,
+  presets (FreeLFS Dark, FreeLFS Light, Compact, Large, and your own in ~/.config/freelfs/themes/), wallpaper shortcut. Corners
+  stay square: no setting. Everything is a desktop.conf key and applies live. Colours are defined once, in src/flui/flpalette.h
+  (libflui and flcomp); the light scheme is contrast-checked by `make check` in src/fltheme. GTK settings.ini hints are written
+  for Flatpak apps; flportal already served color-scheme and accent-color from desktop.conf.
+- Details, numbers and what is untested: docs/INTEGRATION-TODO.md (round of 2026-11-11, "animations and themes"), docs/m7/fltheme-*.png.
+
 ## Phase B: apps (each is its own src/<app>, own recipe, group desktop)
 
 | # | App | Engine / library | Must-haves | Size |

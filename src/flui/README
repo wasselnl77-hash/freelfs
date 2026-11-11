@@ -13,7 +13,10 @@ What is in it
           24-unit large ones for the file manager were added later)
   text.c  fontconfig + FreeType + HarfBuzz, glyph cache, fallback fonts;
           light hinting, whole-pixel advances
-  conf.c  theme tokens (dark, light), the accent colour (accent= in desktop.conf: green,
+  flpalette.h  the colour tokens of both schemes and the accent derivation, header only, shared with flcomp
+          (installed as <flpalette.h>); the light scheme is defined and contrast checked there (fltheme make check)
+  conf.c  theme tokens (dark, light, from flpalette.h), the look settings (fl_lk: font, font_size, buttons,
+          titlebar, panel_*, animations; see flui.h), the accent colour (accent= in desktop.conf: green,
           teal, blue, amber, orange, rose or RRGGBB; fl_accents, fl_accent_find; on_accent
           and the selection fill are derived) and ~/.config/freelfs/desktop.conf with an
           inotify watcher: apps that call fl_app_watch_conf pick up a theme or accent
@@ -44,7 +47,9 @@ Environment
   FLUI_CONF=FILE       desktop.conf path
   FL_KEYBOARD_CONF=F   keyboard.conf path (default /etc/keyboard.conf)
 
-Fonts: IBM Plex Sans (UI, 13 px) and Plex Mono, package ibm-plex.
+Fonts: IBM Plex Sans (UI, 13 px) and Plex Mono, package ibm-plex. font= and font_size= in desktop.conf change
+every fl_font_ui font in place and live (family; size is a factor of size/13); fl_font_mono is untouched.
+Window decorations follow buttons=left|right and titlebar=normal|compact; fl_conf_set_many writes several keys in one go.
 
 Build: make; make install (PREFIX, LIBDIR, DESTDIR). Needs wayland-client,
 freetype2, harfbuzz, fontconfig, xkbcommon and wayland-protocols at build time.

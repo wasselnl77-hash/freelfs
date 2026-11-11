@@ -73,7 +73,7 @@ and OPTIONS=, default us) and can be changed at run time with
 fl_shell.set_keyboard_layout (not saved).
 
 Globals: wl_compositor 4, wl_subcompositor 1, wl_shm, wl_output 3, wl_seat 5, xwayland_shell_v1 1 (Xwayland only),
-wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 6.
+wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 7.
 
 desktop.conf (config.c, ~/.config/freelfs/desktop.conf, $FLUI_CONF; watched with
 inotify, changes apply at once, except display mode and scale)
@@ -88,6 +88,10 @@ inotify, changes apply at once, except display mode and scale)
       colour tables applied while copying to the screen (green and blue go down)
   brightness=percent   written to the backlight's sysfs file at start
   mode=1920x1080@60   scale=100..200   read at start
+  theme=dark|light  accent=...   the colour scheme of everything flcomp draws itself (theme.c, flpalette.h from libflui)
+  animations=on|reduced|off  animation_speed=0.1..4   see "Animations"
+  panel_position=bottom|top  panel_height=36..64   where the panel sits and how much room windows get
+  titlebar=normal|compact  buttons=right|left   the frame of X windows (Wayland windows draw their own, libflui follows the same keys)
   power_saver=0|1   frame cap and dimmed backlight (see "Power saving")
   performance=auto|on|off   see "Performance mode" (default auto)
   lock_on_lid=0|1   closing the lid locks the screen (default 1, see "Lock screen")
@@ -106,14 +110,15 @@ fl_shell (protocol/fl-shell.xml, installed to /usr/share/flcomp)
             minimize(id), close(id), set_keyboard_layout(name), logout,
             destroy; since 2: set_flyout(surface, x); since 3: set_output(w, h,
             hz, scale), confirm_output, revert_output, show_osd(kind, percent, flags);
-            since 4: set_notifications(surface), lock(surface), unlock
+            since 4: set_notifications(surface), lock(surface), unlock; since 7: set_window_entry(id, x, y, w, h)
   events:   window_added(id, app_id, title), window_changed(id, title,
             focused, minimized), window_removed(id), menu_dismissed,
             menu_toggle, keyboard_layout(name); since 2: flyout_dismissed,
             volume_key(action: 0 raise, 1 lower, 2 mute); since 3: output_mode(w,
             h, hz, flags), output_state(scale, w, h, pending), output_failed; since 4:
             lock_state(locked)
-The panel surface is placed at the bottom edge and should be as wide as the
+The panel surface is placed at the bottom edge (the top edge with panel_position=top in desktop.conf: the menu and
+flyouts then open below it, windows get the room under it) and should be as wide as the
 output (wl_output.mode). The menu is shown above the left edge of the panel
 while it has a buffer; a click outside menu and panel hides it and sends
 menu_dismissed (attach a buffer again to show it). A click on the panel
@@ -171,6 +176,25 @@ Lock screen (lock.c; fl_shell 4 lock/unlock, Super+L, the lid)
   The lid switch (libinput) locks the same way, unless lock_on_lid=0 in desktop.conf.
   There is no suspend path in the system yet (flpower knows off and restart); whatever
   later suspends the machine should run fllock first, or just let the lid do it.
+
+Animations (anim.c; desktop.conf animations=on|reduced|off, animation_speed=FACTOR)
+  Short, flat, eased motion, no wobble and no bounce, 100 to 200 ms (divided by the speed factor):
+  window open (fade in, 96 % to 100 %) and close (a picture of the last frame fades out), minimize and restore
+  (the window shrinks towards its panel entry and comes back from it; the panel tells flcomp where the entry is with
+  fl_shell 7 set_window_entry), maximize, snap and restore (the geometry moves from the old place to the new one),
+  the workspace switch (windows slide along the move), the overview (it zooms from 108 % while fading in and out) and
+  the start menu, flyouts and notification cards (a fade with a short slide from the panel edge, or from the right).
+  reduced: fades only (no scale, slide, zoom or geometry motion); off: nothing moves.
+  Cost: flcomp composites on the CPU, there is no GLES compositing path (GLES is only for importing GPU clients), and
+  the animations are drawn the same way. Nothing runs at idle: an animation exists from its start to its last frame,
+  frame_done (the page flip, or a 16 ms timer in the headless backend) advances it by the clock and damages only what
+  moved, which asks for the next frame; there are no timers of its own and no wakeups afterwards. A window that is not
+  scaled is copied like before, a scaled one is sampled bilinearly (windows above 1.2 megapixels fade without scaling).
+  Pictures (closing windows, hiding menus, the overview) are copies freed after at most about 200 ms. Under power
+  saving the 30 frames a second cap applies as always. Not animated: X11 windows, anything while a fullscreen window
+  is drawn alone (performance mode) or the screen is locked. FLCOMP_ANIM_LOG=1 logs frames, intervals and draw time per
+  burst (anim_log=1 in desktop.conf does the same, for a session that has no environment to set); `make check-anim`
+  (tests/anim.sh) tests every motion and the pacing.
 
 Power saving (power.c, media.c, render.c; desktop.conf power_saver=1)
   The panel's battery flyout writes the setting. flcomp then draws at most 30 frames a
@@ -298,7 +322,8 @@ Source map
   xwm.h, xwm-int.h   what the rest of flcomp calls, and what the three share
   media.c      volume, brightness and microphone keys
   osd.c        the on-screen indicator
-  theme.c      accent= and wallpaper= from desktop.conf (own inotify watch): accent colour of the
+  anim.c       animations: window, workspace, overview and shell surface motion, the bilinear sampler
+  theme.c      theme=, accent= and wallpaper= from desktop.conf (own inotify watch): PAL, the colour scheme; accent colour of the
                indicator, Alt-Tab frame and lock caret; wallpaper=accent|NAME|user:NAME, swapped live
   sound.c      system sounds: runs flsound (login, tick, screenshot, error); sounds=0 silences it
   flshell.c    fl_shell

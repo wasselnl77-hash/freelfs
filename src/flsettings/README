@@ -81,6 +81,9 @@ When the system runs from a snapshot a banner offers "Make this the current stat
 (setuid root for group seat); $FLSNAP names another program for tests (the real flsnap with FLSNAP_MOCK=DIR).
 `flsettings --page snapshots`.
 
+Themes: General > Appearance has "More in Themes" (opens fltheme: fonts, window buttons, title bar, panel edge,
+height and icons, animations, presets). Switching Dark/Light here also runs `fltheme --hints` so GTK's settings.ini follows.
+
 Accent colour, wallpaper and sounds (2026-11, roadmap A4, A5, A7).
 General > Appearance: six swatches (green, teal, blue, amber, orange, rose), written as accent= to
 desktop.conf; libflui derives the theme from it (accent, text on it, selection fill) and every app

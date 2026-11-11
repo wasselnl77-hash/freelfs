@@ -255,13 +255,23 @@ static void composite_rect(struct rect clip)
 	if (desktop_visible())	/* the icons: above the wallpaper, below the windows */
 		draw_tree(C.desktop, clip);
 	struct window *w;
-	wl_list_for_each_reverse(w, &C.windows, link)
-		if (window_visible(w) && !(skip_pid && surface_pid(w->surf) == skip_pid)) {
-			draw_tree(w->surf, clip);
-			if (w->xw)
-				xwm_deco_draw(w, clip);	/* the frame flcomp gives an X window */
-		}
-	overview_draw(clip);
+	bool still = clean || skip_pid;		/* a capture shows the desktop as it is, not mid-motion */
+	wl_list_for_each_reverse(w, &C.windows, link) {
+		bool vis = window_visible(w), hid = !vis && !still && anim_window_drawn_hidden(w);
+		if (!(vis || hid) || (skip_pid && surface_pid(w->surf) == skip_pid))
+			continue;
+		if (!still && !w->xw && anim_draw_window(w, clip))	/* opening, closing, moving, sliding (anim.c) */
+			continue;
+		if (!vis)
+			continue;
+		draw_tree(w->surf, clip);
+		if (w->xw)
+			xwm_deco_draw(w, clip);	/* the frame flcomp gives an X window */
+	}
+	if (!still)
+		anim_draw_win_ghosts(clip);	/* a window that was just closed, fading */
+	if (still || !anim_draw_overview(clip))
+		overview_draw(clip);
 	if (panel_visible())
 		draw_tree(C.panel, clip);
 	struct surface *xo[64];		/* menus and tooltips of X programs */
@@ -272,14 +282,15 @@ static void composite_rect(struct rect clip)
 	wl_list_for_each(p, &C.popups, link)
 		if (popup_visible(p))
 			draw_tree(p->surf, clip);
-	if (menu_visible())
+	if (menu_visible() && (still || !anim_draw_surface(C.menu, clip)))
 		draw_tree(C.menu, clip);
-	if (flyout_visible())
+	if (flyout_visible() && (still || !anim_draw_surface(C.flyout, clip)))
 		draw_tree(C.flyout, clip);
-	if (notify_visible())
+	if (notify_visible() && (still || !anim_draw_surface(C.notify, clip)))
 		draw_tree(C.notify, clip);
 	if (clean)
 		return;
+	anim_draw_surf_ghosts(clip);	/* a menu or card that was just put away, fading */
 	switcher_draw(clip);
 	osd_draw(clip);
 	cursor_draw(clip);
@@ -326,6 +337,7 @@ uint32_t now_ms(void)
 void frame_done(void)
 {
 	flush_frames(now_ms());
+	anim_frame();	/* anything moving advances by the clock and damages what it touches */
 	if (C.dmg.n)
 		schedule_repaint();
 }
@@ -345,8 +357,10 @@ static void repaint(void *data)
 		return;
 	}
 	xwm_sync();	/* X windows: positions, stacking */
+	anim_draw_begin();
 	for (int i = 0; i < C.dmg.n; i++)
 		composite_rect(C.dmg.r[i]);
+	anim_draw_end();
 	/* The buffer we draw into is two frames old: it needs this frame's
 	 * damage and the previous one's. */
 	struct damage cp = C.dmg;
@@ -371,6 +385,8 @@ void schedule_repaint(void)
 	repaint_pending = true;
 	/* power saving: at most one frame every power_frame_gap_ms() */
 	int gap = power_frame_gap_ms();
+	if (anim_gap_ms() > gap)	/* headless: pace the motion like a 60 Hz display */
+		gap = anim_gap_ms();
 	uint32_t since = now_ms() - last_repaint;
 	if (gap > 0 && since < (uint32_t)gap) {
 		if (!cap_timer)

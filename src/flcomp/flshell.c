@@ -234,6 +234,16 @@ static void sh_set_desktop(struct wl_client *c, struct wl_resource *r, struct wl
 		damage_tree(s);
 }
 
+static void sh_set_window_entry(struct wl_client *c, struct wl_resource *r, uint32_t id, int32_t x, int32_t y,
+				int32_t w, int32_t h)
+{
+	struct window *win = window_by_id(id);
+	if (!win)
+		return;
+	win->has_entry = w > 0 && h > 0;
+	win->entry = (struct rect){ x, y, x + (w > 0 ? w : 0), y + (h > 0 ? h : 0) };
+}
+
 static void sh_lock(struct wl_client *c, struct wl_resource *r, struct wl_resource *sr)
 {
 	struct surface *s = wl_resource_get_user_data(sr);
@@ -272,6 +282,7 @@ static void sh_toggle_overview(struct wl_client *c, struct wl_resource *r)
 }
 
 static const struct fl_shell_interface shell_impl = {
+	.set_window_entry = sh_set_window_entry,
 	.set_desktop = sh_set_desktop,
 	.set_workspace = sh_set_workspace,
 	.move_window = sh_move_window,
@@ -320,5 +331,5 @@ static void shell_bind(struct wl_client *c, void *data, uint32_t version, uint32
 
 void flshell_init(void)
 {
-	wl_global_create(C.dpy, &fl_shell_interface, 6, NULL, shell_bind);
+	wl_global_create(C.dpy, &fl_shell_interface, 7, NULL, shell_bind);
 }

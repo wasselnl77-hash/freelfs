@@ -33,7 +33,7 @@
 #include "wallpaper.h"
 #include "wifi.h"
 
-enum { ID_DARK = 1, ID_LIGHT, ID_LABELS, ID_SOUNDS, ID_SOUND_TEST, ID_PAGE_GENERAL, ID_PAGE_WIFI, ID_PAGE_DISPLAY, ID_PAGE_INPUT,
+enum { ID_DARK = 1, ID_LIGHT, ID_LABELS, ID_SOUNDS, ID_SOUND_TEST, ID_THEMES, ID_PAGE_GENERAL, ID_PAGE_WIFI, ID_PAGE_DISPLAY, ID_PAGE_INPUT,
        ID_PAGE_KEYBOARD, ID_PAGE_DATETIME, ID_PAGE_SNAPSHOTS, ID_PAGE_ABOUT, ID_SCROLL, ID_KBD = 20, ID_ACCENT = 60 /* .. 65 */ };
 enum { PAGE_GENERAL, PAGE_DISPLAY, PAGE_INPUT, PAGE_KEYBOARD, PAGE_WIFI, PAGE_DATETIME, PAGE_SNAPSHOTS, PAGE_ABOUT };
 #define SIDEBAR 168
@@ -138,6 +138,19 @@ static void play_test(void)
 		signal(SIGCHLD, SIG_IGN);
 }
 
+/* run a program of the desktop without waiting for it (Themes, the GTK hints) */
+static void spawn(const char *prog, const char *a1, const char *a2)
+{
+	pid_t p = fork();
+	if (p == 0) {
+		setsid();
+		execlp(prog, prog, a1, a2, (char *)NULL);
+		_exit(127);
+	}
+	if (p > 0)
+		signal(SIGCHLD, SIG_IGN);
+}
+
 static void draw_general(fl_ui *ui, struct settings *s, fl_rect c)
 {
 	int x = c.x + 28, w = c.w - 56, y = c.y + 24;
@@ -147,12 +160,20 @@ static void draw_general(fl_ui *ui, struct settings *s, fl_rect c)
 	row_text(ui, s, x, y, w - 190, "Theme", "Colours of the panel, windows and menus");
 	int dark = fl_th.dark;
 	fl_rect d = fl_r(x + w - 176, y + 12, 86, 32), l = fl_r(x + w - 86, y + 12, 86, 32);
-	if (choice(ui, ID_DARK, d, "Dark", dark) && !dark)
+	if (choice(ui, ID_DARK, d, "Dark", dark) && !dark) {
 		fl_conf_set("theme", "dark");
-	if (choice(ui, ID_LIGHT, l, "Light", !dark) && dark)
+		spawn("fltheme", "--hints", NULL); /* GTK settings.ini follows (Flatpak apps); a no-op without Themes */
+	}
+	if (choice(ui, ID_LIGHT, l, "Light", !dark) && dark) {
 		fl_conf_set("theme", "light");
+		spawn("fltheme", "--hints", NULL);
+	}
 	y += 56;
 	draw_accents(ui, s, x, y, w);
+	y += 56;
+	row_text(ui, s, x, y, w - 190, "More in Themes", "Fonts, window buttons, panel, animations and presets");
+	if (fl_button(ui, ID_THEMES, fl_r(x + w - 176, y + 12, 176, 32), "Open Themes", FL_BTN_OUTLINE))
+		spawn("fltheme", NULL, NULL);
 	y += 56 + 24;
 
 	section(ui, s, x, y, w, "Panel");

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Themes
+Comment=Colour scheme, accent, fonts, window buttons, panel, animations
+Exec=fltheme
+Categories=Settings;
+X-FreeLFS-Glyph=T

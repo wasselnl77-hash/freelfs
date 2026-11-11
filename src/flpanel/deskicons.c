@@ -63,6 +63,19 @@ static void desk_draw(fl_ui *ui, void *ud)
 	/* a click on nothing of ours does not reach this surface (the compositor hit-tests alpha) */
 }
 
+static struct desk *the_desk;
+
+static int desk_y(void)
+{
+	return MARGIN + (fl_lk.panel_top ? fl_lk.panel_h : 0);	/* below a panel at the top */
+}
+
+void desk_reposition(struct panel *p)
+{
+	if (the_desk && p->shell)
+		fl_shell_set_desktop(p->shell, fl_win_surface(the_desk->w), MARGIN, desk_y());
+}
+
 void desk_init(struct panel *p)
 {
 	if (!p->shell || p->shell_ver < 6 || p->demo || fl_app_ppm(p->app))
@@ -96,6 +109,7 @@ void desk_init(struct panel *p)
 		free(d);
 		return;
 	}
-	fl_shell_set_desktop(p->shell, fl_win_surface(d->w), MARGIN, MARGIN);
+	the_desk = d;
+	fl_shell_set_desktop(p->shell, fl_win_surface(d->w), MARGIN, desk_y());
 	fl_win_map(d->w);
 }

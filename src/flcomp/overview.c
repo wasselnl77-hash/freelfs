@@ -32,7 +32,7 @@ bool overview_on(void)
 
 bool overview_has_pointer(void)
 {
-	return C.py < C.h - C.panel_h;
+	return CF.panel_top ? C.py >= C.panel_h : C.py < C.h - C.panel_h;
 }
 
 void overview_changed(void)
@@ -84,10 +84,11 @@ static int tile_at(const struct rect *t, int x, int y)
 /* a screen rectangle (above the panel) inside tile t */
 static struct rect to_tile(struct rect t, struct rect r)
 {
-	int wh = rect_h(work_area()), tw = rect_w(t), th = rect_h(t);
+	struct rect wa = work_area();
+	int wh = rect_h(wa), tw = rect_w(t), th = rect_h(t), y0 = wa.y1;	/* y0: panel at the top */
 	struct rect o = {
-		t.x1 + (int)((long)r.x1 * tw / C.w), t.y1 + (int)((long)r.y1 * th / wh),
-		t.x1 + (int)((long)r.x2 * tw / C.w), t.y1 + (int)((long)r.y2 * th / wh),
+		t.x1 + (int)((long)r.x1 * tw / C.w), t.y1 + (int)((long)(r.y1 - y0) * th / wh),
+		t.x1 + (int)((long)r.x2 * tw / C.w), t.y1 + (int)((long)(r.y2 - y0) * th / wh),
 	};
 	if (o.x2 <= o.x1)
 		o.x2 = o.x1 + 1;
@@ -196,9 +197,18 @@ static void label(struct rect clip, struct rect t, int num, bool cur)
 								  b.x1 + 5 + i * 12 + x * 2 + 2, b.y1 + 4 + y * 2 + 2 }, fg);
 }
 
+static bool snapshot_draw;	/* anim.c draws the overview off screen while it zooms, open or not */
+
+void overview_draw_snapshot(struct rect clip)
+{
+	snapshot_draw = true;
+	overview_draw(clip);
+	snapshot_draw = false;
+}
+
 void overview_draw(struct rect clip)
 {
-	if (!overview_on())
+	if (!overview_on() && !snapshot_draw)
 		return;
 	struct rect wa = work_area(), c;
 	if (!rect_intersect(wa, clip, &c))
@@ -214,7 +224,7 @@ void overview_draw(struct rect clip)
 			continue;
 		fill(c, t[i], C_BG);
 		if (wp)	/* the wallpaper covers the whole output; the tile is the part above the panel */
-			scaled(c, wp, C.w, rect_h(wa), false, t[i]);
+			scaled(c, wp + (size_t)wa.y1 * C.w, C.w, rect_h(wa), false, t[i]);
 		struct window *w;
 		wl_list_for_each_reverse(w, &C.windows, link)	/* bottom to top */
 			if (window_on_ws(w, i) && w->surf->px) {
@@ -259,6 +269,7 @@ void overview_toggle(void)
 	hot = NULL;
 	if (overview_has_pointer())
 		seat_set_ptr_focus(NULL, 0, 0);
+	anim_overview(true);
 	damage_add(work_area());
 }
 
@@ -266,6 +277,7 @@ void overview_close(void)
 {
 	if (!open_)
 		return;
+	anim_overview(false);	/* the picture of it, fading, before it is gone */
 	damage_add(work_area());
 	open_ = false;
 	hot = NULL;

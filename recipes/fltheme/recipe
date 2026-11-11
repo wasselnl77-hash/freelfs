@@ -1,0 +1,30 @@
+# Themes, from src/fltheme in the FreeLFS tree: colour scheme, accent, fonts, window buttons,
+# panel, animations and presets in one place, with GTK hints for Flatpak apps.
+pkgname=fltheme
+version=0.1
+release=1
+summary="FreeLFS Themes: colour scheme (dark, light), accent, fonts, window controls, panel, animations, presets"
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc flui wayland)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/fltheme" "$srcdir/fltheme"
+	cd "$srcdir/fltheme"
+	make clean
+	make
+}
+
+check() {
+	cd "$srcdir/fltheme"
+	make check
+}
+
+package() {
+	cd "$srcdir/fltheme"
+	make DESTDIR="$pkgdir" install
+}

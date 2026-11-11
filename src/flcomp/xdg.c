@@ -17,6 +17,10 @@
 struct rect work_area(void)
 {
 	struct rect r = { 0, 0, C.w, C.h - C.panel_h };
+	if (CF.panel_top) {	/* panel_position=top */
+		r.y1 = C.panel_h;
+		r.y2 = C.h;
+	}
 	return r;
 }
 
@@ -139,6 +143,7 @@ void window_minimize(struct window *w)
 		return;
 	w->minimized = true;
 	damage_tree(w->surf);
+	anim_window_minimize(w);	/* shrinks towards its panel entry while it is hidden */
 	xwm_window_changed(w);
 	if (C.focused == w) {
 		C.focused = NULL;
@@ -162,6 +167,7 @@ void window_activate(struct window *w)
 	if (w->minimized) {
 		w->minimized = false;
 		damage_tree(w->surf);
+		anim_window_restore(w);
 		if (w->announced)
 			fl_emit_changed(w);
 		schedule_repaint();
@@ -201,6 +207,7 @@ static void window_refit(struct window *w)
 
 static void window_set_state(struct window *w, bool max, bool full)
 {
+	struct rect before = window_rect(w);	/* for the animation of the change */
 	bool was = w->maximized || w->fullscreen, will = max || full;
 	if (!was && will && w->mapped && !w->snap) {	/* a snapped window already holds its old place */
 		w->restore = (struct rect){ w->x, w->y, w->x + geom_w(w), w->y + geom_h(w) };
@@ -226,6 +233,8 @@ static void window_set_state(struct window *w, bool max, bool full)
 	if (w->announced)
 		fl_emit_changed(w);
 	xwm_window_changed(w);
+	if (w->mapped)
+		anim_window_geometry(w, before);
 }
 
 /* Super+Left / Super+Right: one half of the work area. The place from before stays in restore. */
@@ -234,14 +243,17 @@ static void window_snap_to(struct window *w, int side)
 	struct rect a = work_area();
 	int hw = rect_w(a) / 2, nw = side < 0 ? hw : rect_w(a) - hw;
 	struct xinset in = xwm_insets(w);
+	struct rect before = window_rect(w);
 	if (w->mapped)
 		damage_tree(w->surf);
 	w->x = (side < 0 ? a.x1 : a.x1 + hw) + in.l;
 	w->y = a.y1 + in.t;
 	w->snap = side;
 	window_configure(w, nw - in.l - in.r, rect_h(a) - in.t - in.b);
-	if (w->mapped)
+	if (w->mapped) {
 		damage_tree(w->surf);
+		anim_window_geometry(w, before);
+	}
 }
 
 /* back to where the window was before it was snapped */
@@ -252,13 +264,16 @@ static void window_unsnap(struct window *w)
 	w->snap = 0;
 	if (!w->have_restore)
 		return;
+	struct rect before = window_rect(w);
 	if (w->mapped)
 		damage_tree(w->surf);
 	w->x = w->restore.x1;
 	w->y = w->restore.y1;
 	window_configure(w, rect_w(w->restore), rect_h(w->restore));
-	if (w->mapped)
+	if (w->mapped) {
 		damage_tree(w->surf);
+		anim_window_geometry(w, before);
+	}
 }
 
 /* the keyboard shortcuts for the focused window (seat.c) */
@@ -311,13 +326,14 @@ void windows_fit_output(void)
 		int gw = geom_w(w), gh = geom_h(w), nx = w->x, ny = w->y;
 		if (nx + gw > C.w)
 			nx = C.w - gw;
-		if (ny + gh > C.h - C.panel_h)
-			ny = C.h - C.panel_h - gh;
+		struct rect wa = work_area();
+		if (ny + gh > wa.y2)
+			ny = wa.y2 - gh;
 		struct xinset in = xwm_insets(w);
 		if (nx < 0)
 			nx = 0;
-		if (ny < in.t)
-			ny = in.t;
+		if (ny < wa.y1 + in.t)
+			ny = wa.y1 + in.t;
 		if (nx != w->x || ny != w->y) {
 			w->x = nx;
 			w->y = ny;
@@ -327,6 +343,7 @@ void windows_fit_output(void)
 
 void work_area_changed(void)
 {
+	windows_fit_output();	/* a panel that moved or grew: windows that now lie under it come out */
 	struct window *w;
 	wl_list_for_each(w, &C.windows, link) {
 		if (w->maximized || w->fullscreen)
@@ -365,7 +382,9 @@ void ws_switch(int idx)
 		cycle_end();
 	popups_dismiss();
 	struct window *old = C.focused;
+	int from_ws = C.ws_cur;
 	C.ws_cur = idx;
+	anim_ws_switch(from_ws, idx);	/* the windows of both slide; they are drawn by anim.c until it ends */
 	if (old && old->ws != idx) {
 		C.focused = NULL;
 		window_configure(old, old->cfg_w, old->cfg_h);
@@ -653,6 +672,8 @@ void cycle_end(void)
 
 static void window_destroy(struct window *w)
 {
+	anim_window_closing(w);		/* a copy of the last picture fades out; the struct itself goes now */
+	anim_window_gone(w);
 	if (G.w == w) {
 		G.mode = 0;
 		G.w = NULL;
@@ -767,6 +788,7 @@ static void window_commit(struct window *w, bool was_mapped)
 	if (now && !was_mapped) {
 		window_place(w);
 		w->ws = w->parent ? w->parent->ws : C.ws_cur;
+		anim_window_open(w);
 		if (!w->parent && !w->announced && !window_skip_panel(w)) {
 			w->announced = true;
 			fl_emit_added(w);
@@ -858,13 +880,22 @@ void xdg_surface_commit(struct surface *s, bool was_mapped)
 void shell_surface_commit(struct surface *s, bool was_mapped, bool attached)
 {
 	if (s->role == ROLE_MENU) {
+		bool was_shown = was_mapped && !C.menu_dismissed;
 		if (attached)
 			C.menu_dismissed = false;
+		if (attached && !was_shown)
+			anim_surface_show(s);
 		update_kb_focus();
 	} else if (s->role == ROLE_FLYOUT) {
+		bool was_shown = was_mapped && !C.flyout_dismissed;
 		if (attached)
 			C.flyout_dismissed = false;
+		if (attached && !was_shown)
+			anim_surface_show(s);
 		update_kb_focus();
+	} else if (s->role == ROLE_NOTIFY) {
+		if (attached && !was_mapped)
+			anim_surface_show(s);
 	}
 }
 
@@ -874,6 +905,7 @@ void menu_dismiss(void)
 {
 	if (!menu_visible())
 		return;
+	anim_surface_hide(C.menu);
 	C.menu_dismissed = true;
 	damage_tree(C.menu);
 	fl_emit_menu_dismissed();
@@ -885,6 +917,7 @@ void flyout_dismiss(void)
 {
 	if (!flyout_visible())
 		return;
+	anim_surface_hide(C.flyout);
 	C.flyout_dismissed = true;
 	damage_tree(C.flyout);
 	fl_emit_flyout_dismissed();

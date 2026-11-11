@@ -12,8 +12,9 @@ PKGS = wayland-server libdrm libinput libseat xkbcommon libudev libpng xcb xcb-x
 # EGL, GBM and GLES: headers only. gl.c loads the libraries with dlopen when a client needs the GPU path
 # (linked, they pull libgallium and libLLVM into every session: 20 MB of RAM at idle).
 GLPKGS = egl gbm glesv2
-PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS) $(GLPKGS))
-PKG_LIBS = $(shell pkg-config --libs $(PKGS)) -lz
+# flpalette.h, the colour tokens, is libflui's: the flcomp recipe copies it here, a tree build finds it in ../flui
+PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS) $(GLPKGS)) -I. -I../flui
+PKG_LIBS = $(shell pkg-config --libs $(PKGS)) -lz -lm
 SCANNER ?= wayland-scanner
 WLPROTO ?= $(shell pkg-config --variable=pkgdatadir wayland-protocols)
 XWL_XML = $(WLPROTO)/staging/xwayland-shell/xwayland-shell-v1.xml
@@ -26,7 +27,7 @@ GEN = xdg-shell-protocol.h xdg-shell-protocol.c fl-shell-protocol.h fl-shell-pro
 	fl-screencopy-protocol.h fl-screencopy-protocol.c \
 	linux-dmabuf-unstable-v1-protocol.h linux-dmabuf-unstable-v1-protocol.c \
 	xwayland-shell-protocol.h xwayland-shell-protocol.c
-OBJS = main.o render.o surface.o xdg.o seat.o flshell.o drm.o dmabuf.o gl.o config.o output.o media.o osd.o switcher.o shot.o lock.o power.o perf.o theme.o sound.o overview.o screencopy.o xwm.o xwsel.o xwdeco.o \
+OBJS = main.o render.o surface.o xdg.o seat.o flshell.o drm.o dmabuf.o gl.o config.o output.o media.o osd.o switcher.o shot.o lock.o power.o perf.o theme.o sound.o anim.o overview.o screencopy.o xwm.o xwsel.o xwdeco.o \
 	xdg-shell-protocol.o fl-shell-protocol.o fl-screencopy-protocol.o linux-dmabuf-unstable-v1-protocol.o xwayland-shell-protocol.o
 
 all: flcomp
@@ -65,7 +66,12 @@ $(OBJS): comp.h xwm.h xwm-int.h $(GEN)
 check: flcomp tests/shmclient tests/xclient
 	./tests/run.sh
 	./tests/perf.sh
+	./tests/anim.sh
 	./tests/x.sh
+
+# animations: open, close, minimize, maximize, slide, overview, pacing, idleness (needs python3)
+check-anim: flcomp tests/shmclient
+	./tests/anim.sh
 
 # the lock screen, the notification surface and power saving (needs python3)
 check-lock: flcomp tests/shmclient

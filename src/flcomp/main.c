@@ -248,6 +248,7 @@ int main(int argc, char **argv)
 	C.loop = wl_display_get_event_loop(C.dpy);
 
 	config_init();
+	anim_init();
 	if (backend_init() < 0) {
 		backend_fini();
 		return 1;

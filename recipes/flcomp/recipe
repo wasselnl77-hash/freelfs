@@ -1,7 +1,7 @@
 # The FreeLFS Wayland compositor, from src/flcomp in the FreeLFS tree.
 pkgname=flcomp
 version=0.1
-release=12
+release=13
 summary="The FreeLFS Wayland compositor: CPU compositing, DRM/KMS, dmabuf clients, Xwayland window manager, no wlroots"
 license=(MIT)
 arch=(x86_64)
@@ -13,6 +13,8 @@ sha256=()
 
 build() {
 	cp -r "$startdir/../../src/flcomp" "$srcdir/flcomp"
+	# the colour tokens are libflui's (src/flui/flpalette.h): one definition for the apps and the compositor
+	cp "$startdir/../../src/flui/flpalette.h" "$srcdir/flcomp/flpalette.h"
 	cd "$srcdir/flcomp"
 	make clean
 	make flcomp

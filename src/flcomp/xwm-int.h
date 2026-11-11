@@ -36,7 +36,7 @@ struct xatoms {
 #undef A
 };
 
-#define XD_TITLE 30		/* the title bar flcomp draws above an X window that has none */
+#define XD_TITLE (CF.title_h - 4)	/* the title bar flcomp draws above an X window that has none: 30, 24 compact (titlebar=) */
 #define XD_BORDER 3		/* and the frame around the sides and below */
 
 /* an X window the window manager knows about */

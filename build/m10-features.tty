@@ -145,6 +145,27 @@ run pkill -x flstore; echo
 # gives the accent colour written above
 run m10sh 'dbus-send --session --print-reply --dest=org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.DBus.Properties.Get string:org.freedesktop.portal.FileChooser string:version 2>&1 | tail -2'
 run m10sh 'dbus-send --session --print-reply --dest=org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings.Read string:org.freedesktop.appearance string:accent-color 2>&1 | tail -8; pgrep -a "flportal|xdg-"'
+# --- Themes (fltheme): light on the whole desktop, the portal says so, panel at the top, compact bars, buttons at the
+# left, a slow slide caught in the middle, then everything back to the default
+run m10app fltheme
+wait 5
+shot @S@/themes-dark.ppm
+run m10sh 'fltheme --apply "FreeLFS Light"; echo apply-rc=$?; cat ~/.config/gtk-3.0/settings.ini'
+wait 4
+shot @S@/themes-light.ppm
+run m10sh 'dbus-send --session --print-reply --dest=org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings.Read string:org.freedesktop.appearance string:color-scheme 2>&1 | tail -4'
+run m10sh 'printf "panel_position=top\ntitlebar=compact\nbuttons=left\nanimation_speed=0.1\nanim_log=1\n" >> ~/.config/freelfs/desktop.conf; echo top-compact-written'
+wait 4
+shot @S@/themes-top-compact.ppm
+key meta_l-ctrl-right
+shot @S@/themes-slide-mid.ppm
+wait 3
+key meta_l-ctrl-left
+wait 3
+run m10sh 'fltheme --reset; echo reset-rc=$?; grep -c . ~/.config/freelfs/desktop.conf; grep anim: /run/user/$(id -u)/flcomp.log | tail -6'
+wait 4
+shot @S@/themes-reset.ppm
+run pkill -x fltheme; echo themes-closed
 # --- the real btrfs: snapshots
 run flsnap status; flsnap create --reason "m10 desktop test" && flsnap list; ls -l /.snapshots; btrfs subvolume list / | cat
 run dmesg | grep -ci "out of memory\|oom-kill"; free -m | sed -n 2p

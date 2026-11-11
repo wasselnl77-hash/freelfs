@@ -57,6 +57,13 @@ struct rect xwm_deco_outer(struct window *w)
 	return outer_of(w);
 }
 
+/* titlebar= or buttons= changed: the frames are laid out again on the next paint */
+void xwm_frames_changed(void)
+{
+	work_area_changed();
+	damage_all();
+}
+
 void xwm_deco_damage(struct window *w)
 {
 	struct rect r = xwm_deco_outer(w);
@@ -172,6 +179,8 @@ static void box(struct rect clip, int x, int y, int w, int h, uint32_t col)
 static struct rect button_rect(struct rect o, int part)
 {
 	int idx = part == DP_CLOSE ? 0 : part == DP_MAX ? 1 : 2;
+	if (CF.buttons_left)	/* buttons=left: close is the outer one at the left edge too */
+		return (struct rect){ o.x1 + BTN_W * idx, o.y1, o.x1 + BTN_W * (idx + 1), o.y1 + XD_TITLE };
 	return (struct rect){ o.x2 - BTN_W * (idx + 1), o.y1, o.x2 - BTN_W * idx, o.y1 + XD_TITLE };
 }
 
@@ -201,7 +210,7 @@ void xwm_deco_draw(struct window *w, struct rect clip)
 	fill(clip, o.x1, c.y1 - 1, ow, 1, C_LINE);					/* between title bar and client */
 	/* the title */
 	const char *title = w->title && *w->title ? w->title : w->app_id && *w->app_id ? w->app_id : "";
-	int tx = o.x1 + 12, tw = ow - 12 - 3 * BTN_W - 8;
+	int tx = o.x1 + (CF.buttons_left ? 3 * BTN_W + 10 : 12), tw = ow - 12 - 3 * BTN_W - 8;
 	if (tw > 20)
 		text(clip, tx, o.y1 + (XD_TITLE - LF_BODY_H) / 2 + 1, title, foc ? C_TEXT : C_DIM, tw);
 	/* buttons */

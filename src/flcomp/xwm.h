@@ -45,6 +45,7 @@ struct xinset { int l, t, r, b; };
 struct xinset xwm_insets(struct window *w);		/* all 0 for windows without a frame of ours */
 void xwm_deco_draw(struct window *w, struct rect clip);
 void xwm_deco_damage(struct window *w);
+void xwm_frames_changed(void);			/* titlebar= or buttons= changed */
 struct rect xwm_deco_outer(struct window *w);		/* the frame and the window, for damage */
 void xwm_deco_note(struct window *w);			/* pick(): the frame of this window is under the pointer */
 bool xwm_deco_contains(struct window *w, int x, int y);

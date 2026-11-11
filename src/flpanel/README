@@ -1,7 +1,8 @@
 flpanel -- the FreeLFS panel and start menu
 ===========================================
 
-The bottom panel (44 px) and the start menu popup. One process, one fl_shell
+The panel (44 px at the bottom by default; panel_position=top, panel_height=36..64 and panel_icon_size=16..28
+in desktop.conf, all live, set in fltheme) and the start menu popup. One process, one fl_shell
 binding (protocol: src/flcomp/protocol/fl-shell.xml). Needs flcomp; it exits
 with a message under any other compositor.
 

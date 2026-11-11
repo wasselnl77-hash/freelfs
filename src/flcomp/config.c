@@ -16,7 +16,7 @@
 struct conf CF = {
 	.pointer_speed = 0, .tap = true, .typing_disable = true, .repeat_delay = 600, .repeat_rate = 25,
 	.night_warmth = 50, .brightness = -1, .scale = 100, .lock_on_lid = true,
-	.ws_cols = 2, .ws_rows = 2,
+	.ws_cols = 2, .ws_rows = 2, .anim = ANIM_ON, .anim_speed = 100, .title_h = 34, .panel_h = 44,
 };
 
 static char conf_dir[512], conf_name[512];
@@ -70,6 +70,20 @@ static void parse_line(struct conf *c, const char *k, const char *v)
 		c->power_saver = n != 0;
 	else if (!strcmp(k, "performance"))
 		c->perf = perf_parse(v);
+	else if (!strcmp(k, "animations"))	/* on (default), reduced (fades only), off */
+		c->anim = !strcmp(v, "off") || !strcmp(v, "0") ? ANIM_OFF : !strcmp(v, "reduced") ? ANIM_REDUCED : ANIM_ON;
+	else if (!strcmp(k, "anim_log"))
+		c->anim_log = n != 0;
+	else if (!strcmp(k, "animation_speed"))	/* a factor, 0.1 .. 4: 2 is twice as fast */
+		c->anim_speed = clampi((int)(atof(v) * 100 + 0.5), 10, 400);
+	else if (!strcmp(k, "panel_position"))
+		c->panel_top = !strcmp(v, "top");
+	else if (!strcmp(k, "panel_height"))
+		c->panel_h = clampi(n, 36, 64);
+	else if (!strcmp(k, "titlebar"))
+		c->title_h = !strcmp(v, "compact") ? 28 : 34;
+	else if (!strcmp(k, "buttons"))
+		c->buttons_left = !strcmp(v, "left");
 	else if (!strcmp(k, "lock_on_lid"))
 		c->lock_on_lid = n != 0;
 	else if (!strcmp(k, "workspaces")) {	/* workspaces=COLSxROWS (2x2); a bare number N is N x 1 */
@@ -175,6 +189,14 @@ static void apply(const struct conf *old, bool first)
 		power_apply(first);
 	if (first || old->ws_cols != CF.ws_cols || old->ws_rows != CF.ws_rows)
 		ws_configure(CF.ws_cols, CF.ws_rows);
+	if (first || old->anim != CF.anim || old->anim_speed != CF.anim_speed || old->anim_log != CF.anim_log)
+		anim_conf_changed();
+	if (!first && (old->panel_top != CF.panel_top || old->panel_h != CF.panel_h)) {
+		work_area_changed();	/* the panel moves itself; where windows may go changes at once */
+		damage_all();
+	}
+	if (!first && (old->title_h != CF.title_h || old->buttons_left != CF.buttons_left))
+		xwm_frames_changed();
 	if (old->night != CF.night || old->night_warmth != CF.night_warmth || (first && CF.night))
 		backend_night_changed();
 }
@@ -195,7 +217,7 @@ static int conf_cb(int fd, uint32_t mask, void *data)
 	struct conf old = CF, fresh = {
 		.tap = true, .typing_disable = true, .repeat_delay = 600, .repeat_rate = 25,
 		.night_warmth = 50, .brightness = -1, .scale = 100, .lock_on_lid = true,
-		.ws_cols = 2, .ws_rows = 2,
+		.ws_cols = 2, .ws_rows = 2, .anim = ANIM_ON, .anim_speed = 100, .title_h = 34, .panel_h = 44,
 	};
 	load(&fresh);
 	/* the display is only changed through fl_shell: keep what runs */

@@ -28,7 +28,7 @@ static struct {
 
 static struct rect osd_rect(void)
 {
-	int x = (C.w - OSD_W) / 2, y = C.h - C.panel_h - 24 - OSD_H;
+	int x = (C.w - OSD_W) / 2, y = C.h - (CF.panel_top ? 0 : C.panel_h) - 24 - OSD_H;
 	if (y < 0)
 		y = 0;
 	return (struct rect){ x, y, x + OSD_W, y + OSD_H };

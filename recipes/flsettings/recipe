@@ -1,7 +1,7 @@
 # flsettings, from src/flsettings in the FreeLFS tree.
 pkgname=flsettings
 version=0.1
-release=7
+release=8
 summary="FreeLFS settings: theme, accent colour, wallpaper, sounds, panel labels, display, mouse and touchpad, keyboard, date and time, Wi-Fi"
 license=(MIT)
 arch=(x86_64)

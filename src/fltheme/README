@@ -1,0 +1,49 @@
+fltheme -- Themes, the one place to adjust the look
+===================================================
+
+One window for everything about how the desktop looks. Each control writes ~/.config/freelfs/desktop.conf and
+the running desktop follows at once (libflui apps and the panel watch the file, flcomp reads it for its own
+colours, the X window frames, the animations and the panel's edge), so there is no Apply button: the
+miniature at the top of every page is drawn from the same values, the real windows are the preview.
+
+Pages (sidebar, like Settings)
+  Presets      FreeLFS Dark (the default), FreeLFS Light, Compact, Large; "My presets": save the current look
+               under a name, apply or delete saved ones; Reset (every themed key back to the default)
+  Colours      scheme dark or light; accent (the six swatches, or six hex digits); a button to the wallpaper
+               in Settings > Display
+  Fonts        UI font family (IBM Plex Sans, IBM Plex Mono, DejaVu Sans, DejaVu Sans Mono: those that
+               are installed), text size 11 to 16 px (13 is the design size)
+  Windows      buttons at the right or the left, title bar normal (34 px) or compact (28 px). Corners: square,
+               fixed. There is no radius setting and there will not be one.
+  Panel        bottom or top edge, height 36 to 60 px, icon size 16 to 28 px
+  Animations   on, reduced (fades only) or off; speed 0.5x to 2x
+
+desktop.conf keys (defaults in brackets; a key equal to its default is removed, not written)
+  theme=dark|light  accent=green|teal|blue|amber|orange|rose|RRGGBB  font=FAMILY (IBM Plex Sans)
+  font_size=10..18 (13)  buttons=right|left  titlebar=normal|compact  panel_position=bottom|top
+  panel_height=36..64 (44)  panel_icon_size=16..28 (20)  animations=on|reduced|off  animation_speed=0.1..4 (1.0)
+Who reads them: libflui (fl_lk in flui.h, every app; fonts and title bars change live), flcomp (config.c,
+theme.c: colours of the indicator, Alt-Tab, overview, lock screen, X frames; panel edge; animations), flpanel
+(height, icon size, hairline side). The accent is the same key as Settings > General and the same code:
+fl_accents and fl_conf_set of libflui.
+
+Colours are defined once, in libflui's flpalette.h (the compositor includes the same file). `make check`
+prints the WCAG contrast of every pair that matters in both schemes and every accent (light: text 15:1,
+dim 6.8:1, accents 4.8:1 and better on the panel; dark keeps the tokens it always had).
+
+My presets are small files in ~/.config/freelfs/themes/NAME.theme (next to desktop.conf), key=value lines for
+the keys above and nothing else: a theme file cannot set wallpaper= or any other key, unknown lines are
+ignored and a file with none of the keys is refused. Names: letters, digits, space, - and _ (32 at most).
+
+Flatpak and GTK apps: every change rewrites two lines in ~/.config/gtk-3.0/settings.ini and gtk-4.0/settings.ini
+(gtk-application-prefer-dark-theme, gtk-font-name; other lines are kept; Flatpak shows both read-only to apps).
+The portal half is flportal's: its Settings portal answers org.freedesktop.appearance color-scheme and
+accent-color from desktop.conf and emits SettingChanged. Qt is not covered.
+
+Command line
+  fltheme [--page presets|colours|fonts|windows|panel|animations]
+  fltheme --hints | --list | --reset | --apply NAME | --save NAME
+
+Build: make [FLUI=../flui]; make check (contrast, presets, theme files and the hints, no compositor needed);
+make install DESTDIR=. Needs libflui. Test hooks: FLUI_PPM=FILE renders a page without a compositor,
+FLTHEME_SIZE=WxH, FLTHEME_TEST_SAVE=text; tests/shot.sh PAGE OUT.png [KEY=VALUE...] does it with a scratch HOME.

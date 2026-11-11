@@ -99,10 +99,10 @@ void surface_origin(struct surface *s, int *x, int *y)
 		xwm_surface_origin(s, &px, &py);
 		break;
 	case ROLE_PANEL:
-		py = C.h - C.panel_h;
+		py = CF.panel_top ? 0 : C.h - C.panel_h;
 		break;
 	case ROLE_MENU:
-		py = C.h - C.panel_h - s->h;
+		py = CF.panel_top ? C.panel_h : C.h - C.panel_h - s->h;
 		break;
 	case ROLE_FLYOUT:
 		px = C.flyout_x - s->w / 2;
@@ -110,11 +110,11 @@ void surface_origin(struct surface *s, int *x, int *y)
 			px = C.w - s->w;
 		if (px < 0)
 			px = 0;
-		py = C.h - C.panel_h - s->h;
+		py = CF.panel_top ? C.panel_h : C.h - C.panel_h - s->h;
 		break;
 	case ROLE_NOTIFY:
 		px = C.w - s->w - 16;
-		py = 16;
+		py = 16 + (CF.panel_top ? C.panel_h : 0);
 		break;
 	case ROLE_DESKTOP:
 		px = C.desktop_x;
@@ -453,6 +453,10 @@ void surface_unmap(struct surface *s)
 {
 	if (!s->px)
 		return;
+	/* the shell's surfaces fade out: a copy of the picture stays for the length of it */
+	if ((s->role == ROLE_MENU && menu_visible()) || (s->role == ROLE_FLYOUT && flyout_visible()) ||
+	    (s->role == ROLE_NOTIFY && notify_visible()))
+		anim_surface_hide(s);
 	damage_tree(s);
 	free(s->px);
 	s->px = NULL;
@@ -588,6 +592,7 @@ static void surface_destroy(struct wl_resource *res)
 		work_area_changed();
 		damage_all();
 	}
+	anim_surface_gone(s);
 	if (C.menu == s)
 		C.menu = NULL;
 	if (C.flyout == s)

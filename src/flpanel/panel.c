@@ -22,7 +22,10 @@
 #include "flpanel.h"
 #include "sound.h"
 
-#define PANEL_H 44
+/* panel_height= in desktop.conf (36..64, default 44), live: libflui reads it into fl_lk */
+#define PANEL_H (fl_lk.panel_h)
+/* the icon size of the entries (panel_icon_size=, 16..28, default 20) */
+#define ICON_PX (fl_lk.panel_icon)
 
 enum { ID_START = 1, ID_KBD, ID_WIFI, ID_VOL, ID_BAT, ID_CLOCK, ID_WIN = 100, ID_WS = 2000 };
 
@@ -502,7 +505,7 @@ static void on_global(void *ud, struct wl_registry *reg, uint32_t name, const ch
 {
 	struct panel *p = ud;
 	if (!strcmp(iface, "fl_shell")) {
-		p->shell_ver = ver >= 6 ? 6 : ver >= 5 ? 5 : ver >= 4 ? 4 : ver >= 3 ? 3 : ver >= 2 ? 2 : 1;
+		p->shell_ver = ver >= 7 ? 7 : ver >= 6 ? 6 : ver >= 5 ? 5 : ver >= 4 ? 4 : ver >= 3 ? 3 : ver >= 2 ? 2 : 1;
 		p->shell = wl_registry_bind(reg, name, &fl_shell_interface, (uint32_t)p->shell_ver);
 		fl_shell_add_listener(p->shell, &shell_listener, p);
 	}
@@ -609,7 +612,8 @@ static void draw_panel(fl_ui *ui, void *ud)
 	int W = cv->w;
 	int labels = fl_conf_int("panel_labels", 0);
 	fl_fill_rect(cv, fl_r(0, 0, W, PANEL_H), fl_th.panel);
-	fl_fill_rect(cv, fl_r(0, 0, W, 1), fl_th.line);
+	/* the hairline is on the edge that faces the desktop: the top edge for a panel at the bottom */
+	fl_fill_rect(cv, fl_r(0, fl_lk.panel_top ? PANEL_H - 1 : 0, W, 1), fl_th.line);
 
 	/* start button */
 	{
@@ -623,7 +627,7 @@ static void draw_panel(fl_ui *ui, void *ud)
 		fl_fill_rect(cv, r, bg);
 		if (res & FL_FOCUS)
 			fl_stroke_rect(cv, fl_inset(r, 3, 3), 1, fl_th.on_accent);
-		fl_icon_draw(cv, FL_ICON_MENU, r.x + 16, r.y + (r.h - 20) / 2, 20, fl_th.on_accent);
+		fl_icon_draw(cv, FL_ICON_MENU, r.x + (r.w - ICON_PX) / 2, r.y + (r.h - ICON_PX) / 2, ICON_PX, fl_th.on_accent);
 		if ((res & FL_CLICK) || ((res & FL_FOCUS) && (ui->key == XKB_KEY_Return || ui->key == XKB_KEY_space))) {
 			ui->key = 0;
 			if (p->menu_open)
@@ -850,9 +854,9 @@ static void draw_panel(fl_ui *ui, void *ud)
 		int focused = w->focused && !w->minimized && !p->menu_open;
 		const char *name = w->title[0] ? w->title : w->app_id;
 		int tw = labels ? fl_text_width(ui->f_reg, name, -1) : 0;
-		int ew = labels ? 12 + 20 + 8 + tw + 12 : 44;
-		if (ew < 44)
-			ew = 44;
+		int ew = labels ? 12 + ICON_PX + 8 + tw + 12 : ICON_PX + 24;
+		if (ew < 36)
+			ew = 36;
 		if (ew > 180)
 			ew = 180;
 		if (wx + ew > limit)
@@ -868,14 +872,21 @@ static void draw_panel(fl_ui *ui, void *ud)
 			fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 2, r.w, 2), fl_th.accent);
 		else if (res & FL_FOCUS)
 			fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 2, r.w, 2), fl_th.line);
-		int iy = r.y + (r.h - 2 - 20) / 2;
+		int iy = r.y + (r.h - 2 - ICON_PX) / 2;
 		if (labels) {
-			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + 12, iy, 20, fg);
+			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + 12, iy, ICON_PX, fg);
 			char fit[160];
-			fl_text_fit(ui->f_reg, name, ew - 12 - 20 - 8 - 12, fit, sizeof fit);
-			fl_text_in(cv, ui->f_reg, fl_r(r.x + 12 + 20 + 8, r.y, ew - 12 - 20 - 8, r.h - 2), FL_LEFT, 0, fg, fit);
+			fl_text_fit(ui->f_reg, name, ew - 12 - ICON_PX - 8 - 12, fit, sizeof fit);
+			fl_text_in(cv, ui->f_reg, fl_r(r.x + 12 + ICON_PX + 8, r.y, ew - 12 - ICON_PX - 8, r.h - 2), FL_LEFT, 0, fg, fit);
 		} else {
-			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + (r.w - 20) / 2, iy, 20, fg);
+			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + (r.w - ICON_PX) / 2, iy, ICON_PX, fg);
+		}
+		/* tell the compositor where this entry is: minimise and restore move towards it (fl_shell 7) */
+		if (p->shell && p->shell_ver >= 7 && (w->ex != r.x || w->ew != r.w || w->eh != r.h)) {
+			w->ex = r.x;
+			w->ew = r.w;
+			w->eh = r.h;
+			fl_shell_set_window_entry(p->shell, w->id, r.x, r.y, r.w, r.h);
 		}
 		if ((res & FL_CLICK) || ((res & FL_FOCUS) && (ui->key == XKB_KEY_Return || ui->key == XKB_KEY_space))) {
 			ui->key = 0;
@@ -896,6 +907,16 @@ static void conf_changed(void *ud)
 	struct panel *p = ud;
 	notify_conf_changed(p);
 	battery_conf_changed(p);
+	/* panel_height=, panel_position=: the panel resizes itself, the compositor moves it (it reads
+	 * panel_position= from the same file) and makes room; the menu and flyouts follow by themselves */
+	if (p->shell && p->pw && fl_lk.panel_h != p->cur_h) {
+		p->cur_h = fl_lk.panel_h;
+		fl_win_resize(p->pw, p->out_w, fl_lk.panel_h);
+		fl_shell_set_panel(p->shell, fl_win_surface(p->pw), (uint32_t)fl_lk.panel_h);
+		for (int i = 0; i < p->nwins; i++)
+			p->wins[i].ew = 0;	/* the entries moved: tell the compositor again */
+	}
+	desk_reposition(p);
 	fl_win_redraw(p->pw);
 }
 
@@ -972,6 +993,7 @@ int main(int argc, char **argv)
 	if (!p.pw || !p.mw || !p.fw)
 		return 1;
 	if (p.shell) {
+		p.cur_h = PANEL_H;
 		fl_shell_set_panel(p.shell, fl_win_surface(p.pw), PANEL_H);
 		fl_shell_set_menu(p.shell, fl_win_surface(p.mw));
 	}

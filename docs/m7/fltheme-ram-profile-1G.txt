@@ -1,0 +1,110 @@
+== meminfo
+MemTotal:         985344 kB
+MemFree:          737188 kB
+MemAvailable:     901036 kB
+Buffers:            2460 kB
+Cached:           185812 kB
+Active(anon):        676 kB
+Inactive(anon):    29336 kB
+Active(file):      38908 kB
+Inactive(file):   136176 kB
+Dirty:                 0 kB
+AnonPages:         28988 kB
+Mapped:            31776 kB
+Shmem:             13224 kB
+Slab:              16852 kB
+SReclaimable:       6532 kB
+SUnreclaim:        10320 kB
+KernelStack:        1632 kB
+PageTables:         2176 kB
+Percpu:              440 kB
+
+== used = MemTotal - MemAvailable (kB)
+84260
+
+== MemTotal - MemFree (kB, counts the page cache as used)
+248312
+
+== free -m
+               total        used        free      shared  buff/cache   available
+Mem:             962          82         719          12         190         879
+Swap:              0           0           0
+
+== mounts of tmpfs, overlay, squashfs
+tmpfs /run tmpfs rw,relatime,mode=755 0 0
+/dev/loop0 /run/live/rom squashfs ro,relatime,errors=continue 0 0
+tmpfs /run/live/rw tmpfs rw,relatime,mode=755 0 0
+overlay / overlay rw,relatime,lowerdir=/run/live/rom,upperdir=/run/live/rw/up,workdir=/run/live/rw/work,uuid=on 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev,relatime 0 0
+tmpfs /tmp tmpfs rw,nosuid,nodev,relatime 0 0
+
+== df -k (tmpfs, overlay, squashfs)
+Filesystem     1K-blocks   Used Available Use% Mounted on
+devtmpfs          465212      0    465212   0% /dev
+tmpfs             492672    332    492340   1% /run
+tmpfs             492672    580    492092   1% /run/live/rw
+overlay           492672    580    492092   1% /
+tmpfs             492672      0    492672   0% /dev/shm
+tmpfs             492672      0    492672   0% /tmp
+
+== what the overlay holds in RAM (the upper layer, du -k, biggest first)
+580	/run/live/rw/up
+572	/run/live/rw/up/sysflfs
+272	/run/live/rw/up/sysflfs/data
+160	/run/live/rw/up/sysflfs/libexec
+136	/run/live/rw/up/sysflfs/data/log
+132	/run/live/rw/up/sysflfs/bin
+120	/run/live/rw/up/sysflfs/data/cache
+16	/run/live/rw/up/sysflfs/data/lib
+8	/run/live/rw/up/usr/tester
+8	/run/live/rw/up/usr
+8	/run/live/rw/up/sysflfs/settings
+4	/run/live/rw/up/usr/tester/.local
+0	/tmp
+0	/dev/shm
+16	/run/live/rw/up/sysflfs/data/lib
+12	/run/live/rw/up/sysflfs/data/lib/dhcpcd
+4	/run/live/rw/up/usr/tester/.local/state/wireplumber
+4	/run/live/rw/up/usr/tester/.local/state
+4	/run/live/rw/up/usr/tester/.local
+4	/run/live/rw/up/sysflfs/data/lib/dbus
+0	/run/live/rw/up/sysflfs/data/lib/iwd/hotspot
+0	/run/live/rw/up/sysflfs/data/lib/iwd
+
+== per-process PSS, top 15 (Pss Pss_Anon Pss_File Pss_Shmem in kB, name, pid)
+11890 3788 8102 0 wireplumber 340
+11544 9440 2102 2 flcomp 322
+9909 5068 4467 374 flpanel 324
+5247 2408 2827 12 pipewire 330
+5084 1908 3176 0 udevd 84
+2400 429 1970 0 dhcpcd 154
+2344 904 1440 0 pipewire-pulse 341
+1556 232 1324 0 iwd 185
+1234 350 883 0 bash 249
+981 504 477 0 session 325
+959 338 620 0 dhcpcd 155
+913 488 425 0 flupdate-notify 342
+701 268 433 0 dbus-daemon 329
+671 354 316 0 bash 393
+637 264 373 0 sort 394
+
+== sum of all PSS (kB) and number of processes
+61279 26
+
+== loaded kernel modules
+3
+
+== processes by name (count)
+      5 dhcpcd
+      2 sort
+      2 dbus-daemon
+      1 wireplumber
+      1 uniq
+      1 udevd
+      1 syslogd
+      1 sleep
+      1 session
+      1 seatd
+      1 scsi_eh_1
+      1 scsi_eh_0
+

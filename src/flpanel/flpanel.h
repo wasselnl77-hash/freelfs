@@ -24,6 +24,7 @@ struct win {
 	char app_id[64], title[128];
 	int focused, minimized;
 	int ws; /* workspace (fl_shell version 5) */
+	int ex, ew, eh; /* where the panel last said this window's entry is (fl_shell 7), ex = ew = 0: not yet */
 };
 
 struct panel {
@@ -36,6 +37,7 @@ struct panel {
 	char layout[16]; /* as the compositor says: "de", "gb" */
 	int demo;
 	int out_w;
+	int cur_h; /* the panel height the compositor was last told */
 	fl_timer *clock;
 	fl_font *f_small, *f_mono, *f_what, *f_cap;
 	/* menu */
@@ -128,6 +130,7 @@ int battery_saver(const struct panel *p);
 void battery_demo(struct panel *p, int open);
 
 void menu_init(struct panel *p);
+void desk_reposition(struct panel *p); /* the panel moved or changed height: the icons keep clear of it */
 void desk_init(struct panel *p); /* deskicons.c: icons on the desktop (fl_shell version 6) */
 #define FLY_W 260
 #define FLY_H 76
