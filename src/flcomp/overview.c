@@ -11,13 +11,13 @@
 #define GAP 14			/* between tiles */
 #define MAX_WS 64
 
-#define C_BACK 0x15181cu	/* behind the tiles, a step darker than bg */
-#define C_BG 0x1d2125u
-#define C_PANEL 0x272c33u
-#define C_RAISED 0x343a43u
-#define C_LINE 0x3a4048u
-#define C_TEXT 0xd8dce0u
-#define C_DIM 0x8a9199u
+#define C_BACK P(back)	/* behind the tiles, a step beyond bg */
+#define C_BG P(bg)
+#define C_PANEL P(panel)
+#define C_RAISED P(raised)
+#define C_LINE P(line)
+#define C_TEXT P(text)
+#define C_DIM P(dim)
 #define C_ACCENT theme_accent()
 
 static bool open_;
@@ -187,7 +187,7 @@ static void label(struct rect clip, struct rect t, int num, bool cur)
 	int bw = n * 12 + 6 + 4, bh = 14 + 8;
 	struct rect b = { t.x1, t.y1, t.x1 + bw, t.y1 + bh };
 	fill(clip, b, cur ? C_ACCENT : C_PANEL);
-	uint32_t fg = cur ? 0x0e1a13u : C_TEXT;
+	uint32_t fg = cur ? P(on_accent) : C_TEXT;
 	for (int i = 0; i < n; i++)
 		for (int y = 0; y < 7; y++)
 			for (int x = 0; x < 5; x++)

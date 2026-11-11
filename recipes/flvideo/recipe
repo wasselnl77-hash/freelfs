@@ -1,12 +1,12 @@
 pkgname=flvideo
 version=0.1
-release=2
+release=3
 summary="FreeLFS video player: libmpv software rendering, VA-API, subtitles, resume"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
-depends=(glibc flui wayland mpv)
-makedepends=(flui mpv pkgconf)
+depends=(glibc flui wayland mpv dbus xdg-desktop-portal)
+makedepends=(flui mpv pkgconf dbus)
 source=()
 sha256=()
 

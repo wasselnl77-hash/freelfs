@@ -106,12 +106,15 @@ pids="$pids $!"
 
 # Flathub, the Flatpak app catalog, for this person: added once, quietly, on the
 # first session that reaches the network (retried with growing pauses while
-# offline), for the person's own apps only (flatpak --user: no root). The
+# offline; not on the live system), for the person's own apps only (flatpak --user: no root). The
 # stamp file records that it was done, so a remote removed on purpose stays
 # removed. The catalog's appstream data is fetched right after, so that the
 # Packages app opens the Flathub tab with names and descriptions.
 flathub_setup() {
 	command -v flatpak >/dev/null 2>&1 || return 0
+	# Not on the live system: its disk is memory (the appstream data alone is about 110 MB there, and
+	# one app takes 1 to 2 GB). Software Store says so and offers the installer instead.
+	[ -e /run/live ] && return 0
 	stamp=${XDG_DATA_HOME:-$HOME/.local/share}/freelfs/flathub-added
 	[ -e "$stamp" ] && return 0
 	if flatpak remotes --user --columns=name 2>/dev/null | grep -qx flathub; then

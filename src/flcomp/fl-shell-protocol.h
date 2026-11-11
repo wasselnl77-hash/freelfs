@@ -301,6 +301,23 @@ struct fl_shell_interface {
 	 */
 	void (*toggle_overview)(struct wl_client *client,
 				struct wl_resource *resource);
+	/**
+	 * give a surface the desktop icon layer
+	 *
+	 * The surface is drawn above the wallpaper and below every
+	 * window, with its top left corner at x, y (pixels on the output).
+	 * It is meant to be small: the client sizes it to its icons. Only
+	 * what is not transparent takes the pointer; everything else falls
+	 * through, and a window on top of it hides it. It is shown on
+	 * every workspace. Attaching no buffer hides it. One client at a
+	 * time; a second request replaces the first surface.
+	 * @since 6
+	 */
+	void (*set_desktop)(struct wl_client *client,
+			    struct wl_resource *resource,
+			    struct wl_resource *surface,
+			    int32_t x,
+			    int32_t y);
 };
 
 #define FL_SHELL_WINDOW_ADDED 0
@@ -451,6 +468,10 @@ struct fl_shell_interface {
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_TOGGLE_OVERVIEW_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_DESKTOP_SINCE_VERSION 6
 
 /**
  * @ingroup iface_fl_shell

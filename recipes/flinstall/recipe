@@ -5,10 +5,10 @@
 # anywhere else.
 pkgname=flinstall
 version=0.1
-release=1
+release=2
 summary="FreeLFS installer: language, keyboard, Wi-Fi, disk, account, time zone, install"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc flui wayland dbus libxcrypt util-linux btrfs-progs dosfstools mtools e2fsprogs flboot flpanel)
 # the helper runs as root for the group seat, like flpower in flpanel and fltime-set

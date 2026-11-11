@@ -234,6 +234,7 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
 #define FL_SHELL_SET_WORKSPACE 16
 #define FL_SHELL_MOVE_WINDOW 17
 #define FL_SHELL_TOGGLE_OVERVIEW 18
+#define FL_SHELL_SET_DESKTOP 19
 
 /**
  * @ingroup iface_fl_shell
@@ -368,6 +369,10 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_TOGGLE_OVERVIEW_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_DESKTOP_SINCE_VERSION 6
 
 /** @ingroup iface_fl_shell */
 static inline void
@@ -647,6 +652,23 @@ fl_shell_toggle_overview(struct fl_shell *fl_shell)
 {
 	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
 			 FL_SHELL_TOGGLE_OVERVIEW, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * The surface is drawn above the wallpaper and below every window, with its
+ * top left corner at x, y (pixels on the output). It is meant to be small: the
+ * client sizes it to its icons. Only what is not transparent takes the pointer;
+ * everything else falls through, and a window on top of it hides it. It is
+ * shown on every workspace. Attaching no buffer hides it. One client at a
+ * time; a second request replaces the first surface.
+ */
+static inline void
+fl_shell_set_desktop(struct fl_shell *fl_shell, struct wl_surface *surface, int32_t x, int32_t y)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_SET_DESKTOP, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, surface, x, y);
 }
 
 #ifdef  __cplusplus

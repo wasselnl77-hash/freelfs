@@ -114,7 +114,7 @@ static bool ed_verify(const unsigned char pk[32], const unsigned char *msg, size
 }
 
 /* minisign shows the key number as a little-endian 64-bit hex number */
-static void keyid_hex(const unsigned char keynum[8], char out[17])
+void keyid_hex(const unsigned char keynum[8], char out[17])
 {
 	static const char digits[] = "0123456789ABCDEF";
 	for (int i = 0; i < 8; i++) {
@@ -247,6 +247,18 @@ static int pubkey_parse(const char *text, const char *path, struct pubkey *k, ch
 	return 0;
 }
 
+int pubkey_load_file(const char *path, struct pubkey *k, char **error)
+{
+	char *text = read_file(path, NULL);
+	if (!text) {
+		*error = xasprintf("cannot read %s: %s", path, strerror(errno));
+		return -1;
+	}
+	int rc = pubkey_parse(text, path, k, error);
+	free(text);
+	return rc;
+}
+
 void pubkeys_load(const char *dir, struct pubkey **keys, size_t *n)
 {
 	*keys = NULL;
@@ -285,6 +297,11 @@ void pubkeys_free(struct pubkey *keys, size_t n)
 
 int sign_file(const struct seckey *k, const char *file, char **error)
 {
+	return sign_file_ex(k, file, NULL, error);
+}
+
+int sign_file_ex(const struct seckey *k, const char *file, const char *extra, char **error)
+{
 	unsigned char hash[64], sig[SIG_LEN], global[64];
 	if (blake2b_file(file, hash) < 0) {
 		*error = xasprintf("cannot read %s: %s", file, strerror(errno));
@@ -295,8 +312,9 @@ int sign_file(const struct seckey *k, const char *file, char **error)
 	ed_sign(k->seed, hash, sizeof(hash), sig + 10);
 
 	const char *base = strrchr(file, '/') ? strrchr(file, '/') + 1 : file;
-	char *trusted = xasprintf("timestamp:%lld\tfile:%s\thashed",
-	                          (long long)cfg.source_date_epoch, base);
+	char *trusted = xasprintf("timestamp:%lld\tfile:%s\t%s%shashed",
+	                          (long long)cfg.source_date_epoch, base, extra ? extra : "",
+	                          extra && *extra ? "\t" : "");
 	size_t tlen = strlen(trusted);
 	unsigned char *gmsg = xmalloc(64 + tlen);
 	memcpy(gmsg, sig + 10, 64);
@@ -323,6 +341,13 @@ int sign_file(const struct seckey *k, const char *file, char **error)
 
 int verify_file(const struct pubkey *keys, size_t n, const char *file, const char *sigpath,
                 const char *expect_name, char **error)
+{
+	return verify_file_ex(keys, n, file, sigpath, expect_name, error, NULL, NULL);
+}
+
+int verify_file_ex(const struct pubkey *keys, size_t n, const char *file, const char *sigpath,
+                   const char *expect_name, char **error, char **trusted_out,
+                   unsigned char signer[8])
 {
 	char *text = read_file(sigpath, NULL);
 	if (!text) {
@@ -387,6 +412,10 @@ int verify_file(const struct pubkey *keys, size_t n, const char *file, const cha
 			goto out;
 		}
 	}
+	if (trusted_out)
+		*trusted_out = xstrdup(trusted);
+	if (signer)
+		memcpy(signer, key->keynum, 8);
 	rc = 0;
 out:
 	free(copy);

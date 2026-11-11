@@ -21,6 +21,7 @@ enum {
 	ID_TAB_EXPLORE = 1, ID_TAB_INST, ID_TAB_UPD, ID_SEARCH, ID_BACK, ID_PRIMARY, ID_SECOND, ID_THIRD, ID_PG_PREV,
 	ID_PG_NEXT, ID_SHOT_PREV, ID_SHOT_NEXT, ID_CHIP0, ID_CHIP1, ID_UPD_ALL, ID_CHECK, ID_RETRY, ID_ADD_REMOTE,
 	ID_BAR_DETAILS, ID_BAR_CLOSE, ID_BAR_CANCEL, ID_UNUSED, ID_ILIST, ID_ULIST, ID_SCROLL, ID_CONFIRM, ID_CANCEL,
+	ID_LIVE_INSTALL, ID_LIVE_TRY,
 	ID_SIDE = 100, /* + row */
 	ID_CARD = 200, /* + card */
 };
@@ -164,6 +165,7 @@ struct St {
 	double net_rate;
 	long free_mb;		/* free space where the Flatpak data goes, read when an app page opens (-1: unknown) */
 	int live;		/* the live system: its disk is memory, installed apps are gone after shutdown */
+	int live_try;		/* live only: the person asked for the Flathub catalog anyway ("Try one small app anyway") */
 
 	struct job job[J_COUNT];
 	struct ient im[IMG_MAX];
@@ -199,12 +201,13 @@ void frame_end(struct St *s);
 
 /* views.c */
 void draw(fl_ui *ui, void *ud);
+long free_mb_home(void); /* flstore.c: free megabytes in the home folder (memory on the live system), -1 unknown */
 
 /* actions */
 enum {
 	A_NONE, A_TAB, A_HOME, A_CAT, A_PKGS, A_OPEN_REF, A_BACK, A_SEARCH, A_PAGE, A_INSTALL, A_UPDATE, A_ASK_REMOVE,
 	A_REMOVE, A_CANCEL, A_OPEN_APP, A_SHOT, A_CHIP, A_UPDATE_ALL, A_CHECK, A_RETRY, A_ADD_REMOTE, A_BAR_CLOSE,
-	A_BAR_LOG, A_BAR_CANCEL, A_UNUSED,
+	A_BAR_LOG, A_BAR_CANCEL, A_UNUSED, A_LIVE_INSTALL, A_LIVE_TRY,
 };
 
 #endif

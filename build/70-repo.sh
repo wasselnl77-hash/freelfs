@@ -28,6 +28,18 @@
 #   FLPKG           the flpkg binary (default: the one 60-packages.sh built,
 #                   run through the target's dynamic loader, or flpkg in PATH)
 #   FLFS_REPO_KEEP_OLD=1   keep older versions in the repo directory
+#   FLFS_REPO_VALID_DAYS   how long clients accept the signed index (default 14).
+#                   It is signed into the index as valid-until together with an
+#                   ever-increasing serial: flpkg refuses an expired index and
+#                   one older than the last it accepted. So run this script
+#                   again (it re-signs even when no package changed) before the
+#                   validity runs out, from the machine that holds the key.
+#   FLFS_REPO_INTRODUCE    key rotation: base path of a NEW key (NEW.pub, made with
+#                   'flpkg key generate NEW'). Writes rotate.pub[.sig] into the repo,
+#                   signed with the current key; clients then trust both keys from
+#                   their next sync (the new public key also goes to config/flpkg/keys).
+#   FLFS_REPO_RETIRE_DAYS  with FLFS_REPO_INTRODUCE: days until clients stop trusting
+#                   the old key (default 60). Procedure and key custody: docs/SECURITY.md
 
 set -euo pipefail
 . "$(dirname "$0")/config.sh"
@@ -69,12 +81,16 @@ chmod 700 "$(dirname "$KEY")"
 chmod 600 "$KEY.key"
 [ -f "$KEY.pub" ] || die "$KEY.pub is missing; restore it or delete $KEY.key to start a new key"
 
-# 2. the public key goes into the image config (public half only)
+# 2. the public key goes into the image config (public half only). The default key
+#    "freelfs" is installed as freelfs-repo.pub, any other (a rotation) under its own
+#    name, so during a transition the image carries both.
 mkdir -p "$PUBDIR/keys"
-if [ -f "$PUBDIR/keys/freelfs-repo.pub" ] && ! cmp -s "$KEY.pub" "$PUBDIR/keys/freelfs-repo.pub"; then
-	warn "config/flpkg/keys/freelfs-repo.pub differs from $KEY.pub; replacing it (installed systems need the new key)"
+pubname=$(basename "$KEY").pub
+[ "$pubname" != freelfs.pub ] || pubname=freelfs-repo.pub
+if [ -f "$PUBDIR/keys/$pubname" ] && ! cmp -s "$KEY.pub" "$PUBDIR/keys/$pubname"; then
+	warn "config/flpkg/keys/$pubname differs from $KEY.pub; replacing it (installed systems need the new key)"
 fi
-install -m644 "$KEY.pub" "$PUBDIR/keys/freelfs-repo.pub"
+install -m644 "$KEY.pub" "$PUBDIR/keys/$pubname"
 if [ -n "${FLFS_REPO_URL:-}" ]; then
 	printf '%s\n' "$FLFS_REPO_URL" > "$PUBDIR/repo-url"
 fi
@@ -93,10 +109,29 @@ done
 msg "${#new[@]} new or changed package(s) to sign"
 
 # 4. sign them and rebuild the signed index (a single flpkg run)
-opts=(--key "$KEY.key")
+# The index gets a serial (above the previous one) and valid-until (default 14 days).
+VALID_DAYS=${FLFS_REPO_VALID_DAYS:-14}
+case $VALID_DAYS in ''|*[!0-9]*) die "FLFS_REPO_VALID_DAYS must be a whole number of days" ;; esac
+[ "$VALID_DAYS" -ge 1 ] || die "FLFS_REPO_VALID_DAYS must be at least 1"
+opts=(--key "$KEY.key" --valid-days "$VALID_DAYS")
 [ -n "${FLFS_REPO_KEEP_OLD:-}" ] || opts+=(--remove-old)
 flpkg --config /dev/null repo add "${opts[@]}" "$REPO" "${new[@]}"
-install -m644 "$KEY.pub" "$REPO/freelfs-repo.pub" # for people to fetch; trust comes from the image
+install -m644 "$KEY.pub" "$REPO/$pubname" # for people to fetch; trust comes from the image
+
+# 4b. key rotation: introduce a new key, signed by the current one (docs/SECURITY.md)
+if [ -n "${FLFS_REPO_INTRODUCE:-}" ]; then
+	NEWKEY=$FLFS_REPO_INTRODUCE
+	[ -f "$NEWKEY.pub" ] || die "$NEWKEY.pub does not exist (make it with: flpkg key generate $NEWKEY)"
+	RETIRE_DAYS=${FLFS_REPO_RETIRE_DAYS:-60}
+	case $RETIRE_DAYS in ''|*[!0-9]*) die "FLFS_REPO_RETIRE_DAYS must be a whole number of days" ;; esac
+	flpkg --config /dev/null key introduce --key "$KEY.key" --new "$NEWKEY.pub" \
+		--retire-days "$RETIRE_DAYS" "$REPO"
+	newname=$(basename "$NEWKEY").pub
+	install -m644 "$NEWKEY.pub" "$PUBDIR/keys/$newname"
+	msg "rotation announced. Keep signing with the OLD key until clients had time to sync"
+	msg "(at least one release cycle), then run with FLFS_REPO_KEY=$NEWKEY and rebuild flpkg + image."
+	msg "Remove the old public key from config/flpkg/keys only after the retirement date."
+fi
 
 # 5. check it the way a client does: sync from a scratch root with only this key
 chk=$(mktemp -d)
@@ -112,6 +147,7 @@ flpkg --config "$chk/flpkg.conf" --root "$chk/root" sync
 
 n=$(ls "$REPO"/*.flpkg | wc -l)
 msg "repo ready: $REPO ($n packages, $(du -sh "$REPO" | cut -f1))"
+msg "the signed index is valid for $VALID_DAYS days: sign again (run this script) before $(date -u -d "+$VALID_DAYS days" +%F)"
 cat <<TXT
 
 To publish, copy the directory's contents to any static host so that

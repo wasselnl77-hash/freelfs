@@ -38,7 +38,7 @@ release=2
 summary="Application sandboxing and distribution framework"
 url=https://flatpak.org/
 license=(LGPL-2.1-or-later)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc glib json-glib ostree libxml2 curl libarchive gpgme gnupg appstream gdk-pixbuf
 	libseccomp libcap zstd bubblewrap xdg-dbus-proxy fuse3 wayland ca-certificates dbus)

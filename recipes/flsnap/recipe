@@ -2,10 +2,10 @@
 # The flpkg hook 10-flsnap takes one before every transaction; flboot lists them.
 pkgname=flsnap
 version=0.1
-release=1
+release=2
 summary="Btrfs snapshots of the system before updates, and going back to one"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(base)
 depends=(glibc btrfs-progs util-linux flpkg)
 # setuid root for the group seat, like fltime-set: Settings > Snapshots uses it

@@ -2129,6 +2129,126 @@ static unsigned mem_total_mb(void)
 	return (unsigned)(total / 1024);
 }
 
+/* ---- web process sandbox ----------------------------------------------------
+ * WPE WebKit built with ENABLE_BUBBLEWRAP_SANDBOX (recipes/wpewebkit, release 2) starts every web
+ * process inside bubblewrap by itself (user, pid, ipc and uts namespaces, a seccomp filter, a private
+ * /tmp and a runtime dir of its own, / not visible: only /usr, /etc, /lib*, the GPU nodes /dev/dri
+ * and /dev/udmabuf, fonts, the GStreamer data and what add_path_to_sandbox() names; the session bus
+ * only through xdg-dbus-proxy). The network process is not sandboxed by WebKit (it reads and writes
+ * the cache, cookies and the download folder). The Wayland link is not a file: the nested
+ * display's socket is handed to the web process over the IPC connection, so dmabuf and shm buffers
+ * need nothing from the file system except the render node.
+ *
+ * The one thing WebKit does not do is check that bubblewrap can run here: where it cannot (no user
+ * namespaces, a container, bwrap or xdg-dbus-proxy missing), WebKit aborts the UI process at the first
+ * web process. So the browser tries bwrap itself first, with the same kind of namespaces.
+ *   sandbox=auto (default)  works: on. Does not: off, with a warning in the log (stderr) and on the
+ *                           Settings page, so nobody believes in a sandbox that is not there.
+ *   sandbox=on              does not work: freebws exits with the reason (for people who prefer
+ *                           no browser to an unsandboxed one).
+ *   sandbox=off             switched off on purpose, also warned about.
+ * FREEBWS_SANDBOX=auto|on|off overrides the config file key "sandbox". `freebws --sandbox-check`
+ * prints the verdict and exits 0 (usable) or 1. Extra read-only paths for the web process (testing):
+ * FREEBWS_SANDBOX_RO=/a:/b. */
+#ifndef BWRAP_PATH
+#define BWRAP_PATH "/usr/bin/bwrap"
+#endif
+#ifndef DBUS_PROXY_PATH
+#define DBUS_PROXY_PATH "/usr/bin/xdg-dbus-proxy"
+#endif
+
+/* 1 when WebKit's sandbox can start here; else 0 with the reason in WHY */
+static int sandbox_probe(char *why, size_t n)
+{
+	if (access(BWRAP_PATH, X_OK) != 0) {
+		snprintf(why, n, "%s is not installed", BWRAP_PATH);
+		return 0;
+	}
+	if (access(DBUS_PROXY_PATH, X_OK) != 0) {
+		snprintf(why, n, "%s is not installed (WebKit needs it for the session bus)", DBUS_PROXY_PATH);
+		return 0;
+	}
+	char self[400];
+	ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
+	if (l <= 0) {
+		snprintf(why, n, "cannot find my own executable");
+		return 0;
+	}
+	self[l] = 0;
+	/* as WebKit starts its web process: new user namespace (bwrap does that itself), uts, pid and
+	 * ipc namespaces, the usual mounts; the program is this one, in a mode that just exits */
+	char *argv[] = { BWRAP_PATH, "--unshare-uts", "--unshare-pid", "--unshare-ipc", "--ro-bind", "/usr", "/usr",
+			 "--ro-bind-try", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dev", "/dev",
+			 "--proc", "/proc", "--tmpfs", "/tmp", self, "--sandbox-child", NULL };
+	gchar *err = NULL;
+	gint st = 0;
+	GError *ge = NULL;
+	if (!g_spawn_sync(NULL, argv, NULL, G_SPAWN_STDOUT_TO_DEV_NULL, NULL, NULL, NULL, &err, &st, &ge)) {
+		snprintf(why, n, "cannot run bwrap: %s", ge ? ge->message : "?");
+		g_clear_error(&ge);
+		return 0;
+	}
+	if (!g_spawn_check_wait_status(st, NULL)) {
+		char *e = err ? g_strstrip(err) : NULL;
+		char *nl = e ? strchr(e, '\n') : NULL;
+		if (nl)
+			*nl = 0;
+		snprintf(why, n, "bwrap failed%s%s", e && *e ? ": " : "", e && *e ? e : " (no user namespaces?)");
+		g_free(err);
+		return 0;
+	}
+	g_free(err);
+	return 1;
+}
+
+/* Decide before the WebKitWebContext exists (that is when WebKit reads the environment).
+ * Returns 0 normally, 1 when sandbox=on cannot be honoured. */
+static int sandbox_setup(void)
+{
+	const char *mode = getenv("FREEBWS_SANDBOX");
+	if (!mode || !*mode)
+		mode = cfg_get("sandbox", "auto");
+	if (!strcmp(mode, "off") || !strcmp(mode, "0")) {
+		fprintf(stderr, "freebws: WARNING: the web process sandbox is switched OFF (sandbox=off): pages run "
+			"with all your rights\n");
+		setenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", 1);
+		pages_sandbox_status = "Web process sandbox: OFF. It was switched off by the sandbox setting; pages run with all your rights.";
+		return 0;
+	}
+	char why[400];
+	if (sandbox_probe(why, sizeof why)) {
+		unsetenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS");
+		fprintf(stderr, "freebws: web process sandbox on (bubblewrap)\n");
+		pages_sandbox_status = "Web process sandbox: on (bubblewrap). Web pages run in their own namespaces, "
+				 "with a syscall filter and without your files.";
+		return 0;
+	}
+	if (!strcmp(mode, "on") || !strcmp(mode, "1")) {
+		fprintf(stderr, "freebws: the web process sandbox is required (sandbox=on) but cannot start: %s\n", why);
+		return 1;
+	}
+	fprintf(stderr, "freebws: WARNING: the web process sandbox is NOT available (%s); continuing WITHOUT a sandbox, "
+		"pages run with all your rights. Set sandbox=on in ~/.config/freebws/config to refuse that.\n", why);
+	setenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", 1);
+	pages_sandbox_status = "Web process sandbox: OFF, it is not available here (bubblewrap does not start). Pages run with all your rights.";
+	return 0;
+}
+
+/* paths the web process may read besides what WebKit grants by itself; after the context exists,
+ * before the first web process */
+static void sandbox_paths(void)
+{
+	if (!getenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS") || !strcmp(getenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"), "0")) {
+		webkit_web_context_add_path_to_sandbox(B.ctx, share_dir(), TRUE);
+		const char *e = getenv("FREEBWS_SANDBOX_RO");
+		char **v = e ? g_strsplit(e, ":", 0) : NULL;
+		for (int i = 0; v && v[i]; i++)
+			if (v[i][0] == '/')
+				webkit_web_context_add_path_to_sandbox(B.ctx, v[i], TRUE);
+		g_strfreev(v);
+	}
+}
+
 static void tune_webkit(void)
 {
 	const char *e = getenv("FREEBWS_MP");	/* limit_mb,conservative,strict,kill,poll_s */
@@ -2158,6 +2278,7 @@ static void tune_webkit(void)
 		     g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL);
 	if (ms)
 		webkit_memory_pressure_settings_free(ms);
+	sandbox_paths();
 	/* the memory-saving model below is for machines under 3 GB; bigger ones keep WebKit's
 	 * defaults (back/forward cache, a process per site) */
 	int small = mem_total_mb() < 3072;
@@ -2774,7 +2895,17 @@ int main(int argc, char **argv)
 		return adb_child_main("update");
 	if (argc > 1 && !strcmp(argv[1], "--adblock-build"))
 		return adb_child_main("build");
+	if (argc > 1 && !strcmp(argv[1], "--sandbox-child"))	/* what sandbox_probe runs inside bwrap */
+		return 0;
 	cfg_load();
+	if (argc > 1 && !strcmp(argv[1], "--sandbox-check")) {
+		char why[400];
+		int ok = sandbox_probe(why, sizeof why);
+		printf("%s\n", ok ? "sandbox: bubblewrap works, the web process sandbox can be on" : why);
+		return ok ? 0 : 1;
+	}
+	if (sandbox_setup())
+		return 1;
 	const char *start = argc > 1 ? argv[1] : "freebws://start";
 	B.home = "freebws://start";
 	B.app = fl_app_new(on_global, NULL);

@@ -6,7 +6,7 @@ url=https://pyyaml.org/
 license=(MIT)
 # built without libyaml/Cython, so it is the pure-Python implementation, but
 # the wheel is still tagged for the platform
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(python)
 source=(https://pypi.org/packages/source/P/PyYAML/pyyaml-$version.tar.gz)

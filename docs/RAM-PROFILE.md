@@ -1,7 +1,52 @@
-# RAM profile of the live session (measured 2026-11-11, nothing optimized yet)
+# RAM profile of the live session (measured 2026-11-11, before and after a first trim)
 
 Question: the user saw about 350 MB used at an idle desktop on the laptop with the live ISO. Where does it go?
-This file only records what was measured; the trimming is a later job (target in INTEGRATION-TODO: 200-250 MB).
+The first part records what was measured before any trimming; "First trim" below has what was changed and the
+numbers after it. Both sets were measured the same way, on twins of the ISO built from the same tree one
+before and one after the changes.
+
+## First trim (2026-11-11): 110 MB -> 85 MB at 1 GB
+
+`build/iso-test.py --iso twin.iso --mem 1G --profile FILE`, idle desktop 75 s after login, MemTotal - MemAvailable:
+
+| | before | after |
+|---|---|---|
+| **MemTotal - MemAvailable** | **110.4 MB** | **84.7 MB** (-25.7 MB, -23 %; an earlier run of the same tree: 83.9) |
+| `free -m` used / available | 107 / 854 | 81 / 880 |
+| Cached (squashfs, libraries read so far) | 395 MB | 193 MB |
+| Shmem | 35 MB | 13 MB |
+| overlay upper layer (RAM) | 22.6 MB | 0.6 MB |
+| sum of all PSS, processes | 83.4 MB (30) | 61.6 MB (26) |
+| flcomp PSS | 33.4 MB | 11.6 MB |
+
+What was changed (each one measured by the same run):
+1. **flcomp no longer links EGL, GBM and GLES** (gl.c loads them with dlopen when the first client binds the dmabuf
+   global). libEGL and libgbm need libgallium, which needs libLLVM (16 MB of resident pages at idle), SPIRV-Tools,
+   libelf, libstdc++ and a dozen X libraries: all of that was mapped in every session although the live desktop has
+   shm clients only. With a real GPU the same libraries load at the first dmabuf client (FreeBWS) as before.
+2. **The flpkg database stays in the squashfs.** `flpkg fix-owners` ran at every boot and opened the 14 MB
+   database for writing, which copies it up into the RAM overlay. It now opens it read-only when nothing is pending
+   (installed systems: every boot), and on the live system rc.sysinit calls `flpkg fix-owners --keep` (sets the
+   owners, leaves the list in the database).
+3. **No Flathub at login on the live system.** The session no longer adds the remote there (no 7.7 MB of
+   `flatpak/repo/tmp` straight away and no 110 MB appstream a minute later); Software Store explains this and
+   offers the installer ("Try one small app anyway" loads the catalog on request and shows the room left).
+4. tty3 to tty6 get no login prompt on the live system (four agetty fewer).
+
+Tried and not kept: `MALLOC_ARENA_MAX=2` for the session daemons (no measurable change).
+
+Where the 85 MB are now (PSS in kB): wireplumber 11 854, flcomp 11 565, flpanel 9 955, udevd 5 203, pipewire 5 083,
+pipewire-pulse 2 607, dhcpcd 2 434 + 981, iwd 1 604. Kernel: slab 17 MB, page tables 2 MB. Next candidates, not done:
+wireplumber (lua scripting engine, libgio, libcrypto: 8 MB is shared library pages), flpanel's 4 MB heap, the five
+dhcpcd processes (privilege separation), udevd. A smaller RAM profile on the laptop itself: `flreport` now writes
+`memory.txt` (used memory, PSS totals of the processes the user may read, the overlay upper layer and its biggest
+places on the live system), so the laptop can send its own numbers.
+
+At 4 GB (same tree): 120.6 MB used, down from 269 MB; the difference to the 1 GB run is kernel structures that grow with RAM, not the overlay (0.6 MB) or the processes (61.7 MB PSS, the same as at 1 GB). Both final runs passed `build/iso-test.py` (login, desktop, Store, Videos with the file dialog, the egg).
+
+---
+
+## Before the trim
 
 ## How
 
@@ -68,7 +113,7 @@ which links Mesa for the dmabuf/GL path; not itemised here). flcomp is the singl
 | /tmp, /dev/shm | 0 | 0 |
 | /run | 0.3 MB | 0.3 MB |
 
-## Findings (to act on later)
+## Findings (written before the trim; items 1, 2 and 4 are done, see "First trim" above)
 
 1. The biggest single item is not a process: the session adds the Flathub remote at the first login that has a network
    (`session: flathub added` in session.log) and Flatpak pulls the appstream metadata (111 MB unpacked) into

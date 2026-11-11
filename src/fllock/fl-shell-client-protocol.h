@@ -177,6 +177,31 @@ struct fl_shell_listener {
 	void (*lock_state)(void *data,
 			   struct fl_shell *fl_shell,
 			   uint32_t locked);
+	/**
+	 * the workspace grid and the one in view
+	 *
+	 * Sent on bind and whenever the grid (desktop.conf
+	 * workspaces=COLSxROWS) or the current workspace changes. The grid
+	 * is cols wide and rows high; workspace numbers run row by row
+	 * from 0.
+	 * @since 5
+	 */
+	void (*workspaces)(void *data,
+			   struct fl_shell *fl_shell,
+			   uint32_t cols,
+			   uint32_t rows,
+			   uint32_t current);
+	/**
+	 * the workspace a window is on
+	 *
+	 * Sent after window_added (and its window_changed) and whenever
+	 * the window moves.
+	 * @since 5
+	 */
+	void (*window_workspace)(void *data,
+				 struct fl_shell *fl_shell,
+				 uint32_t id,
+				 uint32_t index);
 };
 
 /**
@@ -206,6 +231,10 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
 #define FL_SHELL_SET_NOTIFICATIONS 13
 #define FL_SHELL_LOCK 14
 #define FL_SHELL_UNLOCK 15
+#define FL_SHELL_SET_WORKSPACE 16
+#define FL_SHELL_MOVE_WINDOW 17
+#define FL_SHELL_TOGGLE_OVERVIEW 18
+#define FL_SHELL_SET_DESKTOP 19
 
 /**
  * @ingroup iface_fl_shell
@@ -255,6 +284,14 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_LOCK_STATE_SINCE_VERSION 4
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_WORKSPACES_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_WINDOW_WORKSPACE_SINCE_VERSION 5
 
 /**
  * @ingroup iface_fl_shell
@@ -320,6 +357,22 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_UNLOCK_SINCE_VERSION 4
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_WORKSPACE_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_MOVE_WINDOW_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_TOGGLE_OVERVIEW_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_DESKTOP_SINCE_VERSION 6
 
 /** @ingroup iface_fl_shell */
 static inline void
@@ -562,6 +615,60 @@ fl_shell_unlock(struct fl_shell *fl_shell)
 {
 	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
 			 FL_SHELL_UNLOCK, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * index counts the grid row by row, from 0 (top left) to cols * rows - 1.
+ * Out of range is ignored. Answered by workspaces.
+ */
+static inline void
+fl_shell_set_workspace(struct fl_shell *fl_shell, uint32_t index)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_SET_WORKSPACE, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, index);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * The window (and the dialogs that belong to it) leaves the current view when it
+ * goes to another workspace. The screen stays where it is. Answered by
+ * window_workspace.
+ */
+static inline void
+fl_shell_move_window(struct fl_shell *fl_shell, uint32_t id, uint32_t index)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_MOVE_WINDOW, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, id, index);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ */
+static inline void
+fl_shell_toggle_overview(struct fl_shell *fl_shell)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_TOGGLE_OVERVIEW, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * The surface is drawn above the wallpaper and below every window, with its
+ * top left corner at x, y (pixels on the output). It is meant to be small: the
+ * client sizes it to its icons. Only what is not transparent takes the pointer;
+ * everything else falls through, and a window on top of it hides it. It is
+ * shown on every workspace. Attaching no buffer hides it. One client at a
+ * time; a second request replaces the first surface.
+ */
+static inline void
+fl_shell_set_desktop(struct fl_shell *fl_shell, struct wl_surface *surface, int32_t x, int32_t y)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_SET_DESKTOP, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, surface, x, y);
 }
 
 #ifdef  __cplusplus

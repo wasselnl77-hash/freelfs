@@ -26,7 +26,7 @@ xdg-shell-client-protocol.h: $(XDG_XML)
 xdg-shell-protocol.c: $(XDG_XML)
 	wayland-scanner private-code $< $@
 
-%.o: %.c flui.h internal.h xdg-shell-client-protocol.h
+%.o: %.c flui.h internal.h flpalette.h xdg-shell-client-protocol.h
 	$(CC) $(CFLAGS) $$(pkg-config --cflags $(PKGS)) -c -o $@ $<
 
 $(LIB): $(OBJS)
@@ -39,6 +39,7 @@ install: all
 	install -Dm755 $(LIB) $(DESTDIR)$(LIBDIR)/$(LIB)
 	ln -sf $(LIB) $(DESTDIR)$(LIBDIR)/libflui.so
 	install -Dm644 flui.h $(DESTDIR)$(PREFIX)/include/flui.h
+	install -Dm644 flpalette.h $(DESTDIR)$(PREFIX)/include/flpalette.h
 	install -Dm644 flui.pc $(DESTDIR)$(LIBDIR)/pkgconfig/flui.pc
 	install -Dm644 README $(DESTDIR)$(PREFIX)/share/doc/flui/README
 

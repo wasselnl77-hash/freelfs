@@ -26,6 +26,8 @@ g.add_argument("--disk")
 ap.add_argument("--mem", default="1G")
 ap.add_argument("--shots", default="")
 ap.add_argument("--no-desktop", action="store_true")
+ap.add_argument("--gui-shots", action="store_true", help="after the desktop and menu shots: start Store, Videos (Ctrl+O, the "
+                "portal's file dialog) and the egg as tester, and take a screenshot of each (needs --shots)")
 ap.add_argument("--profile", default="", help="after 60 s of idle desktop write the memory profile (meminfo, mounts, "
                 "per-process PSS) to this file (not for the memory-poor first minute: it waits)")
 args = ap.parse_args()
@@ -178,6 +180,28 @@ def main():
                 monitor("sendkey meta_l")
                 time.sleep(2)
                 shot("live-menu")
+                if args.gui_shots:
+                    monitor("sendkey meta_l")
+                    time.sleep(1)
+
+                    def gui(cmd, wait):
+                        env = ("export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 "
+                               "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_CURRENT_DESKTOP=FreeLFS; ")
+                        run(f"su -s /bin/sh tester -c '{env}setsid sh -c \"{cmd}\" >/tmp/gui.log 2>&1 </dev/null &'; echo started", "started")
+                        time.sleep(wait)
+
+                    gui("flstore", 8)
+                    shot("live-store")
+                    run("pkill -x flstore; echo gone", "gone")
+                    run("ls -d /run/live/rw/up/usr/tester/.local/share/flatpak 2>&1 | tail -1; du -sk /run/live/rw/up | cut -f1", "")
+                    gui("flvideo", 4)
+                    monitor("sendkey ctrl-o")
+                    time.sleep(8)
+                    shot("live-video-open")
+                    run("pgrep -a flportal; pkill -x flvideo; pkill -f 'flvideo --pick-file'; pkill -x flportal; echo gone", "gone")
+                    gui("flcrash --cant /sysflfs/bin", 4)
+                    shot("live-egg")
+                    run("pkill -x flcrash; echo gone", "gone")
             con.send("poweroff")
             con.drain(40)
         except Exception as e:

@@ -21,6 +21,8 @@ char *search_url(const char *text);
 
 /* ---- the scheme and the bridge -------------------------------------------------------------- */
 void pages_init(WebKitWebContext *ctx);
+/* one line for the Settings page: is the web process sandbox on (set by freebws.c) */
+extern const char *pages_sandbox_status;
 /* per tab: the message handler of the pages (world "freebws-ui") and the bridge script */
 void pages_setup_view(WebKitUserContentManager *ucm, void *tab);
 void pages_teardown_view(WebKitUserContentManager *ucm, void *tab);

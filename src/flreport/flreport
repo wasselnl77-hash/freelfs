@@ -243,6 +243,15 @@ sh_run mounts.txt 'for b in /sys/block/*; do echo "${b##*/}: $(cat $b/size) sect
 run processes.txt ps -eo pid,ppid,user,rss,stat,etime,args
 run processes.txt uptime
 
+# memory.txt: where the RAM goes. PSS (proportional set size: shared pages split between the processes
+# that map them) is readable for your own processes only; the totals say how many that was. On the live
+# system the "overlay upper layer" is everything written since boot (it is RAM: logs, downloads, apps).
+sh_run memory.txt 'awk "/^MemTotal:/{t=\$2} /^MemAvailable:/{a=\$2} END{printf \"used (MemTotal - MemAvailable): %d MB of %d MB\n\", (t-a)/1024, t/1024}" /proc/meminfo; grep -E "^(MemFree|Cached|AnonPages|Shmem|Slab|SUnreclaim|PageTables|KernelStack|Mapped):" /proc/meminfo'
+sh_run memory.txt 'for p in /proc/[0-9]*; do [ -r $p/smaps_rollup ] || continue; echo "$(awk "/^Pss:/{a=\$2} /^Pss_Anon:/{b=\$2} /^Pss_File:/{c=\$2} /^Pss_Shmem:/{d=\$2} END{print a+0, b+0, c+0, d+0}" $p/smaps_rollup 2>/dev/null) $(cat $p/comm 2>/dev/null) ${p#/proc/}"; done | sort -rn > "${TMPDIR:-/tmp}/flreport-pss.$$"; awk "{s+=\$1; an+=\$2; fi+=\$3; sh+=\$4; n++} END{printf \"PSS total of %d readable processes: %d kB (anonymous %d, file %d, shmem %d)\n\", n, s, an, fi, sh}" "${TMPDIR:-/tmp}/flreport-pss.$$"; echo "per process, biggest 20 (Pss Pss_Anon Pss_File Pss_Shmem in kB, name, pid):"; head -n 20 "${TMPDIR:-/tmp}/flreport-pss.$$"; rm -f "${TMPDIR:-/tmp}/flreport-pss.$$"'
+if [ -d /run/live ]; then
+	sh_run memory.txt 'echo "live system: the overlay upper layer is RAM (tmpfs)"; du -sk /run/live/rw/up 2>/dev/null | awk "{printf \"overlay upper layer: %d kB\n\", \$1}"; df -k /run/live/rw / /tmp 2>/dev/null; echo "biggest places in the upper layer (kB):"; du -k -d 4 /run/live/rw/up 2>/dev/null | sort -rn | head -n 15; du -sk /tmp /dev/shm 2>/dev/null'
+fi
+
 # ---- packages and apps ------------------------------------------------------------------
 run packages.txt flpkg list
 run packages.txt flatpak --version

@@ -151,6 +151,8 @@ squash_step() {
 		cgroup2         /sys/fs/cgroup  cgroup2   nosuid,noexec,nodev          0    0
 		FSTAB
 		sed -i "s/^snapshots = .*/snapshots = 0                   # live system: no btrfs/" "$settings/flpkg.conf"
+		# RAM: login prompts on tty3 to tty6 are not needed in the live session (tty1 is the desktop, tty2 stays)
+		sed -i "/^[3-6]:2345:respawn:\/sbin\/agetty/d" "$settings/inittab"
 		printf "%s\n" "" "Live system: log in as tester, there is no password. Nothing is" \
 			"written to the disks of this computer; changes are lost at shutdown." >> "$settings/issue"
 		mksquashfs "$w/stage" "$w/iso/live/root.sfs" -quiet -noappend -comp zstd \

@@ -14,9 +14,9 @@
 #define PAD 12			/* around the row */
 
 /* FreeLFS palette (dark): panel, raised, bg, line, accent */
-#define C_BOX 0x272c33u
-#define C_BG 0x1d2125u
-#define C_LINE 0x3a4048u
+#define C_BOX P(panel)
+#define C_BG P(bg)
+#define C_LINE P(line)
 #define C_ACCENT theme_accent()	/* accent= of desktop.conf, see theme.c */
 
 static struct rect last;	/* where it was drawn last: empty when not shown */

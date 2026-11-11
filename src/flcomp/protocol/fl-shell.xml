@@ -2,7 +2,7 @@
 <protocol name="fl_shell">
   <copyright>SPDX-License-Identifier: MIT</copyright>
 
-  <interface name="fl_shell" version="5">
+  <interface name="fl_shell" version="7">
     <description summary="FreeLFS desktop shell protocol">
       Private protocol between flcomp and the desktop programs (flpanel,
       flsettings). The panel owns the bottom panel and the start menu; the
@@ -272,5 +272,38 @@
       <arg name="id" type="uint"/>
       <arg name="index" type="uint"/>
     </event>
+
+    <!-- version 6: icons on the desktop -->
+
+    <request name="set_desktop" since="6">
+      <description summary="give a surface the desktop icon layer">
+        The surface is drawn above the wallpaper and below every window, with its
+        top left corner at x, y (pixels on the output). It is meant to be small: the
+        client sizes it to its icons. Only what is not transparent takes the pointer;
+        everything else falls through, and a window on top of it hides it. It is
+        shown on every workspace. Attaching no buffer hides it. One client at a
+        time; a second request replaces the first surface.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+
+    <!-- version 7: where a window's panel entry is (minimise and restore animations) -->
+
+    <request name="set_window_entry" since="7">
+      <description summary="where the panel shows a window">
+        The rectangle of the window's entry in the panel surface (surface coordinates,
+        the panel's top left is 0, 0). The compositor shrinks a minimised window towards
+        it and grows a restored one from it. It is only a hint for animations: without it
+        (or with animations off) the window just appears and disappears. Send it again
+        when the entry moves; w = 0 forgets it.
+      </description>
+      <arg name="id" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="w" type="int"/>
+      <arg name="h" type="int"/>
+    </request>
   </interface>
 </protocol>

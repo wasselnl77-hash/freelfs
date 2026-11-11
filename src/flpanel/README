@@ -57,6 +57,11 @@ NotificationClosed, ActionInvoked; capabilities actions, body, icon-static, pers
 there is no second process. libdbus runs on a private connection whose fd is in flui's loop;
 the panel starts before the session script starts dbus-daemon, so connecting is retried every
 second (every ten after 90 tries). If another daemon owns the name the panel leaves it alone.
+Desktop icons (deskicons.c, fl_shell 6 set_desktop): .desktop files with X-FreeLFS-Desktop-Icon=true
+(and a TryExec that exists, so "FreeLFS install" only on the live system) get a flat tile with the glyph
+and the name in a box at the top left of the screen, below the windows. Click selects, double click
+starts. No such file, no surface.
+
 Cards: a transparent surface at the top right of the screen (fl_shell 4 set_notifications), at
 most four stacked, newest on top: tile (a built-in icon for known apps, else the first letter),
 app name, summary, body (3 lines), up to three action buttons (the key "default" has no

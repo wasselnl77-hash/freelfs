@@ -4,7 +4,7 @@
 CC ?= cc
 CFLAGS ?= -O2 -g
 CFLAGS += -std=c17 -D_GNU_SOURCE -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation
-PKGS = flui mpv
+PKGS = flui mpv dbus-1
 PREFIX ?= /usr
 DESTDIR ?=
 

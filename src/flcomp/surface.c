@@ -116,6 +116,10 @@ void surface_origin(struct surface *s, int *x, int *y)
 		px = C.w - s->w - 16;
 		py = 16;
 		break;
+	case ROLE_DESKTOP:
+		px = C.desktop_x;
+		py = C.desktop_y;
+		break;
 	default:	/* ROLE_LOCK: 0, 0 */
 		break;
 	}
@@ -198,6 +202,11 @@ bool notify_visible(void)
 	return C.notify && C.notify->px && !C.locked;
 }
 
+bool desktop_visible(void)
+{
+	return C.desktop && C.desktop->px && !C.locked;
+}
+
 /* ---- hit testing ------------------------------------------------------ */
 
 static bool surface_has_point(struct surface *s, int lx, int ly)
@@ -205,7 +214,7 @@ static bool surface_has_point(struct surface *s, int lx, int ly)
 	if (lx < 0 || ly < 0 || lx >= s->w || ly >= s->h)
 		return false;
 	/* the cards are a transparent surface: only what is drawn takes the click */
-	if (s->role == ROLE_NOTIFY && s->alpha && (s->px[(size_t)ly * s->w + lx] >> 24) == 0)
+	if ((s->role == ROLE_NOTIFY || s->role == ROLE_DESKTOP) && s->alpha && (s->px[(size_t)ly * s->w + lx] >> 24) == 0)
 		return false;
 	return s->input_def || ops_contains(&s->input, lx, ly);
 }
@@ -264,6 +273,8 @@ struct surface *pick(int x, int y, int *lx, int *ly)
 			return NULL;
 		}
 	}
+	if (desktop_visible() && (r = tree_pick(C.desktop, x, y, lx, ly)))	/* the icons: below every window */
+		return r;
 	return NULL;
 }
 
@@ -485,6 +496,7 @@ static void surf_commit(struct wl_client *c, struct wl_resource *r)
 	case ROLE_MENU:
 	case ROLE_FLYOUT:
 	case ROLE_NOTIFY:
+	case ROLE_DESKTOP:
 		shell_surface_commit(s, was_mapped, attached);
 		break;
 	case ROLE_LOCK:
@@ -582,6 +594,10 @@ static void surface_destroy(struct wl_resource *res)
 		C.flyout = NULL;
 	if (C.notify == s)
 		C.notify = NULL;
+	if (C.desktop == s) {
+		damage_tree(s);
+		C.desktop = NULL;
+	}
 	lock_surface_gone(s);
 	seat_surface_gone(s);
 	if (s->xs)

@@ -16,6 +16,14 @@ Sources
               "Check now" also runs `flpkg sync`; if flpkg refuses (it is a
               root command today) the index is simply read again.
 
+The live system
+  When /run/live exists (the live ISO: its disk is RAM) the Store neither downloads the catalog nor
+  touches Flathub (the session does not add the remote there either). Explore says that apps can be
+  installed after installing FreeLFS, offers "Install FreeLFS" (flinstall) and, as a clearly
+  labelled second choice, "Try one small app anyway" (loads the catalog, about 100 MB of memory),
+  with the room left in memory shown. Installed and Updates still work. FLSTORE_LIVE_DIR=PATH
+  replaces /run/live for tests.
+
 The Flathub catalog
   Flathub's appstream collection (11 MB gzip) is downloaded with curl into
   $XDG_CACHE_HOME/flstore/appstream.xml.gz (only when Flathub has something

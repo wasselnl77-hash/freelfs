@@ -114,4 +114,23 @@ Features
   Testing   FREEBWS_HOME=DIR puts config, data and cache under DIR, FREEBWS_DATADIR=DIR is
             /usr/share/freebws, FREEBWS_EVAL=js runs a script in each page after 3 s and logs it.
 
-Not there yet: find in page, history, zoom, private window, WebKit's sandbox (needs bubblewrap).
+Not there yet: find in page, history, zoom, private window.
+
+Web process sandbox (docs/SECURITY.md)
+  wpewebkit is built with ENABLE_BUBBLEWRAP_SANDBOX (recipe release 2): WebKit starts every web process
+  in bubblewrap: own user, pid, ipc and uts namespaces, a seccomp filter, private /tmp and runtime
+  dir, / not visible (only /usr, /etc, /lib*, /dev/dri and /dev/udmabuf for the GPU, fonts,
+  GStreamer data, and the paths added with webkit_web_context_add_path_to_sandbox: here
+  /usr/share/freebws and $FREEBWS_SANDBOX_RO); the session bus only through xdg-dbus-proxy. The
+  network process is not sandboxed by WebKit: it writes the cache, the cookies and the downloads
+  (~/downloads), so downloads need no extra rule. The Wayland link is a socket handed over the IPC
+  connection (not a path), so dmabuf and shm buffers need nothing but the render node.
+  WebKit aborts the browser if bwrap cannot run, so freebws runs a probe bwrap first:
+    sandbox=auto (default)  usable: on. Not usable (no user namespaces, bwrap or xdg-dbus-proxy
+                            missing, a container): the web processes run WITHOUT a sandbox, with a
+                            WARNING on stderr and the Settings page saying so
+    sandbox=on              not usable: freebws exits with the reason
+    sandbox=off             off on purpose (warned about)
+  Config key "sandbox" or FREEBWS_SANDBOX=auto|on|off. `freebws --sandbox-check` prints the verdict
+  (exit 0: usable). A page that crashes the web process at once on a machine where the sandbox is on
+  is a sandbox problem to look for in the log first (FREEBWS_SANDBOX=off to compare).

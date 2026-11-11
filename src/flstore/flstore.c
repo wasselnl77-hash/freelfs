@@ -667,7 +667,7 @@ static long mono_ms(void)
 }
 
 /* free megabytes where the person's Flatpak data lives (the home folder), -1 when unknown */
-static long free_mb_home(void)
+long free_mb_home(void)
 {
 	const char *h = getenv("HOME");
 	struct statvfs v;
@@ -1510,7 +1510,6 @@ static void app_open(struct St *s)
 		s->det_ok = db_detail(&s->db, &s->db.a[s->cur.app.idx], &s->det) == 0;
 	s->ask_remove = 0;
 	s->free_mb = free_mb_home();
-	s->live = access("/run/live", F_OK) == 0;
 	info_load(s, 1);
 }
 
@@ -1988,9 +1987,35 @@ static void run_action(struct St *s)
 		} else {
 			pk_load(s);
 		}
-		if (s->idx_state != IDX_BUILD)
+		if (s->idx_state != IDX_BUILD && (!s->live || s->live_try))
 			start_fetch(s);
 		break;
+	case A_LIVE_TRY:
+		if (s->live && !s->live_try) {
+			s->live_try = 1;
+			s->idx_state = IDX_NONE;
+			cat_start(s);
+		}
+		break;
+	case A_LIVE_INSTALL: {
+		pid_t pid = fork();
+		if (pid == 0) {
+			if (fork() != 0)
+				_exit(0);
+			setsid();
+			int nul = open("/dev/null", O_RDWR);
+			if (nul >= 0) {
+				dup2(nul, 0);
+				dup2(nul, 1);
+				dup2(nul, 2);
+			}
+			execlp("flinstall", "flinstall", (char *)NULL);
+			_exit(127);
+		}
+		if (pid > 0)
+			waitpid(pid, NULL, 0);
+		break;
+	}
 	case A_RETRY:
 		if (s->idx_state == IDX_ERR) {
 			s->idx_state = IDX_NONE;
@@ -2201,7 +2226,11 @@ int main(int argc, char **argv)
 	if (!s->win)
 		return 1;
 	s->fl_have = access(s->flatpak, X_OK) == 0;
-	cat_start(s);
+	/* The live system keeps everything in memory: no catalog download (11 MB packed, 100 MB or more
+	 * unpacked and indexed) and no Flathub unless the person asks for it on the notice (A_LIVE_TRY). */
+	s->live = access(getenv("FLSTORE_LIVE_DIR") ? getenv("FLSTORE_LIVE_DIR") : "/run/live", F_OK) == 0;
+	if (!s->live)
+		cat_start(s);
 	fl_load_remote(s);
 	fl_load_fin(s);
 	pk_load(s);

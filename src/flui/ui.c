@@ -522,21 +522,27 @@ int fl_titlebar(fl_ui *ui, fl_rect r, const char *title, int focused, int maximi
 	fl_color fg = focused ? fl_th.text : fl_th.dim;
 	fl_fill_rect(&ui->cv, r, fl_th.panel);
 	int hit = -1;
-	fl_rect btns = {r.x + r.w - 6 - 90, r.y + (r.h - 26) / 2, 90, 26};
+	int bh = r.h - 8 < 26 ? r.h - 8 : 26, left = fl_lk.buttons_left; /* compact bars get smaller buttons */
+	int bx = left ? r.x + 6 : r.x + r.w - 6 - 90;
+	fl_rect btns = {bx, r.y + (r.h - bh) / 2, 90, bh};
+	/* buttons at the right: minimise, maximise, close (close is the outer one); at the left the
+	 * order mirrors, so close stays at the window's edge */
 	static const fl_icon ics[3] = {FL_ICON_MINIMIZE, FL_ICON_MAXIMIZE, FL_ICON_CLOSE};
 	for (int i = 0; i < 3; i++) {
-		fl_rect b = {btns.x + i * 30, btns.y, 30, 26};
+		int slot = left ? 2 - i : i;
+		fl_rect b = {btns.x + slot * 30, btns.y, 30, bh};
 		int res = fl_widget(ui, 0xf1000000u + i, b, 0);
 		if (res & (FL_HOVER | FL_DOWN))
 			fl_fill_rect(&ui->cv, b, fl_th.raised);
 		fl_icon ic = ics[i];
 		if (i == 1 && maximized)
 			ic = FL_ICON_RESTORE;
-		fl_icon_draw(&ui->cv, ic, b.x + 9, b.y + 7, 12, fg);
+		fl_icon_draw(&ui->cv, ic, b.x + 9, b.y + (bh - 12) / 2, 12, fg);
 		if (res & FL_CLICK)
 			hit = ics[i];
 	}
-	fl_rect tr = {r.x + 14, r.y, r.w - 14 - 96, r.h};
+	fl_rect tr = left ? (fl_rect){r.x + 6 + 90 + 8, r.y, r.w - 6 - 90 - 8 - 14, r.h}
+	                  : (fl_rect){r.x + 14, r.y, r.w - 14 - 96, r.h};
 	char fit[256];
 	fl_font *f = focused ? ui->f_med : ui->f_reg;
 	fl_text_fit(f, title, tr.w, fit, sizeof fit);

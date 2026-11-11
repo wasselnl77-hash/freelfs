@@ -11,12 +11,12 @@
 #define FADE_MS 300
 
 /* FreeLFS palette (dark): panel, line, text, dim, accent, err */
-#define C_BOX 0x272c33u
-#define C_LINE 0x3a4048u
-#define C_TEXT 0xd8dce0u
-#define C_DIM 0x8a9199u
+#define C_BOX P(panel)
+#define C_LINE P(line)
+#define C_TEXT P(text)
+#define C_DIM P(dim)
 #define C_ACCENT theme_accent()	/* accent= of desktop.conf, see theme.c */
-#define C_ERR 0xe06c6cu
+#define C_ERR P(err)
 
 static struct {
 	bool on;

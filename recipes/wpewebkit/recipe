@@ -1,22 +1,27 @@
 pkgname=wpewebkit
 version=2.52.5
-release=1
+release=2
 summary="WPE WebKit: the web engine of FreeBWS (Skia, GStreamer, no GTK, no X11)"
 url=https://wpewebkit.org/
 license=(LGPL-2.1-or-later AND BSD-2-Clause)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
-depends=(glibc gcc glib glib-networking libsoup libxml2 libxslt icu harfbuzz freetype fontconfig libjpeg-turbo libpng libwebp libgcrypt libtasn1 libepoxy sqlite libwpe wpebackend-fdo libxkbcommon mesa libdrm wayland woff2 lcms2 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav zlib)
-makedepends=(cmake ninja python perl ruby gperf unifdef pkgconf)
+depends=(glibc gcc glib glib-networking libsoup libxml2 libxslt icu harfbuzz freetype fontconfig libjpeg-turbo libpng libwebp libgcrypt libtasn1 libepoxy sqlite libwpe wpebackend-fdo libxkbcommon mesa libdrm wayland woff2 lcms2 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav zlib libseccomp bubblewrap xdg-dbus-proxy)
+makedepends=(cmake ninja python perl ruby gperf unifdef pkgconf libseccomp bubblewrap xdg-dbus-proxy)
 source=(https://wpewebkit.org/releases/wpewebkit-$version.tar.xz)
 sha256=(bcfc6c91db7659dcf24f6ff79ad27ac1eae1bc61dca0dbfee154706926740b3b)
 # Legacy WPE API (libwpe + wpebackend-fdo), which is what FreeBWS embeds: the
 # web process draws to a nested Wayland display inside the UI process, and
 # the UI process gets dmabuf (GPU) or shm (llvmpipe) buffers per frame.
-# Off: GTK, X11, introspection, docs, journald, speech, sandbox (no
-# bubblewrap yet), WebDriver, gamepad, WebRTC, media stream/recorder, GPU
-# process (one process less), JPEG-XL, AVIF, hyphenation, libbacktrace,
-# sysprof, ATK.
+# Off: GTK, X11, introspection, docs, journald, speech, WebDriver, gamepad,
+# WebRTC, media stream/recorder, GPU process (one process less), JPEG-XL,
+# AVIF, hyphenation, libbacktrace, sysprof, ATK.
+# On since release 2: the bubblewrap sandbox of the web processes (docs/SECURITY.md).
+# WebKit then starts every web process through /usr/bin/bwrap (seccomp filter from
+# libseccomp, session bus through /usr/bin/xdg-dbus-proxy); both paths are compiled in.
+# In the WPE 2.0 API it is on by default; FreeBWS checks that bwrap runs and says so
+# when it does not (WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 is what turns it off).
+# The flag changes config.h and compiler definitions: a full rebuild, hours, not minutes.
 prepare() {
 	# CMake 4.x does not parse an unquoted empty variable in this condition
 	sed -i 's/(${framework} STREQUAL ${_linked_into})/("${framework}" STREQUAL "${_linked_into}")/;
@@ -41,7 +46,8 @@ build() {
 		-D ENABLE_MINIBROWSER=OFF -D ENABLE_COG=OFF \
 		-D USE_ATK=OFF -D USE_LIBBACKTRACE=OFF -D USE_LIBHYPHEN=OFF -D USE_SYSPROF_CAPTURE=OFF \
 		-D USE_AVIF=OFF -D USE_JPEGXL=OFF -D USE_LCMS=ON -D USE_WOFF2=ON -D USE_FLITE=OFF \
-		-D ENABLE_SPEECH_SYNTHESIS=OFF -D ENABLE_BUBBLEWRAP_SANDBOX=OFF -D ENABLE_WEBDRIVER=OFF \
+		-D ENABLE_SPEECH_SYNTHESIS=OFF -D ENABLE_BUBBLEWRAP_SANDBOX=ON -D ENABLE_WEBDRIVER=OFF \
+		-D BWRAP_EXECUTABLE=/usr/bin/bwrap -D DBUS_PROXY_EXECUTABLE=/usr/bin/xdg-dbus-proxy \
 		-D ENABLE_GAMEPAD=OFF -D ENABLE_WEB_RTC=OFF -D USE_GSTREAMER_WEBRTC=OFF \
 		-D ENABLE_MEDIA_STREAM=OFF -D ENABLE_MEDIA_RECORDER=OFF -D ENABLE_GPU_PROCESS=OFF \
 		-D ENABLE_API_TESTS=OFF -D ENABLE_LAYOUT_TESTS=OFF -D USE_SYSTEM_UNIFDEF=ON \

@@ -20,16 +20,19 @@
 
 #define DEFAULT_WALL "wallpaper.flw"
 
-static const struct { const char *id; uint32_t rgb; } ACCENTS[] = {
-	{"green", 0x3f9b63}, {"teal", 0x35a09b}, {"blue", 0x4d8fd0},
-	{"amber", 0xd0a032}, {"orange", 0xe0793f}, {"rose", 0xd4678c},
-};
+/* the ids of the wallpaper variants (flsplash genart) are the accent ids of flpalette.h */
+struct flpal PAL;
 
 static char accent_id[24] = "green", wall_val[512] = "accent", wall_path[600];
-static uint32_t accent_rgb = 0x3f9b63;
+static bool light;
 static char conf_dir[512], conf_name[512];
 static bool inited;
 static bool sounds_on = true;
+
+static void __attribute__((constructor)) pal_default(void)
+{
+	flpal_base(&PAL, 1);
+}
 
 static const char *share_dir(void)
 {
@@ -54,6 +57,7 @@ static void read_conf(void)
 	snprintf(accent_id, sizeof accent_id, "green");
 	snprintf(wall_val, sizeof wall_val, "accent");
 	sounds_on = true;
+	light = false;
 	conf_file(path, sizeof path);
 	FILE *f = fopen(path, "r");
 	while (f && fgets(line, sizeof line, f)) {
@@ -65,6 +69,8 @@ static void read_conf(void)
 		v[strcspn(v, "\r\n")] = 0;
 		if (!strcmp(line, "accent") && *v)
 			snprintf(accent_id, sizeof accent_id, "%s", v);
+		else if (!strcmp(line, "theme"))
+			light = !strcmp(v, "light");
 		else if (!strcmp(line, "sounds"))
 			sounds_on = atoi(v) != 0;
 		else if (!strcmp(line, "wallpaper") && *v)
@@ -72,13 +78,7 @@ static void read_conf(void)
 	}
 	if (f)
 		fclose(f);
-	accent_rgb = ACCENTS[0].rgb;
-	for (size_t i = 0; i < sizeof ACCENTS / sizeof *ACCENTS; i++)
-		if (!strcmp(accent_id, ACCENTS[i].id))
-			accent_rgb = ACCENTS[i].rgb;
-	const char *h = accent_id + (accent_id[0] == '#');
-	if (strlen(h) == 6 && strspn(h, "0123456789abcdefABCDEF") == 6)
-		accent_rgb = (uint32_t)strtoul(h, NULL, 16);
+	flpal_make(&PAL, !light, accent_id);
 }
 
 /* the file to show now: the value of wallpaper= with fallbacks down to the green default */
@@ -100,8 +100,8 @@ const char *theme_wallpaper(void)
 			snprintf(wall_path, sizeof wall_path, "%s/.local/share/freelfs/wallpapers/%s.flw", h ? h : "", name + 5);
 	} else {
 		snprintf(wall_path, sizeof wall_path, "%s", def);
-		for (size_t i = 1; i < sizeof ACCENTS / sizeof *ACCENTS; i++)
-			if (!strcmp(name, ACCENTS[i].id))
+		for (size_t i = 1; i < FLPAL_ACCENT_COUNT; i++)
+			if (!strcmp(name, flpal_accents[i].id))
 				snprintf(wall_path, sizeof wall_path, "%s/wallpaper-%s.flw", share_dir(), name);
 	}
 	if (access(wall_path, R_OK) != 0)
@@ -116,7 +116,7 @@ bool theme_sounds(void)
 
 uint32_t theme_accent(void)
 {
-	return accent_rgb;
+	return PAL.accent & 0xffffffu;
 }
 
 static int theme_cb(int fd, uint32_t mask, void *data)
@@ -134,7 +134,10 @@ static int theme_cb(int fd, uint32_t mask, void *data)
 		return 0;
 	char old[600];
 	snprintf(old, sizeof old, "%s", wall_path);
+	struct flpal was = PAL;
 	read_conf();
+	if (memcmp(&was, &PAL, sizeof PAL))
+		damage_all();	/* a new scheme or accent: the indicator, overview, lock and X frames follow */
 	if (strcmp(old, theme_wallpaper()) && !getenv("FLCOMP_WALLPAPER")) {
 		wall_reload();
 		damage_all();

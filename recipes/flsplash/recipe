@@ -4,7 +4,7 @@ version=0.2
 release=3
 summary="FreeLFS boot screen: a glossy 3D logo on the KMS framebuffer, no compositor"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc zlib)
 # genart renders the logo and the word (IBM Plex Sans) at build time

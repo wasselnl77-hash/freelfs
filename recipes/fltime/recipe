@@ -6,7 +6,7 @@ version=0.1
 release=1
 summary="Automatic time (SNTP client) and the time zone helper for Settings"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc util-linux tzdata initscripts)
 # the helper runs as root for the group seat, like flpower in flpanel

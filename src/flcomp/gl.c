@@ -14,6 +14,7 @@
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <dlfcn.h>
 #include <drm_fourcc.h>
 #include <fcntl.h>
 #include <gbm.h>
@@ -21,6 +22,137 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+/* EGL, GBM and GLES come in by dlopen, when the first client binds the dmabuf global: linked in, they pull
+ * libgallium, libLLVM (16 MB of resident pages), SPIRV-Tools and the X libraries into every session, also
+ * the live desktop of shm clients that never needs them (flcomp was 33 MB PSS, about 10 without). */
+#define EGL_FUNCS(X) \
+	X(eglBindAPI) \
+	X(eglChooseConfig) \
+	X(eglCreateContext) \
+	X(eglDestroyContext) \
+	X(eglGetProcAddress) \
+	X(eglInitialize) \
+	X(eglMakeCurrent) \
+	X(eglQueryString) \
+	X(eglTerminate)
+#define GBM_FUNCS(X) \
+	X(gbm_create_device) \
+	X(gbm_device_destroy) \
+	X(gbm_device_get_format_modifier_plane_count)
+#define GLES_FUNCS(X) \
+	X(glActiveTexture) \
+	X(glAttachShader) \
+	X(glBindAttribLocation) \
+	X(glBindFramebuffer) \
+	X(glBindTexture) \
+	X(glCheckFramebufferStatus) \
+	X(glCompileShader) \
+	X(glCreateProgram) \
+	X(glCreateShader) \
+	X(glDeleteShader) \
+	X(glDisable) \
+	X(glDrawArrays) \
+	X(glEnableVertexAttribArray) \
+	X(glFramebufferTexture2D) \
+	X(glGenFramebuffers) \
+	X(glGenTextures) \
+	X(glGetError) \
+	X(glGetProgramiv) \
+	X(glGetShaderiv) \
+	X(glGetString) \
+	X(glGetUniformLocation) \
+	X(glLinkProgram) \
+	X(glPixelStorei) \
+	X(glReadPixels) \
+	X(glShaderSource) \
+	X(glTexImage2D) \
+	X(glTexParameteri) \
+	X(glUniform1f) \
+	X(glUseProgram) \
+	X(glVertexAttribPointer) \
+	X(glViewport)
+static struct {
+#define X(n) __typeof__(n) *n;
+	EGL_FUNCS(X) GBM_FUNCS(X) GLES_FUNCS(X)
+#undef X
+} L;
+
+static bool load_libs(void)
+{
+	static int state;	/* 0 not tried, 1 loaded, -1 failed */
+	if (state)
+		return state > 0;
+	state = -1;
+	void *egl = dlopen("libEGL.so.1", RTLD_NOW | RTLD_LOCAL), *gbm = dlopen("libgbm.so.1", RTLD_NOW | RTLD_LOCAL),
+	     *gles = dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_LOCAL);
+	if (!egl || !gbm || !gles) {
+		fprintf(stderr, "flcomp: no EGL/GBM/GLES (%s): dmabuf stays on the CPU path\n", dlerror());
+		return false;
+	}
+	bool ok = true;
+#define X(n) if (!(L.n = (__typeof__(n) *)dlsym(EGL_SRC, #n))) ok = false;
+#define EGL_SRC egl
+	EGL_FUNCS(X)
+#undef EGL_SRC
+#define EGL_SRC gbm
+	GBM_FUNCS(X)
+#undef EGL_SRC
+#define EGL_SRC gles
+	GLES_FUNCS(X)
+#undef EGL_SRC
+#undef X
+	if (ok)
+		state = 1;
+	else
+		fprintf(stderr, "flcomp: EGL/GBM/GLES lacks a function: dmabuf stays on the CPU path\n");
+	return ok;
+}
+
+/* from here on the plain names are the loaded ones */
+#define eglBindAPI L.eglBindAPI
+#define eglChooseConfig L.eglChooseConfig
+#define eglCreateContext L.eglCreateContext
+#define eglDestroyContext L.eglDestroyContext
+#define eglGetProcAddress L.eglGetProcAddress
+#define eglInitialize L.eglInitialize
+#define eglMakeCurrent L.eglMakeCurrent
+#define eglQueryString L.eglQueryString
+#define eglTerminate L.eglTerminate
+#define gbm_create_device L.gbm_create_device
+#define gbm_device_destroy L.gbm_device_destroy
+#define gbm_device_get_format_modifier_plane_count L.gbm_device_get_format_modifier_plane_count
+#define glActiveTexture L.glActiveTexture
+#define glAttachShader L.glAttachShader
+#define glBindAttribLocation L.glBindAttribLocation
+#define glBindFramebuffer L.glBindFramebuffer
+#define glBindTexture L.glBindTexture
+#define glCheckFramebufferStatus L.glCheckFramebufferStatus
+#define glCompileShader L.glCompileShader
+#define glCreateProgram L.glCreateProgram
+#define glCreateShader L.glCreateShader
+#define glDeleteShader L.glDeleteShader
+#define glDisable L.glDisable
+#define glDrawArrays L.glDrawArrays
+#define glEnableVertexAttribArray L.glEnableVertexAttribArray
+#define glFramebufferTexture2D L.glFramebufferTexture2D
+#define glGenFramebuffers L.glGenFramebuffers
+#define glGenTextures L.glGenTextures
+#define glGetError L.glGetError
+#define glGetProgramiv L.glGetProgramiv
+#define glGetShaderiv L.glGetShaderiv
+#define glGetString L.glGetString
+#define glGetUniformLocation L.glGetUniformLocation
+#define glLinkProgram L.glLinkProgram
+#define glPixelStorei L.glPixelStorei
+#define glReadPixels L.glReadPixels
+#define glShaderSource L.glShaderSource
+#define glTexImage2D L.glTexImage2D
+#define glTexParameteri L.glTexParameteri
+#define glUniform1f L.glUniform1f
+#define glUseProgram L.glUseProgram
+#define glVertexAttribPointer L.glVertexAttribPointer
+#define glViewport L.glViewport
 
 static struct {
 	bool started, ok, have_mods;
@@ -85,7 +217,7 @@ void gl_start(void)
 	G.started = true;
 	G.dpy = EGL_NO_DISPLAY;
 	G.ctx = EGL_NO_CONTEXT;
-	if (getenv("FLCOMP_NO_GL"))
+	if (getenv("FLCOMP_NO_GL") || !load_libs())
 		return;
 	int fd = backend_drm_fd();
 	if (fd < 0 && getenv("FLCOMP_RENDER_NODE")) {

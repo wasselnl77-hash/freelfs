@@ -4,7 +4,7 @@ release=1
 summary="The Python programming language"
 url=https://www.python.org/
 license=(PSF-2.0)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(base)
 depends=(glibc expat libffi openssl zlib bzip2 xz sqlite mpdecimal gdbm ncurses
 	readline libxcrypt)

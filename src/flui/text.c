@@ -15,6 +15,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 struct glyph {
 	uint32_t gid; /* + 1, 0 = empty slot */
@@ -39,7 +40,14 @@ struct fl_font {
 	int nfall;
 	uint32_t miss[16]; /* code points no font has */
 	int nmiss;
+	int ui;            /* made by fl_font_ui: follows the look (family, scale), see fl_text_set_look */
+	float base;        /* the size asked for, before the scale */
+	fl_font *ui_next;
 };
+
+static fl_font *ui_fonts;        /* every live UI font */
+static char ui_family[48] = "IBM Plex Sans";
+static float ui_scale = 1.0f;
 
 static FT_Library ft_lib;
 static hb_buffer_t *hbuf;
@@ -121,9 +129,114 @@ fl_font *fl_font_open(const char *family, int weight, int italic, float px)
 	return f;
 }
 
+int fl_font_family_exists(const char *family)
+{
+	if (fl_text_init() < 0 || !family || !*family)
+		return 0;
+	FcPattern *pat = FcPatternCreate();
+	FcPatternAddString(pat, FC_FAMILY, (const FcChar8 *)family);
+	FcConfigSubstitute(NULL, pat, FcMatchPattern);
+	FcDefaultSubstitute(pat);
+	FcResult res;
+	FcPattern *m = FcFontMatch(NULL, pat, &res);
+	int ok = 0;
+	FcChar8 *got;
+	if (m && FcPatternGetString(m, FC_FAMILY, 0, &got) == FcResultMatch)
+		ok = strcasecmp((const char *)got, family) == 0;
+	if (m)
+		FcPatternDestroy(m);
+	FcPatternDestroy(pat);
+	return ok;
+}
+
 fl_font *fl_font_ui(int weight, float px)
 {
-	return fl_font_open("IBM Plex Sans", weight, 0, px);
+	const char *fam = fl_font_family_exists(ui_family) ? ui_family : "IBM Plex Sans";
+	fl_font *f = fl_font_open(fam, weight, 0, px * ui_scale);
+	if (!f)
+		return NULL;
+	f->ui = 1;
+	f->base = px;
+	f->ui_next = ui_fonts;
+	ui_fonts = f;
+	return f;
+}
+
+static void flush_cache(fl_font *f)
+{
+	for (int i = 0; i < f->nfall; i++)
+		fl_font_close(f->fall[i]);
+	f->nfall = 0;
+	f->nmiss = 0;
+	for (int i = 0; i < CACHE_SLOTS; i++)
+		free(f->cache[i].bits);
+	memset(f->cache, 0, CACHE_SLOTS * sizeof(struct glyph));
+	f->ncache = 0;
+}
+
+/* new size and, if the family changed, a new face, in place: the pointers the apps hold stay good */
+static void font_retarget(fl_font *f, const char *family, float px)
+{
+	if (strcmp(family, f->family)) {
+		FcPattern *pat = FcPatternCreate();
+		FcPatternAddString(pat, FC_FAMILY, (const FcChar8 *)family);
+		FcPatternAddInteger(pat, FC_WEIGHT, FcWeightFromOpenType(f->weight));
+		FcPatternAddInteger(pat, FC_SLANT, f->italic ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
+		FcConfigSubstitute(NULL, pat, FcMatchPattern);
+		FcDefaultSubstitute(pat);
+		FcResult res;
+		FcPattern *m = FcFontMatch(NULL, pat, &res);
+		FcChar8 *file;
+		int index = 0;
+		FT_Face nf;
+		if (m && FcPatternGetString(m, FC_FILE, 0, &file) == FcResultMatch) {
+			FcPatternGetInteger(m, FC_INDEX, 0, &index);
+			if (!FT_New_Face(ft_lib, (const char *)file, index & 0xffff, &nf)) {
+				hb_font_destroy(f->hb);
+				FT_Done_Face(f->face);
+				f->face = nf;
+				f->hb = hb_ft_font_create_referenced(nf);
+				hb_ft_font_set_load_flags(f->hb, FT_LOAD_TARGET_LIGHT | FT_LOAD_NO_BITMAP);
+				char *fam = strdup(family);
+				if (fam) {
+					free(f->family);
+					f->family = fam;
+				}
+			}
+		}
+		if (m)
+			FcPatternDestroy(m);
+		FcPatternDestroy(pat);
+	}
+	FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)(px * 64 + 0.5f), 72, 72);
+	hb_ft_font_changed(f->hb);
+	f->px = px;
+	FT_Size_Metrics *m = &f->face->size->metrics;
+	f->ascent = (int)ceilf(m->ascender / 64.0f);
+	f->descent = (int)ceilf(-m->descender / 64.0f);
+	f->cell = 0;
+	if (!FT_Load_Char(f->face, '0', FT_LOAD_TARGET_LIGHT | FT_LOAD_NO_BITMAP))
+		f->cell = (int)((f->face->glyph->advance.x + 32) >> 6);
+	flush_cache(f);
+}
+
+void fl_text_set_look(const char *family, float scale)
+{
+	if (!family || !*family)
+		family = "IBM Plex Sans";
+	if (scale < 0.5f)
+		scale = 0.5f;
+	if (scale > 2.0f)
+		scale = 2.0f;
+	if (!strcmp(family, ui_family) && scale == ui_scale)
+		return;
+	snprintf(ui_family, sizeof ui_family, "%s", family);
+	ui_scale = scale;
+	if (!ui_fonts)
+		return; /* nothing open yet: fl_font_ui reads the globals */
+	const char *fam = fl_font_family_exists(ui_family) ? ui_family : "IBM Plex Sans";
+	for (fl_font *f = ui_fonts; f; f = f->ui_next)
+		font_retarget(f, fam, f->base * ui_scale);
 }
 
 fl_font *fl_font_mono(int weight, float px)
@@ -135,6 +248,13 @@ void fl_font_close(fl_font *f)
 {
 	if (!f)
 		return;
+	if (f->ui) {
+		for (fl_font **pp = &ui_fonts; *pp; pp = &(*pp)->ui_next)
+			if (*pp == f) {
+				*pp = f->ui_next;
+				break;
+			}
+	}
 	for (int i = 0; i < f->nfall; i++)
 		fl_font_close(f->fall[i]);
 	if (f->cache) {

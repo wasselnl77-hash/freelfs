@@ -1341,7 +1341,7 @@ static int cant_gui(int focus)
 	if (!e.app)
 		return -1;
 	fl_win_opts o = {
-		.title = "FreeLFS", .app_id = "flcrash", .w = 1280, .h = 800, .decorated = 0, .fullscreen = 1,
+		.title = "FreeLFS", .app_id = "flcrash", .w = 1280, .h = 800, .decorated = 0, .fullscreen = 0,
 		.resizable = 1, .draw = egg_draw, .key = egg_key, .pointer = egg_pointer, .close = egg_close, .ud = &e,
 	};
 	fl_app_output_size(e.app, &o.w, &o.h);
@@ -1350,6 +1350,9 @@ static int cant_gui(int focus)
 		fl_app_free(e.app);
 		return -1;
 	}
+	/* The work area, not the whole screen: a fullscreen window hides the panel (flcomp does that for
+	 * games), but the egg is a question on the desktop, so it stacks below the panel. */
+	fl_win_maximize(w);
 	cant_sound();
 	fl_app_run(e.app);
 	fl_app_free(e.app);

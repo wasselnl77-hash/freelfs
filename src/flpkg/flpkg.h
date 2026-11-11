@@ -276,7 +276,7 @@ int cmd_files_installed(const char *name);
 int cmd_owns(int argc, char **argv);
 int cmd_verify(int argc, char **argv);
 int cmd_history(void);
-int cmd_fix_owners(void);
+int cmd_fix_owners(int argc, char **argv);
 int cmd_upgrade(int argc, char **argv);
 int cmd_sync(void);
 int cmd_check_updates(int argc, char **argv);

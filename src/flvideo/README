@@ -1,7 +1,7 @@
 flvideo -- the FreeLFS video player ("Videos")
 ==============================================
 
-    flvideo [--start SECONDS] [--pause] FILE
+    flvideo [--start SECONDS] [--pause] [FILE]
 
 libmpv (recipe mpv, built without any window system or GPU code) demuxes, decodes, plays
 the sound (PipeWire, else ALSA) and draws the subtitles with libass. Pictures come out of
@@ -32,8 +32,13 @@ that played to the end starts from the top).
 Fullscreen opens a second window and closes the first (libflui has no fullscreen toggle on a
 live window); playback continues in the same mpv instance.
 
-Not done: a file picker (open files from Files, which should pass the path), playlists, DVD
-or network streams, chapters in the UI, subtitle delay, screenshots.
+Open: the Open button or Ctrl+O asks the desktop's file dialog (xdg-desktop-portal FileChooser, i.e.
+flportal) for one file, filtered to videos with "All files" as the second filter. The dialog runs in
+a child process (`flvideo --pick-file`, libdbus) so the window never waits; the chosen file replaces
+the current one (its position is saved first, a remembered position of the new file is used). Without
+the portal the window says so. libflui has no file dialog of its own.
+
+Not done: playlists, DVD or network streams, chapters in the UI, subtitle delay, screenshots.
 
 Test: make check needs the ffmpeg tool: it generates a clip (tests/mkclip.sh), renders a
 frame at a seek position, and checks that a second run resumes at the same frame.

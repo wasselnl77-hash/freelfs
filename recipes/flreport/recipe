@@ -2,7 +2,7 @@
 # ~/freelfs-report-DATE.tar.gz (Settings > About > Save a report runs it).
 pkgname=flreport
 version=0.1
-release=1
+release=2
 summary="Collects logs, kernel messages and hardware info into one archive for bug reports"
 license=(MIT)
 arch=(any)

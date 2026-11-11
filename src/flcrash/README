@@ -51,7 +51,8 @@ for tests). The screen is the crash screen's layout and green with the stretched
 `>:(` and only "You can't do that.", and two buttons: "Never mind" (default: Enter, Esc, N) and
 "Continue" (C, Tab then Enter, or a click), which lets the caller really delete. Exit status 0: go
 ahead (not a vital path, or Continue), 1: Never mind. On the desktop (WAYLAND_DISPLAY) it is one
-full-screen window and plays the error sound (flsound); on a console the same words in text; with
+maximized window (the work area: the panel stays visible and on top; a fullscreen window hides the
+panel in flcomp, which is right for games and wrong for a question) and plays the error sound (flsound); on a console the same words in text; with
 neither (no terminal, no desktop) the answer is Never mind. `--text` forces the console version,
 FLCRASH_PPM=FILE (with --cant PATH or --always, --focus continue, --size WxH) writes the picture.
 Callers: flfiles (Delete and Move to Trash, one question for the whole selection) and an

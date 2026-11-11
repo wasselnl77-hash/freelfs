@@ -69,7 +69,8 @@ fix_owners() {
 	local list=/usr/share/freelfs/ownership.list stamp=/var/lib/freelfs/ownership.done
 	local path uid gid mode
 	if command -v flpkg > /dev/null; then
-		flpkg fix-owners > /dev/null
+		# live system: keep the list in the read-only database (writing it copies 14 MB into RAM)
+		if [ -d /run/live ]; then flpkg fix-owners --keep > /dev/null; else flpkg fix-owners > /dev/null; fi
 		return
 	fi
 	[ -r "$list" ] || return 0

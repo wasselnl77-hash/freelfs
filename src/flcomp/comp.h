@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <wayland-server.h>
 
+#include "flpalette.h"
+
 /* ---- geometry and damage -------------------------------------------- */
 
 struct rect { int x1, y1, x2, y2; };		/* half open */
@@ -24,7 +26,7 @@ void dmg_add(struct damage *d, struct rect r);
 
 /* ---- objects -------------------------------------------------------- */
 
-enum role { ROLE_NONE, ROLE_TOPLEVEL, ROLE_POPUP, ROLE_SUB, ROLE_PANEL, ROLE_MENU, ROLE_FLYOUT, ROLE_NOTIFY, ROLE_LOCK, ROLE_XWL };
+enum role { ROLE_NONE, ROLE_TOPLEVEL, ROLE_POPUP, ROLE_SUB, ROLE_PANEL, ROLE_MENU, ROLE_FLYOUT, ROLE_NOTIFY, ROLE_LOCK, ROLE_XWL, ROLE_DESKTOP };
 
 struct regionop { struct rect r; bool add; };
 struct regionops { struct regionop *v; int n; };
@@ -123,7 +125,8 @@ struct comp {
 	struct damage dmg, prev;
 	struct wl_list surfaces, windows, popups;
 	struct wl_list outputs, shells;	/* struct reslink */
-	struct surface *panel, *menu, *flyout, *notify;
+	struct surface *panel, *menu, *flyout, *notify, *desktop;
+	int desktop_x, desktop_y;	/* fl_shell set_desktop: the icon layer (surface.c, render.c) */
 	bool nolock;			/* --firstboot (the login screen, setup): Super+L and the lid do not lock */
 	bool locked;			/* the screen is locked (lock.c): only lock_surf is shown and gets input */
 	struct surface *lock_surf;	/* the lock client's surface, NULL while there is none (it died, or is starting) */
@@ -164,6 +167,7 @@ bool panel_visible(void);
 bool menu_visible(void);
 bool flyout_visible(void);
 bool notify_visible(void);
+bool desktop_visible(void);
 bool popup_visible(struct popup *p);		/* not dismissed, and its window is on the workspace in view */
 
 /* xdg.c */
@@ -279,12 +283,46 @@ void fl_emit_output(void);	/* modes and state to every binding of version 3 */
 void fl_emit_workspaces(void);	/* version 5: the grid and the current one */
 void fl_emit_window_ws(struct window *w);	/* version 5 */
 
+/* anim.c: short eased motion for windows, the workspace switch, the overview and the shell's popups.
+ * All of it is driven by frame_done (the page flip), so nothing runs and nothing wakes while idle. */
+enum { ANIM_OFF, ANIM_REDUCED, ANIM_ON };
+void anim_init(void);
+bool anim_active(void);				/* something is moving: the next frame is wanted at once */
+int anim_gap_ms(void);				/* minimum time between frames while moving (headless has no vblank) */
+void anim_frame(void);				/* a frame reached the screen: advance, damage what moves, ask for the next */
+void anim_conf_changed(void);			/* animations=, animation_speed= */
+/* hooks from the window code; each is a no-op when animations are off */
+void anim_window_open(struct window *w);			/* it has just been mapped */
+void anim_window_closing(struct window *w);			/* about to be destroyed: keep a picture and fade it out */
+void anim_window_gone(struct window *w);			/* the struct is going away: forget it */
+void anim_window_minimize(struct window *w);			/* just minimized (still has pixels) */
+void anim_window_restore(struct window *w);			/* just restored from the panel */
+void anim_window_geometry(struct window *w, struct rect from);	/* it moved or resized to the place w now has (maximize, snap, restore) */
+void anim_ws_switch(int from, int to);				/* the workspace in view changed */
+void anim_overview(bool opening);				/* the overview is opening or closing (it draws itself at the end state) */
+void anim_surface_show(struct surface *s);			/* menu, flyout, notification surface shown */
+void anim_surface_hide(struct surface *s);			/* ... about to be hidden: keep a picture */
+void anim_surface_gone(struct surface *s);
+/* the compositing side (render.c) */
+struct anim_xf { struct rect dst; int alpha; };			/* where a window's bounds go and how opaque (0..255) */
+bool anim_window_xf(struct window *w, struct anim_xf *xf);	/* the window is animating: draw it this way */
+bool anim_window_drawn_hidden(struct window *w);		/* not window_visible, but still drawn (minimizing, sliding out) */
+bool anim_surface_xf(struct surface *s, struct anim_xf *xf);
+void anim_draw_ghosts(struct rect clip);			/* pictures of surfaces that are gone, drawn above the windows */
+bool anim_overview_xf(struct anim_xf *xf, bool *hold);		/* the overview is zooming: it is drawn off screen, then this way */
+void anim_overview_done(void);
+bool anim_ws_active(void);
+
 /* render.c */
 void damage_add(struct rect r);
 void damage_all(void);
 void wall_init(void);
 
-/* theme.c: accent= and wallpaper= from desktop.conf, watched */
+/* theme.c: theme=, accent= and wallpaper= from desktop.conf, watched. PAL is the colour scheme
+ * (flpalette.h: the same tokens as libflui's apps); everything the compositor draws takes its
+ * colours from it, and a change repaints the screen. P(x) is a token as 0xRRGGBB. */
+extern struct flpal PAL;
+#define P(x) (PAL.x & 0xffffffu)
 void theme_init(void);
 uint32_t theme_accent(void);		/* 0xRRGGBB */
 const char *theme_wallpaper(void);	/* .flw file to show */
@@ -335,6 +373,12 @@ struct conf {
 	bool lock_on_lid;		/* lock_on_lid=1 (default): closing the lid locks the screen */
 	int ws_cols, ws_rows;		/* workspaces=COLSxROWS, default 2x2 */
 	int perf;			/* performance=auto|on|off (PERF_*, perf.c); 0 is auto */
+	int anim;			/* animations=on|reduced|off (ANIM_*, anim.c) */
+	int anim_speed;			/* animation_speed= in percent: 100 is normal, 200 twice as fast */
+	bool panel_top;			/* panel_position=top: the panel is at the top edge */
+	int title_h;			/* titlebar=normal|compact: 34 or 28 (the frame of X windows) */
+	bool buttons_left;		/* buttons=left: window buttons at the left (X window frames) */
+	int panel_h;			/* panel_height= (the panel itself also sends set_panel), 44 */
 };
 extern struct conf CF;
 void config_init(void);

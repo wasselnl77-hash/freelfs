@@ -46,17 +46,36 @@ See [docs/PLAN.md](docs/PLAN.md) for the full plan and milestones.
   ([docs/m6-drawtest.png](docs/m6-drawtest.png)).
 - M7 (our own desktop): compositor, toolkit, panel with start menu and a live
   tray (battery, network, volume), terminal, file manager, text editor, login
-  screen, keyboard choice at first boot, settings, a Packages app (installed
-  list, search, install and remove through the setuid helper `flpkg-seat`),
-  PipeWire in the session. Tested headless and in QEMU with 1 GB of RAM
-  (docs/m7/); not yet on the real laptop. The kernel now has USB storage built
-  in, so a USB stick image can boot (`build/52-usb.sh`). Next: GLES path.
-- M9 (release), first part: a live ISO, `./build/53-iso.sh` (rootless, 678 MB).
-  One file that boots as a CD, written to a stick with `dd`, or copied to a
-  Ventoy stick (UEFI only, Secure Boot off); user `tester`, no password;
-  nothing is written to the computer's disks. Tested in QEMU with 1 GB and
-  with real Ventoy 1.1.18 in QEMU; not yet on real hardware. See
-  "The live ISO" in [docs/PLAN.md](docs/PLAN.md). The installer is still to do.
+  screen, keyboard choice at first boot, settings, PipeWire in the session.
+  Tested headless and in QEMU with 1 GB of RAM (docs/m7/). Compositing is on
+  the CPU; on a real GPU, dmabuf buffers are read back through GLES (EGL is
+  loaded only when a client needs it). The first boot on a real laptop found
+  bugs (FreeBWS blank on the GPU, a Settings crash, no Wi-Fi page); they are
+  fixed, but the whole desktop has not been run on that laptop again. The
+  kernel has USB storage built in, so a USB stick image can boot
+  (`build/52-usb.sh`).
+- M8 (FreeBWS, the browser on WPE WebKit): built, runs in QEMU at 1 GB; no
+  sandbox yet.
+- M10 integration round (2026-11-11): workspaces, screenshot tool, task
+  manager, accent colours and wallpapers, system sounds, editor with syntax
+  colours, archive tool, image/PDF/music/video apps, Software Store (Flathub
+  and FreeLFS packages), portals for Flatpak apps, update notifier, btrfs
+  snapshots with "start an earlier state", Xwayland (X11 apps), gaming kernel
+  options, installer. All built into one image and exercised in QEMU at 2 GB
+  and 1 GB; see [docs/ROADMAP-NEXT.md](docs/ROADMAP-NEXT.md) and
+  [docs/INTEGRATION-TODO.md](docs/INTEGRATION-TODO.md) for what is open.
+- M9 (release), first part: a live ISO, `./build/53-iso.sh` (rootless,
+  843 MB). One file that boots as a CD, written to a stick with `dd`, or
+  copied to a Ventoy stick (UEFI only, Secure Boot off); user `tester`, no
+  password; nothing is written to the computer's disks. The installer
+  ("FreeLFS install", also an icon on the live desktop) did a whole-disk
+  install onto a virtual disk in QEMU, and the installed system booted. Not
+  tried on real hardware or on a real disk; "next to existing partitions",
+  "Manual" and the Wi-Fi step are untested. The live session keeps
+  everything in RAM, so the Store does not add Flathub there. See "The live
+  ISO" in [docs/PLAN.md](docs/PLAN.md). Still to do: Secure Boot (flboot is
+  not signed), a public package repository, the laptop.
+- Architectures: x86_64 only. Nothing has been built for aarch64.
 
 ## Quick start
 

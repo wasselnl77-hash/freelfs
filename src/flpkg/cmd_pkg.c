@@ -513,11 +513,32 @@ int cmd_history(void)
 	return 0;
 }
 
-int cmd_fix_owners(void)
+/* Nothing deferred: the database is not opened for writing at all (every boot runs this; on the live
+ * system a write copies the whole 14 MB database into RAM). --keep (the live system): the owners are
+ * set but the list is left as it is, so the database stays read-only and in the squashfs. */
+int cmd_fix_owners(int argc, char **argv)
 {
-	struct txn *t = txn_new(cfg.root, NULL); /* for the lock */
-	struct db *db = txn_db(t);
+	bool keep = argc > 1 && !strcmp(argv[1], "--keep");
+	if (argc > 1 && !keep)
+		die("usage: flpkg fix-owners [--keep]");
 	struct manifest pending;
+	struct db *ro = db_open(cfg.root, false);
+	if (!ro)
+		return 0; /* no database: nothing is installed */
+	db_pending(ro, &pending);
+	size_t todo = pending.n;
+	manifest_free(&pending);
+	if (!todo) {
+		db_close(ro);
+		return 0;
+	}
+	struct txn *t = NULL;
+	struct db *db = ro;
+	if (!keep) {
+		db_close(ro);
+		t = txn_new(cfg.root, NULL); /* for the lock */
+		db = txn_db(t);
+	}
 	db_pending(db, &pending);
 	int fixed = 0, failed = 0;
 	for (size_t i = 0; i < pending.n; i++) {
@@ -525,10 +546,12 @@ int cmd_fix_owners(void)
 		char *abs = path_join(cfg.root, e->path);
 		struct stat st;
 		if (lstat(abs, &st) < 0) {
-			db_drop_pending(db, e->path); /* gone: nothing to fix */
+			if (!keep)
+				db_drop_pending(db, e->path); /* gone: nothing to fix */
 		} else if (lchown(abs, e->uid, e->gid) == 0 &&
 		           (S_ISLNK(st.st_mode) || chmod(abs, e->mode & 07777) == 0)) {
-			db_drop_pending(db, e->path);
+			if (!keep)
+				db_drop_pending(db, e->path);
 			fixed++;
 		} else {
 			warn("cannot set owner of /%s: %s", e->path, strerror(errno));
@@ -537,7 +560,10 @@ int cmd_fix_owners(void)
 		free(abs);
 	}
 	manifest_free(&pending);
-	txn_free(t);
+	if (t)
+		txn_free(t);
+	else
+		db_close(db);
 	if (fixed || failed)
 		msg("set the owner of %d files%s", fixed, failed ? " (some failed)" : "");
 	return failed ? 1 : 0;

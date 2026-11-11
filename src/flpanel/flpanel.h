@@ -16,6 +16,7 @@ struct entry {
 	char name[64], what[96], exec[256], glyph[8];
 	unsigned cats; /* bit per CAT_* */
 	int terminal;
+	int desktop; /* X-FreeLFS-Desktop-Icon=true: also an icon on the desktop (deskicons.c) */
 };
 
 struct win {
@@ -127,6 +128,7 @@ int battery_saver(const struct panel *p);
 void battery_demo(struct panel *p, int open);
 
 void menu_init(struct panel *p);
+void desk_init(struct panel *p); /* deskicons.c: icons on the desktop (fl_shell version 6) */
 #define FLY_W 260
 #define FLY_H 76
 void vol_set_pct(struct panel *p, int pct);

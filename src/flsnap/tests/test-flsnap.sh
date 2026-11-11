@@ -17,7 +17,13 @@ fs() { "$flsnap" "$@" > "$work/out" 2>&1; }
 
 mkdir -p "$FLSNAP_MOCK"/top/@/etc "$FLSNAP_MOCK"/top/@snapshots "$FLSNAP_MOCK"/esp/flboot
 echo one > "$FLSNAP_MOCK"/top/@/etc/version
-printf '#!/bin/sh\necho "glibc 2.40-1"\necho "demo 1.0-1"\n' > "$work/flpkg"
+printf 'glibc 2.40-1\ndemo 1.0-1\n' > "$FLSNAP_MOCK"/top/@/etc/packages
+# stand-in flpkg: "--root DIR list" answers with the packages of that tree (DIR/etc/packages), like the real one
+cat > "$work/flpkg" <<'EOS'
+#!/bin/sh
+if [ "$1" = --root ]; then cat "$2/etc/packages" 2> /dev/null; exit 0; fi
+echo "glibc 2.40-1"; echo "demo 1.0-1"
+EOS
 chmod +x "$work/flpkg"
 snaps=$FLSNAP_MOCK/top/@snapshots
 cur=$FLSNAP_MOCK/top/@
@@ -77,7 +83,7 @@ check "default subvolume is @" '[ "$(cat "$FLSNAP_MOCK/default")" = @ ]'
 check "the state left is a snapshot" 'grep -l "before going back to #7" "$snaps"/*.info | head -1 | grep -q info'
 old=$(grep -l "before going back to #7" "$snaps"/*.info | head -1); old=${old%.info}
 check "... with the broken contents" '[ "$(cat "$old/etc/version")" = "broken update" ] && [ -f "$old/etc/new-file" ]'
-check "... and its packages (the running system's)" 'grep -qx "demo 1.0-1" "$old.info"'
+check "... and its packages" 'grep -qx "demo 1.0-1" "$old.info"'
 check "snapshot 7 is still there" '[ -d "$snaps/7" ]'
 check "still at most 5 snapshots" '[ "$(ls "$snaps" | grep -c "^[0-9]*$")" -le 5 ]'
 check "boot list lists the new one" 'grep -q "before going back to #7" "$boot"'
@@ -93,8 +99,11 @@ check "the running snapshot cannot be deleted" '[ $? -ne 0 ] && [ -d "$snaps/7" 
 fs prune --keep 1
 check "prune spares the running snapshot" '[ -d "$snaps/7" ]'
 echo "tweaked in the snapshot" > "$cur/etc/version"
+printf 'glibc 2.40-1\nleft-behind 3.1-2\n' > "$cur/etc/packages"
 fs rollback
 check "rollback without N uses the running snapshot" '[ $? -eq 0 ] && [ "$(cat "$cur/etc/version")" = v7 ]'
+last=$(ls "$snaps" | grep '^[0-9]*$' | sort -n | tail -1)
+check "the state left lists ITS packages although the system ran from a snapshot" 'grep -qx "left-behind 3.1-2" "$snaps/$last.info" && fs show "$last" && grep -q "packages (2)" "$work/out"'
 rm -f "$FLSNAP_MOCK/booted"
 
 # a failure leaves @ as it was: make the copy fail (cp that always fails)

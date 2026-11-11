@@ -275,8 +275,8 @@ fl_rect fl_win_content(const fl_win *w)
 {
 	if (!w->o.decorated)
 		return (fl_rect){0, 0, w->w, w->h};
-	int b = (w->maximized || w->fullscreen) ? 0 : 1;
-	return (fl_rect){b, 36, w->w - 2 * b, w->h - 36 - b};
+	int b = (w->maximized || w->fullscreen) ? 0 : 1, top = fl_lk.title_h + 2; /* 36 normal, 30 compact */
+	return (fl_rect){b, top, w->w - 2 * b, w->h - top - b};
 }
 
 static void decorate(fl_win *w)
@@ -314,9 +314,10 @@ static void decorate(fl_win *w)
 		}
 	}
 
-	fl_rect tb = {b, top, w->w - 2 * b, w->activated ? 33 : 34};
+	/* the bar ends one line above the content: at 35 for the normal height */
+	fl_rect tb = {b, top, w->w - 2 * b, fl_lk.title_h + 1 - top};
 	if (top == 0)
-		tb.h = 34;
+		tb.h = fl_lk.title_h;
 	int hit = fl_titlebar(ui, tb, w->title ? w->title : "", w->activated, w->maximized);
 	fl_fill_rect(cv, (fl_rect){b, tb.y + tb.h, tb.w, 1}, fl_th.line);
 	if (hit == FL_ICON_CLOSE) {
@@ -439,6 +440,16 @@ static void render(fl_win *w)
 	wl_surface_damage_buffer(w->surf, 0, 0, w->w, w->h);
 	wl_surface_commit(w->surf);
 	b->busy = 1;
+}
+
+/* The title bar height changed (look): the content moved, tell the apps the new size. */
+HIDDEN void fl_wins_relayout(fl_app *a)
+{
+	for (fl_win *w = a->wins; w; w = w->next)
+		if (w->o.decorated && w->o.resized && w->configured && !w->dead) {
+			fl_rect c = fl_win_content(w);
+			w->o.resized(w, c.w, c.h, w->o.ud);
+		}
 }
 
 void fl_win_redraw(fl_win *w)
@@ -631,6 +642,12 @@ void fl_win_minimize(fl_win *w)
 {
 	if (w->xt)
 		xdg_toplevel_set_minimized(w->xt);
+}
+
+void fl_win_maximize(fl_win *w)
+{
+	if (w && w->xt)
+		xdg_toplevel_set_maximized(w->xt);
 }
 
 void fl_win_destroy(fl_win *w)

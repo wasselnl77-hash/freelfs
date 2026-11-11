@@ -601,8 +601,8 @@ static void write_boot_list(void)
 	snap_free(v, n);
 }
 
-/* "name version" lines of what is installed, from FILE or flpkg */
-static char *package_list(const char *file)
+/* "name version" lines of what is installed, from FILE or flpkg (of the system under ROOT, when given) */
+static char *package_list(const char *file, const char *root)
 {
 	if (file) {
 		char *t = slurp(file);
@@ -613,7 +613,8 @@ static char *package_list(const char *file)
 	if (!out)
 		die("out of memory");
 	char *a[] = {C.flpkg, "list", NULL};
-	if (access(C.flpkg, X_OK) < 0 || run(a, out, cap))
+	char *ar[] = {C.flpkg, "--root", (char *)root, "list", NULL};
+	if (access(C.flpkg, X_OK) < 0 || run(root ? ar : a, out, cap))
 		out[0] = '\0';
 	return out;
 }
@@ -683,7 +684,7 @@ static int cmd_create(int argc, char **argv)
 		die("could not take a snapshot");
 	}
 	/* a caller with more rights than its own must not make us read files for it */
-	char *pk = package_list(C.elevated ? NULL : pkgfile);
+	char *pk = package_list(C.elevated ? NULL : pkgfile, NULL);
 	if (write_info(C.dir, n, reason, pk) < 0)
 		warn("cannot write the information file of snapshot #%ld", n);
 	free(pk);
@@ -819,11 +820,13 @@ static int cmd_rollback(int argc, char **argv)
 	if (lstat(src, &st) < 0)
 		die("no snapshot #%ld", n);
 
-	/* the packages of the state that is left, when it is the running system */
-	char *pk = booted == 0 ? package_list(NULL) : strdup("");
 	const char *top = top_open();
 	char cur[PATH_MAX], from[PATH_MAX], keepdir[PATH_MAX], sdir[PATH_MAX];
 	pathf(cur, "%s/@", top);
+	/* The packages of the state that is left: always read from the @ subvolume itself. The usual
+	 * case is that the system runs from a snapshot, so the running system's flpkg database is the
+	 * old state's, not the one that is left (this used to list 0 packages there). */
+	char *pk = package_list(NULL, cur);
 	pathf(sdir, "%s/@snapshots", top);
 	pathf(from, "%s/@snapshots/%ld", top, n);
 	long m = next_number(sdir);

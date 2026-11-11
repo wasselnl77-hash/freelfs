@@ -30,5 +30,6 @@ HIDDEN void fl_blend_px(fl_canvas *cv, int x, int y, fl_color c, unsigned cov);
 /* Opens the shared fontconfig/freetype state and the UI fonts. */
 HIDDEN int fl_text_init(void);
 HIDDEN fl_app *fl_win_app(fl_win *w);
+HIDDEN void fl_wins_relayout(fl_app *a);
 
 #endif

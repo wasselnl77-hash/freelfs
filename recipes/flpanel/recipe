@@ -1,10 +1,10 @@
 # flpanel, from src/flpanel in the FreeLFS tree.
 pkgname=flpanel
 version=0.1
-release=10
+release=11
 summary="The FreeLFS desktop panel and start menu"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc flui wayland dbus)
 owner=("/usr/bin/flpower 0 98 4750")

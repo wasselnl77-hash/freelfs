@@ -16,12 +16,12 @@
 #define GRIP 4			/* grab zone outside the border */
 #define BTN_W 46
 
-#define C_PANEL 0x272c33u
-#define C_RAISED 0x343a43u
-#define C_LINE 0x3a4048u
-#define C_TEXT 0xd8dce0u
-#define C_DIM 0x8a9199u
-#define C_CLOSE 0xb04a4au
+#define C_PANEL P(panel)
+#define C_RAISED P(raised)
+#define C_LINE P(line)
+#define C_TEXT P(text)
+#define C_DIM P(dim)
+#define C_CLOSE P(err)
 
 enum { DP_NONE, DP_TITLE, DP_MIN, DP_MAX, DP_CLOSE, DP_EDGE };
 

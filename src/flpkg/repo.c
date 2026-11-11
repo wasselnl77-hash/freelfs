@@ -104,10 +104,16 @@ static void repos_load_from(struct reposet *rs, const char *base)
 			free(sub);
 		}
 		char *text = read_zst(path, NULL);
-		if (!text)
+		if (!text) {
 			warn("no index for repo %s; run 'flpkg sync'", cfg.repos[i].name);
-		else
+		} else {
 			parse_index(text, path, cfg.repos[i].name, cfg.repos[i].url, rs);
+			if (!base) {
+				char *sigp = xasprintf("%s.sig", path);
+				index_warn_cached(cfg.repos[i].name, sigp);
+				free(sigp);
+			}
+		}
 		free(text);
 		free(path);
 	}
@@ -163,7 +169,7 @@ static int copy_file(const char *from, const char *to)
 
 /* Fetch URL/NAME to DEST: local paths and file:// are copied, http(s)
  * goes through curl. */
-static int fetch(const char *url, const char *name, const char *dest)
+static int fetch_q(const char *url, const char *name, const char *dest, bool quiet)
 {
 	if (has_prefix(url, "file://") || url[0] == '/') {
 		char *src = path_join(has_prefix(url, "file://") ? url + 7 : url, name);
@@ -175,7 +181,7 @@ static int fetch(const char *url, const char *name, const char *dest)
 		die("fetching %s needs curl, which is not installed", url);
 	char *src = xasprintf("%s/%s", url, name), *part = xasprintf("%s.part", dest);
 	/* only http(s); give up on a dead connection instead of hanging */
-	char *argv[] = {"curl", "-fsSL", "--proto", "=http,https", "--proto-redir", "=http,https",
+	char *argv[] = {"curl", quiet ? "-fsL" : "-fsSL", "--proto", "=http,https", "--proto-redir", "=http,https",
 	                "--connect-timeout", "20", "--speed-time", "30", "--speed-limit", "1000",
 	                "--retry", "3", "-o", part, src, NULL};
 	int rc = run_argv(argv, NULL, NULL) == 0 ? rename(part, dest) : -1;
@@ -186,21 +192,31 @@ static int fetch(const char *url, const char *name, const char *dest)
 	return rc;
 }
 
-static void check_signature(const char *file, const char *sig, const char *name)
+static int fetch(const char *url, const char *name, const char *dest)
 {
+	return fetch_q(url, name, dest, false);
+}
+
+/* Check FILE's signature. With TRUSTED, the verified trusted comment comes back (free it), or
+ * NULL if the signature was not required and is missing. */
+static void check_signature(const char *file, const char *sig, const char *name, char **trusted)
+{
+	if (trusted)
+		*trusted = NULL;
 	if (!strcmp(cfg.signatures, "never"))
 		return;
 	struct pubkey *keys;
 	size_t n;
-	pubkeys_load(cfg.keydir, &keys, &n);
+	keys_effective(&keys, &n);
 	char *err = NULL;
 	struct stat st;
 	if (stat(sig, &st) < 0 && !strcmp(cfg.signatures, "optional")) {
 		warn("%s is not signed", name);
-	} else if (verify_file(keys, n, file, sig, name, &err) < 0) {
+	} else if (verify_file_ex(keys, n, file, sig, name, &err, trusted, NULL) < 0) {
+		char *hint = keys_retired_hint();
 		unlink(file);
 		unlink(sig);
-		die("%s%s", err, n ? "" : " (no trusted keys in the key directory)");
+		die("%s%s%s", err, n ? "" : " (no trusted keys in the key directory)", hint);
 	}
 	pubkeys_free(keys, n);
 }
@@ -226,7 +242,7 @@ char *repo_fetch(const struct repopkg *rp)
 	if (strcmp(cfg.signatures, "never") && fetch(rp->url, signame, sig) < 0 &&
 	    !strcmp(cfg.signatures, "required"))
 		die("cannot fetch the signature of %s", rp->info.filename);
-	check_signature(dest, sig, rp->info.filename);
+	check_signature(dest, sig, rp->info.filename, NULL);
 	free(signame);
 	free(sig);
 	free(dir);
@@ -235,8 +251,27 @@ char *repo_fetch(const struct repopkg *rp)
 
 /* ---- flpkg sync ---------------------------------------------------------------- */
 
-/* Fetch, verify and parse the index of R into DIR (index.zst + .sig). */
-static int sync_repo(const struct repo_cfg *r, const char *dir)
+/* Offer the repo's key rotation statement (rotate.pub + .sig), if it has one, to the trust code.
+ * Done before the index is checked: after the switch the index is signed by the new key. */
+static void offer_rotation(const struct repo_cfg *r, const char *dir)
+{
+	if (!strcmp(cfg.signatures, "never"))
+		return;
+	/* the signature names the file "rotate.pub", so it is saved under that name */
+	char *pub = path_join(dir, "rotate.pub"), *sig = path_join(dir, "rotate.pub.sig");
+	if (fetch_q(r->url, "rotate.pub", pub, true) == 0 &&
+	    fetch_q(r->url, "rotate.pub.sig", sig, true) == 0)
+		rotate_apply(r->name, pub, sig);
+	unlink(pub);
+	unlink(sig);
+	free(pub);
+	free(sig);
+}
+
+/* Fetch, verify and parse the index of R into DIR (index.zst + .sig). With PERSIST the serial
+ * is remembered and learned keys are saved; without (check-updates, which may not write the
+ * system) neither is. */
+static int sync_repo(const struct repo_cfg *r, const char *dir, bool persist)
 {
 	if (mkdirs(dir, 0755) < 0)
 		die("cannot create %s: %s", dir, strerror(errno));
@@ -246,7 +281,20 @@ static int sync_repo(const struct repo_cfg *r, const char *dir)
 	if (strcmp(cfg.signatures, "never") && fetch(r->url, "index.zst.sig", sig) < 0 &&
 	    !strcmp(cfg.signatures, "required"))
 		die("repo %s has no signed index", r->name);
-	check_signature(idx, sig, "index.zst");
+	offer_rotation(r, dir);
+	char *trusted = NULL;
+	check_signature(idx, sig, "index.zst", &trusted);
+	long long serial = -1;
+	if (trusted) {
+		char *ferr = NULL;
+		serial = index_check(r->name, trusted, &ferr);
+		free(trusted);
+		if (serial < 0) {
+			unlink(idx);
+			unlink(sig);
+			die("%s", ferr);
+		}
+	}
 	char *final = path_join(dir, "index.zst"), *fsig = path_join(dir, "index.zst.sig");
 	struct reposet rs = {0};
 	char *text = read_zst(idx, NULL);
@@ -256,6 +304,8 @@ static int sync_repo(const struct repo_cfg *r, const char *dir)
 	if (rename(idx, final) < 0)
 		die("cannot replace %s: %s", final, strerror(errno));
 	rename(sig, fsig);
+	if (persist && serial >= 0)
+		index_commit(r->name, serial);
 	reposet_free(&rs);
 	free(text);
 	free(final);
@@ -272,7 +322,7 @@ int cmd_sync(void)
 	for (size_t i = 0; i < cfg.nrepos; i++) {
 		char *sub = xasprintf("repos/%s", cfg.repos[i].name);
 		char *dir = cache_path(sub);
-		int count = sync_repo(&cfg.repos[i], dir);
+		int count = sync_repo(&cfg.repos[i], dir, true);
 		msg("%s: %d packages", cfg.repos[i].name, count);
 		free(dir);
 		free(sub);
@@ -315,9 +365,12 @@ int cmd_check_updates(int argc, char **argv)
 		tmp = xasprintf("%s/flpkg-check.XXXXXX", t && *t ? t : "/tmp");
 		if (!mkdtemp(tmp))
 			die("cannot create a temporary directory: %s", strerror(errno));
+		char *scratch = path_join(tmp, ".trust");
+		trust_set_scratch(scratch);
+		free(scratch);
 		for (size_t i = 0; i < cfg.nrepos; i++) {
 			char *dir = path_join(tmp, cfg.repos[i].name);
-			sync_repo(&cfg.repos[i], dir);
+			sync_repo(&cfg.repos[i], dir, false);
 			free(dir);
 		}
 		repos_load_from(&rs, tmp);
@@ -404,7 +457,8 @@ static int cmp_entry_name(const void *a, const void *b)
 
 /* Rebuild DIR/index.zst from the packages in DIR (newest version of each
  * name) and sign it. With REMOVE_OLD, delete older package files. */
-static void build_index(const char *dir, const struct seckey *key, bool remove_old)
+static void build_index(const char *dir, const struct seckey *key, bool remove_old, long long serial,
+                        time_t valid_until)
 {
 	DIR *d = opendir(dir);
 	if (!d)
@@ -470,9 +524,15 @@ static void build_index(const char *dir, const struct seckey *key, bool remove_o
 	    rename(tmp, idx) < 0)
 		die("cannot write %s", idx);
 	char *err = NULL;
-	if (key && sign_file(key, idx, &err) < 0)
+	char until[32];
+	iso_format(valid_until, until);
+	char *extra = xasprintf("serial:%lld\tvalid-until:%s", serial, until);
+	if (key && sign_file_ex(key, idx, extra, &err) < 0)
 		die("%s", err);
+	free(extra);
 	msg("%s: %d packages%s", idx, count, key ? ", signed" : " (unsigned)");
+	if (key)
+		msg("index serial %lld, valid until %s", serial, until);
 
 	for (size_t i = 0; i < n; i++) {
 		pkginfo_free(&v[i].info);
@@ -487,12 +547,18 @@ static void build_index(const char *dir, const struct seckey *key, bool remove_o
 int cmd_repo(int argc, char **argv)
 {
 	if (argc < 2)
-		die("usage: flpkg repo add [--key FILE] [--remove-old] DIR [FILE.flpkg...]");
+		die("usage: flpkg repo add [--key FILE] [--remove-old] [--valid-days N] [--serial N] DIR [FILE.flpkg...]");
 	if (strcmp(argv[1], "add"))
 		die("unknown repo command '%s'", argv[1]);
 	static const struct option longopts[] = {
-		{"key", required_argument, NULL, 'k'}, {"remove-old", no_argument, NULL, 'r'}, {0},
+		{"key", required_argument, NULL, 'k'},
+		{"remove-old", no_argument, NULL, 'r'},
+		{"valid-days", required_argument, NULL, 'd'},
+		{"serial", required_argument, NULL, 's'},
+		{0},
 	};
+	long valid_days = 14; /* how long clients accept this index: sign again before it runs out */
+	long long serial = -1;
 	const char *keypath = cfg.signkey;
 	bool remove_old = false;
 	int c;
@@ -501,11 +567,13 @@ int cmd_repo(int argc, char **argv)
 		switch (c) {
 		case 'k': keypath = optarg; break;
 		case 'r': remove_old = true; break;
+		case 'd': valid_days = strtol(optarg, NULL, 10); break; /* negative: expired, for tests */
+		case 's': serial = strtoll(optarg, NULL, 10); break;
 		default: return 2;
 		}
 	}
 	if (optind >= argc)
-		die("usage: flpkg repo add [--key FILE] [--remove-old] DIR [FILE.flpkg...]");
+		die("usage: flpkg repo add [--key FILE] [--remove-old] [--valid-days N] [--serial N] DIR [FILE.flpkg...]");
 	const char *dir = argv[optind++];
 	if (mkdirs(dir, 0755) < 0)
 		die("cannot create %s: %s", dir, strerror(errno));
@@ -532,14 +600,22 @@ int cmd_repo(int argc, char **argv)
 		free(rd);
 		free(dest);
 	}
-	build_index(dir, keypath ? &key : NULL, remove_old);
+	if (serial < 0)
+		serial = index_next_serial(dir); /* above the previous index, and at least the clock */
+	build_index(dir, keypath ? &key : NULL, remove_old, serial, time(NULL) + (time_t)valid_days * 86400);
 	return 0;
 }
 
 int cmd_key(int argc, char **argv)
 {
+	if (argc >= 2 && !strcmp(argv[1], "introduce"))
+		return cmd_key_introduce(argc, argv);
+	if (argc == 2 && !strcmp(argv[1], "list"))
+		return cmd_key_list();
 	if (argc != 3 || strcmp(argv[1], "generate"))
-		die("usage: flpkg key generate PATH   (writes PATH.key and PATH.pub)");
+		die("usage: flpkg key generate PATH   (writes PATH.key and PATH.pub)\n"
+		    "       flpkg key introduce --key OLD.key --new NEW.pub [--retire-days N] DIR\n"
+		    "       flpkg key list");
 	key_generate(argv[2]);
 	return 0;
 }

@@ -502,7 +502,7 @@ static void on_global(void *ud, struct wl_registry *reg, uint32_t name, const ch
 {
 	struct panel *p = ud;
 	if (!strcmp(iface, "fl_shell")) {
-		p->shell_ver = ver >= 5 ? 5 : ver >= 4 ? 4 : ver >= 3 ? 3 : ver >= 2 ? 2 : 1;
+		p->shell_ver = ver >= 6 ? 6 : ver >= 5 ? 5 : ver >= 4 ? 4 : ver >= 3 ? 3 : ver >= 2 ? 2 : 1;
 		p->shell = wl_registry_bind(reg, name, &fl_shell_interface, (uint32_t)p->shell_ver);
 		fl_shell_add_listener(p->shell, &shell_listener, p);
 	}
@@ -978,6 +978,7 @@ int main(int argc, char **argv)
 	fl_win_map(p.pw);
 	notify_init(&p);
 	battery_init(&p);
+	desk_init(&p);
 
 	if (p.demo) {
 		struct win demo[2] = {

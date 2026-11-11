@@ -25,8 +25,10 @@ static void usage(FILE *f)
 	      "  build [DIR]                build the recipe in DIR\n"
 	      "  repo add REPO FILE...      add packages to a repo\n"
 	      "  key generate NAME          create a signing key\n"
+	      "  key introduce --key OLD.key --new NEW.pub DIR   rotation statement (see docs/SECURITY.md)\n"
+	      "  key list                   the trusted keys and their retirement dates\n"
 	      "System:\n"
-	      "  fix-owners                 apply ownership a rootless install deferred\n"
+	      "  fix-owners [--keep]        apply ownership a rootless install deferred (--keep: leave the database alone)\n"
 	      "  snapshots                  list the btrfs snapshots taken before transactions\n"
 	      "  history                    show past transactions\n"
 	      "  version\n",
@@ -180,7 +182,7 @@ int main(int argc, char **argv)
 	if (!strcmp(cmd, "history"))
 		return cmd_history();
 	if (!strcmp(cmd, "fix-owners"))
-		return cmd_fix_owners();
+		return cmd_fix_owners(argc, argv);
 	if (!strcmp(cmd, "upgrade"))
 		return cmd_upgrade(argc, argv);
 	if (!strcmp(cmd, "sync"))

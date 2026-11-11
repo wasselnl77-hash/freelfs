@@ -215,6 +215,25 @@ static void sh_set_notifications(struct wl_client *c, struct wl_resource *r, str
 	C.notify = s;
 }
 
+static void sh_set_desktop(struct wl_client *c, struct wl_resource *r, struct wl_resource *sr, int32_t x, int32_t y)
+{
+	struct surface *s = wl_resource_get_user_data(sr);
+	if (s->role != ROLE_NONE && s->role != ROLE_DESKTOP) {
+		wl_resource_post_error(r, FL_SHELL_ERROR_ROLE, "surface already has a role");
+		return;
+	}
+	s->role = ROLE_DESKTOP;
+	if (C.desktop && C.desktop != s)
+		damage_tree(C.desktop);
+	if (s->px)
+		damage_tree(s);	/* the old place */
+	C.desktop = s;
+	C.desktop_x = x < 0 ? 0 : x;
+	C.desktop_y = y < 0 ? 0 : y;
+	if (s->px)
+		damage_tree(s);
+}
+
 static void sh_lock(struct wl_client *c, struct wl_resource *r, struct wl_resource *sr)
 {
 	struct surface *s = wl_resource_get_user_data(sr);
@@ -253,6 +272,7 @@ static void sh_toggle_overview(struct wl_client *c, struct wl_resource *r)
 }
 
 static const struct fl_shell_interface shell_impl = {
+	.set_desktop = sh_set_desktop,
 	.set_workspace = sh_set_workspace,
 	.move_window = sh_move_window,
 	.toggle_overview = sh_toggle_overview,
@@ -300,5 +320,5 @@ static void shell_bind(struct wl_client *c, void *data, uint32_t version, uint32
 
 void flshell_init(void)
 {
-	wl_global_create(C.dpy, &fl_shell_interface, 5, NULL, shell_bind);
+	wl_global_create(C.dpy, &fl_shell_interface, 6, NULL, shell_bind);
 }

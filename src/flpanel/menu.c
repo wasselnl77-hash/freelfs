@@ -121,6 +121,8 @@ static int load_file(const char *path, struct entry *e)
 			hidden |= !strcmp(v, "true");
 		else if (!strcmp(k, "Type"))
 			app = !strcmp(v, "Application");
+		else if (!strcmp(k, "X-FreeLFS-Desktop-Icon"))
+			e->desktop = !strcmp(v, "true");
 		else if (!strcmp(k, "X-FreeLFS-Glyph"))
 			snprintf(e->glyph, sizeof e->glyph, "%s", v);
 	}

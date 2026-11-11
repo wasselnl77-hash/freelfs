@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Make the sample files the M10 desktop test opens (build/m10-features.sh), as a small FAT disk
-image: sample.png, sample.pdf, sample.wav, sample.flac, sample.m4a, sample.mp4 (mpeg4 + aac), a zip
+image: sample.png, sample.pdf, sample.wav, sample.flac, sample.m4a, sample.mp3 (build/mk-mp3.py), sample.mp4 (mpeg4 + aac), a zip
 with a folder in it, a text file and a shell script. Everything is generated here (python3 standard
 library; the audio and video encoders are the ones of the FreeLFS ffmpeg run through its own loader),
 nothing is downloaded.
@@ -117,6 +117,9 @@ def main():
     wav(f"{d}/sample.wav")
     ff("-i", f"{d}/sample.wav", f"{d}/sample.flac")
     ff("-i", f"{d}/sample.wav", "-c:a", "aac", f"{d}/sample.m4a")
+    # mp3: the ffmpeg here has a decoder but no encoder; build/mk-mp3.py writes the frames by hand
+    subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(os.path.abspath(__file__)), "mk-mp3.py"),
+                    f"{d}/sample.mp3", "12"], check=True, stdout=subprocess.DEVNULL)
     video(f"{d}/sample.mp4", f"{d}/sample.wav")
     with zipfile.ZipFile(f"{d}/project.zip", "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("project/readme.txt", "FreeLFS zip test: this file came out of an archive.\n")

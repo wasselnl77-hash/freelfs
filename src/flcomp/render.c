@@ -8,7 +8,7 @@
 #include <time.h>
 #include <zlib.h>
 
-#define BG 0x001d2125u		/* fl bg: the desktop colour */
+#define BG P(bg)		/* fl bg: the desktop colour */
 
 /* ---- the wallpaper: scaled once to the output size, one cached buffer -------------------- */
 
@@ -252,6 +252,8 @@ static void composite_rect(struct rect clip)
 			for (int x = clip.x1; x < clip.x2; x++)
 				p[x] = BG;
 	}
+	if (desktop_visible())	/* the icons: above the wallpaper, below the windows */
+		draw_tree(C.desktop, clip);
 	struct window *w;
 	wl_list_for_each_reverse(w, &C.windows, link)
 		if (window_visible(w) && !(skip_pid && surface_pid(w->surf) == skip_pid)) {

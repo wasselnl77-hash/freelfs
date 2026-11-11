@@ -13,7 +13,7 @@ CORE = util.o hash.o version.o tar.o zst.o pkginfo.o spawn.o config.o pack.o pkg
 
 all: flpkg
 
-flpkg: main.o build.o db.o txn.o sysusers.o triggers.o cmd_pkg.o sign.o repo.o solve.o snapshot.o $(CORE)
+flpkg: main.o build.o db.o txn.o sysusers.o triggers.o cmd_pkg.o sign.o trust.o repo.o solve.o snapshot.o $(CORE)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 tests/test-core: tests/test-core.o $(CORE)
@@ -24,6 +24,7 @@ check: flpkg tests/test-core
 	./tests/test-build.sh
 	./tests/test-txn.sh
 	./tests/test-repo.sh
+	./tests/test-trust.sh
 	./tests/test-hook.sh
 
 %.o: %.c flpkg.h db.h txn.h repo.h sign.h

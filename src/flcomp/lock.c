@@ -24,9 +24,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BG 0x1d2125u
-#define TEXT 0xd8dce0u
-#define DIM 0x8a9199u
+#define BG P(bg)
+#define TEXT P(text)
+#define DIM P(dim)
 #define ACCENT theme_accent()	/* accent= of desktop.conf, see theme.c */
 #define QUICK_MS 5000	/* a lock program that dies within this counts as failing */
 #define HINT_MS 1500	/* nothing shows the lock for this long: say so */

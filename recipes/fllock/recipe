@@ -6,7 +6,7 @@ version=0.1
 release=2
 summary="FreeLFS lock screen: clock, date and password; the compositor holds the lock"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc flui wayland libxcrypt flcomp)
 # the checker runs as root for the group seat, like flpower in flpanel

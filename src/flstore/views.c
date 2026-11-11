@@ -10,6 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "flstore.h"
 
@@ -242,10 +243,42 @@ static void bar_indeterminate(fl_ui *ui, fl_rect bar)
 
 /* ---- Explore pages ------------------------------------------------------------------------------------ */
 
+/* The live system: no Flathub unless asked for. Plain words, the installer, and the room that is left. */
+static void live_notice(fl_ui *ui, struct St *s, int x, int y, int w)
+{
+	y = notice(ui, s, x, y, w, "Apps can be installed after you install FreeLFS",
+	           "This is the live system: everything it writes, apps and their downloads included, is kept in "
+	           "memory and is gone at shutdown. One Flatpak app with its runtime takes 1 to 2 GB, more than "
+	           "most computers have to spare here. Install FreeLFS on this computer first; then the whole "
+	           "Flathub catalog is yours to use.");
+	y += 18;
+	int bx = x;
+	if (access("/usr/bin/flinstall", X_OK) == 0) {
+		if (fl_button(ui, ID_LIVE_INSTALL, fl_r(bx, y, 170, 34), "Install FreeLFS", FL_BTN_ACCENT))
+			queue(s, A_LIVE_INSTALL, 0);
+		bx += 182;
+	}
+	if (fl_button(ui, ID_LIVE_TRY, fl_r(bx, y, 220, 34), "Try one small app anyway", FL_BTN_OUTLINE))
+		queue(s, A_LIVE_TRY, 0);
+	y += 50;
+	long mb = free_mb_home();
+	char t[200];
+	if (mb >= 0)
+		snprintf(t, sizeof t, "Room left for apps and downloads right now: %ld MB (memory). \"Try\" loads the Flathub "
+		         "catalog, which takes about 100 MB of it.", mb);
+	else
+		snprintf(t, sizeof t, "\"Try\" loads the Flathub catalog, which takes about 100 MB of memory.");
+	text_block(ui, s->small, x, y, w, fl_th.dim, t, 4);
+}
+
 static void catalog_notice(fl_ui *ui, struct St *s, fl_rect body)
 {
 	fl_fill_rect(&ui->cv, body, fl_th.bg);
 	int x = body.x + PAD, w = body.w - 2 * PAD, y = body.y + PAD;
+	if (s->live && !s->live_try) {
+		live_notice(ui, s, x, y, w);
+		return;
+	}
 	if (s->idx_state == IDX_ERR) {
 		y = notice(ui, s, x, y, w, "The Flathub catalog could not be loaded.", s->idx_err);
 		y += 8;

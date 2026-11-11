@@ -6,16 +6,16 @@
 # FreeBWS serves them to pages that carry DSSL tags (see src/freebws/freebws.c).
 pkgname=freebws
 version=0.1
-release=9
+release=10
 dssl=0.16.3
 summary="FreeBWS: web browser on WPE WebKit with a libflui toolbar"
 # The program is MIT. The ad blocker's filter lists (data files in /usr/share/freebws/lists, read at
 # run time, not part of the program) keep their own licenses: EasyList and EasyPrivacy GPL-3.0-or-later
 # or CC BY-SA 3.0, uBlock filters GPL-3.0-or-later (see lists/LICENSES and COPYING-GPL3 there).
 license=(MIT GPL3 CCBYSA3)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
-depends=(glibc glib libsoup flui libdssl wayland wpewebkit wpebackend-fdo libwpe gst-plugins-good gst-libav shared-mime-info ca-certificates)
+depends=(glibc glib libsoup flui libdssl wayland wpewebkit wpebackend-fdo libwpe gst-plugins-good gst-libav shared-mime-info ca-certificates bubblewrap xdg-dbus-proxy)
 makedepends=(flui libdssl wayland-protocols wpewebkit wpebackend-fdo libwpe libsoup pkgconf xz)
 # dssl-engine.tar.gz is the engine package of commit 0d7ad1f (v0.16.3) of
 # huggingface.co/EHS-Studio/dssl; its LICENSE (MIT) is installed with it.

@@ -1,10 +1,10 @@
 # libflui, the FreeLFS desktop toolkit, from src/flui in the FreeLFS tree.
 pkgname=flui
 version=0.1
-release=8
+release=9
 summary="FreeLFS desktop toolkit: drawing, text, widgets, Wayland client glue"
 license=(MIT)
-arch=(x86_64 aarch64)
+arch=(x86_64)
 groups=(desktop)
 depends=(glibc wayland libxkbcommon freetype harfbuzz fontconfig ibm-plex)
 makedepends=(wayland-protocols)

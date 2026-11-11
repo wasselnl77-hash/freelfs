@@ -8,8 +8,11 @@ CFLAGS += -std=c17 -D_GNU_SOURCE -Wall -Wextra -Wshadow -Wno-unused-parameter
 PREFIX ?= /usr
 DESTDIR ?=
 
-PKGS = wayland-server libdrm libinput libseat xkbcommon libudev egl gbm glesv2 libpng xcb xcb-xfixes xcb-composite xcb-res
-PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
+PKGS = wayland-server libdrm libinput libseat xkbcommon libudev libpng xcb xcb-xfixes xcb-composite xcb-res
+# EGL, GBM and GLES: headers only. gl.c loads the libraries with dlopen when a client needs the GPU path
+# (linked, they pull libgallium and libLLVM into every session: 20 MB of RAM at idle).
+GLPKGS = egl gbm glesv2
+PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS) $(GLPKGS))
 PKG_LIBS = $(shell pkg-config --libs $(PKGS)) -lz
 SCANNER ?= wayland-scanner
 WLPROTO ?= $(shell pkg-config --variable=pkgdatadir wayland-protocols)

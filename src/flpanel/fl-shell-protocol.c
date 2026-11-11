@@ -32,6 +32,9 @@ static const struct wl_interface *fl_shell_types[] = {
 	NULL,
 	&wl_surface_interface,
 	&wl_surface_interface,
+	&wl_surface_interface,
+	NULL,
+	NULL,
 };
 
 static const struct wl_message fl_shell_requests[] = {
@@ -54,6 +57,7 @@ static const struct wl_message fl_shell_requests[] = {
 	{ "set_workspace", "5u", fl_shell_types + 0 },
 	{ "move_window", "5uu", fl_shell_types + 0 },
 	{ "toggle_overview", "5", fl_shell_types + 0 },
+	{ "set_desktop", "6oii", fl_shell_types + 11 },
 };
 
 static const struct wl_message fl_shell_events[] = {
@@ -74,8 +78,8 @@ static const struct wl_message fl_shell_events[] = {
 };
 
 WL_PRIVATE const struct wl_interface fl_shell_interface = {
-	"fl_shell", 5,
-	19, fl_shell_requests,
+	"fl_shell", 6,
+	20, fl_shell_requests,
 	14, fl_shell_events,
 };
 

@@ -68,6 +68,29 @@ FL_API void fl_conf_load(void); /* reads the file and applies theme= */
 FL_API const char *fl_conf_get(const char *key, const char *def);
 FL_API int fl_conf_int(const char *key, int def);
 FL_API int fl_conf_set(const char *key, const char *val); /* writes the file; 0 or -1 */
+/* n pairs {key, value, key, value, ...} in one write (watchers wake once); a NULL value removes the key */
+FL_API int fl_conf_set_many(const char *const *pairs, int n);
+FL_API int fl_conf_unset(const char *key);
+
+/* The look that is not a colour, from desktop.conf (fl_conf_load and fl_conf_set refresh it; apps
+ * that fl_app_watch_conf follow live). Keys and defaults:
+ *   font=IBM Plex Sans   font_size=13 (10..18)   buttons=right|left   titlebar=normal|compact
+ *   panel_position=bottom|top   panel_height=44 (36..64)   panel_icon_size=20 (16..28)
+ *   animations=on|reduced|off   animation_speed=1.0 (0.1..4)
+ * font_size scales every fl_font_ui font (13 is 1.0), the family replaces IBM Plex Sans in all of
+ * them; the monospace font is not touched. Corners are always square, there is no setting. */
+typedef struct {
+	char ui_font[48];
+	float font_px;       /* the UI size, 13 is the design size */
+	int buttons_left;    /* window buttons at the left of the title bar */
+	int title_h;         /* title bar height: 34 normal, 28 compact */
+	int panel_h;         /* panel height */
+	int panel_top;       /* panel at the top edge */
+	int panel_icon;      /* icon size in the panel's window entries */
+	int anim;            /* 0 off, 1 reduced (fades only), 2 on */
+	float anim_speed;    /* factor on how fast: 2 is twice as fast */
+} fl_look;
+extern FL_API fl_look fl_lk;
 
 /* Accent colour: accent= in desktop.conf is an id from fl_accents or a hex colour. Apps that
  * use fl_app_watch_conf pick a change up live (the theme is re-applied, windows redraw). */
@@ -128,7 +151,11 @@ FL_API fl_icon fl_icon_for_app(const char *app_id);
 
 /* family as fontconfig knows it; weight 400, 500, 600, 700; px may be fractional */
 FL_API fl_font *fl_font_open(const char *family, int weight, int italic, float px);
-FL_API fl_font *fl_font_ui(int weight, float px);   /* IBM Plex Sans */
+FL_API fl_font *fl_font_ui(int weight, float px);   /* the UI font (fl_lk.ui_font, IBM Plex Sans) at px * font_size / 13 */
+/* The look changed (conf.c calls this): every UI font takes the new family and scale at once. */
+FL_API void fl_text_set_look(const char *family, float scale);
+/* 1 when fontconfig has this family (not a substitute), for pickers */
+FL_API int fl_font_family_exists(const char *family);
 FL_API fl_font *fl_font_mono(int weight, float px); /* IBM Plex Mono */
 FL_API void fl_font_close(fl_font *f);
 FL_API int fl_font_ascent(const fl_font *f);
@@ -245,6 +272,7 @@ FL_API fl_ui *fl_win_ui(fl_win *w);
 FL_API fl_rect fl_win_content(const fl_win *w); /* inside the decorations */
 FL_API int fl_win_active(const fl_win *w);
 FL_API void fl_win_minimize(fl_win *w);
+FL_API void fl_win_maximize(fl_win *w); /* ask for the whole work area (below the panel), not fullscreen */
 
 /* fds and timers; the callback gets the revents of poll(2). */
 FL_API int fl_fd_add(fl_app *a, int fd, short events, void (*cb)(void *ud, int fd, short rev),

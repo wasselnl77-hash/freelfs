@@ -85,6 +85,8 @@ static void respond(WebKitURISchemeRequest *req, const char *mime, char *data, g
 	g_object_unref(in);
 }
 
+const char *pages_sandbox_status;
+
 static void scheme_cb(WebKitURISchemeRequest *req, gpointer ud)
 {
 	GUri *u = g_uri_parse(webkit_uri_scheme_request_get_uri(req), G_URI_FLAGS_PARSE_RELAXED, NULL);
@@ -117,6 +119,12 @@ static void scheme_cb(WebKitURISchemeRequest *req, gpointer ud)
 		webkit_uri_scheme_request_finish_error(req, e);
 		g_error_free(e);
 	} else {
+		if (host && !strcmp(host, "settings")) {
+			char *sb = html_esc(pages_sandbox_status ? pages_sandbox_status : "");
+			data = replace_all(data, "@SANDBOX@", sb);
+			len = strlen(data);
+			g_free(sb);
+		}
 		if (host && !strcmp(host, "start")) {
 			const struct engine *en = search_current();
 			char *act = html_esc(en->action), *par = html_esc(en->param), *nm = html_esc(en->name);

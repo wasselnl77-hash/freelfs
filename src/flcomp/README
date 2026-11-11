@@ -63,7 +63,9 @@ GPU the first client that binds the global makes flcomp start EGL on the DRM
 device through GBM; then every modifier the GPU can sample is announced and a
 tiled or compressed buffer is imported as an EGLImage, drawn by GLES2 into a
 linear texture and read back into the surface copy. A session of shm clients
-never loads EGL. FLCOMP_NO_GL=1 turns the GPU path off. wl_drm (old EGL
+never loads EGL: gl.c reaches EGL, GBM and GLES through dlopen when the first client
+binds the global (linked, they pulled libgallium, libLLVM and SPIRV-Tools into every
+session: flcomp went from 33 MB to 12 MB PSS on the idle live desktop). FLCOMP_NO_GL=1 turns the GPU path off. wl_drm (old EGL
 clients without dmabuf) and a GPU compositing path are not implemented.
 
 Keyboard layout comes from /etc/keyboard.conf (LAYOUT=de, optional VARIANT=
@@ -71,7 +73,7 @@ and OPTIONS=, default us) and can be changed at run time with
 fl_shell.set_keyboard_layout (not saved).
 
 Globals: wl_compositor 4, wl_subcompositor 1, wl_shm, wl_output 3, wl_seat 5, xwayland_shell_v1 1 (Xwayland only),
-wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 4.
+wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 6.
 
 desktop.conf (config.c, ~/.config/freelfs/desktop.conf, $FLUI_CONF; watched with
 inotify, changes apply at once, except display mode and scale)
@@ -118,6 +120,11 @@ menu_dismissed (attach a buffer again to show it). A click on the panel
 itself never dismisses it, the panel decides. The flyout (set_flyout) works the
 same way for a small popup directly above the panel, centred on x and kept on
 screen; it sends flyout_dismissed.
+
+Desktop icons (fl_shell 6 set_desktop(surface, x, y); surface.c, render.c): a small transparent surface
+drawn above the wallpaper and below every window, on every workspace, at x, y. Only what is drawn takes the
+pointer. flpanel (deskicons.c) uses it for the programs whose .desktop file says X-FreeLFS-Desktop-Icon=true
+("FreeLFS install" on the live system); the compositor has no icon logic of its own.
 
 Notifications (fl_shell 4 set_notifications): the panel's card surface goes to the top
 right of the screen, 16 px from the edges, above windows, panel, menu and flyout. It is

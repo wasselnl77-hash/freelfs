@@ -27,7 +27,9 @@ which starts the snapshot read-only with rootflags=subvol=@snapshots/N; (2) chec
 (3) "Make this the current state": the desktop notice (flsnap-notice, which the
 session should start once; it does nothing on a normal boot), Settings > Snapshots, or
 `flsnap rollback`. Rollback mounts the top level of the file system (subvolid=5) and
-  - moves @ to @snapshots/M, so the state left is a snapshot too ("before going back to #N"),
+  - moves @ to @snapshots/M, so the state left is a snapshot too ("before going back to #N"; its
+    package list is read with `flpkg --root` from the @ that is left, not from the running system,
+    which is the old snapshot when you roll back from one),
   - makes a writable snapshot of @snapshots/N as the new @,
   - sets it as the default subvolume (fstab mounts / without subvol=, flboot's default
     entries rely on that),

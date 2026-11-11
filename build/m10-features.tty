@@ -90,6 +90,18 @@ key audioplay
 wait 2
 run m10sh 'flmusic --ctl status'
 run pkill -x flmusic; echo music-closed
+# mp3 (made by build/mk-mp3.py: the ffmpeg here cannot encode it): must play and move on
+run m10app flmusic /usr/tester/m10/sample.mp3
+wait 5
+run m10sh 'flmusic --ctl status'
+run m10sh 'flmusic --ctl play'
+wait 3
+shot @S@/music-mp3.ppm
+run m10sh 'flmusic --ctl status'
+wait 4
+run m10sh 'flmusic --ctl status'
+run m10sh 'grep -c . /usr/tester/.local/state/freelfs/log/flmusic.log 2>/dev/null; tail -n 5 /tmp/m10app.log'
+run pkill -x flmusic; echo mp3-closed
 run m10app flvideo /usr/tester/m10/sample.mp4
 wait 6
 shot @S@/video.ppm

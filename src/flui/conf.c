@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "internal.h"
+#include "flpalette.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -18,33 +19,24 @@ fl_theme fl_th = {
 	.strong = FL_HEX(0xf0f2f4), .term_bg = FL_HEX(0x16191c), .err = FL_HEX(0xe06c6c), .dark = 1,
 };
 
+/* the look settings that are not colours: see flui.h (fl_look) */
+fl_look fl_lk = {
+	.ui_font = "IBM Plex Sans", .font_px = 13, .buttons_left = 0, .title_h = 34, .panel_h = 44,
+	.panel_top = 0, .panel_icon = 20, .anim = 2, .anim_speed = 1.0f,
+};
+
 /* ---- accent colour ---------------------------------------------------------------------
  * accent= in desktop.conf is one of the ids below or a hex colour (RRGGBB, #RRGGBB). Every
  * accent has a dark-theme and a light-theme shade; a hex colour is used as is on dark and
  * darkened on light. on_accent (text on an accent fill) is picked for contrast and the
  * selection fill is the accent thinly mixed into the panel colour. */
 
+/* the table lives in flpalette.h, shared with the compositor */
 const fl_accent fl_accents[FL_ACCENT_COUNT] = {
-	{"green",  "Green",  FL_HEX(0x3f9b63), FL_HEX(0x2c7a4b)},
-	{"teal",   "Teal",   FL_HEX(0x35a09b), FL_HEX(0x217c78)},
-	{"blue",   "Blue",   FL_HEX(0x4d8fd0), FL_HEX(0x2f6cae)},
-	{"amber",  "Amber",  FL_HEX(0xd0a032), FL_HEX(0x9a7210)},
-	{"orange", "Orange", FL_HEX(0xe0793f), FL_HEX(0xb35318)},
-	{"rose",   "Rose",   FL_HEX(0xd4678c), FL_HEX(0xab4569)},
+#define A(i) {flpal_accents[i].id, flpal_accents[i].name, FL_HEX(flpal_accents[i].dark), FL_HEX(flpal_accents[i].light)}
+	A(0), A(1), A(2), A(3), A(4), A(5),
+#undef A
 };
-
-static int parse_hex(const char *s, fl_color *out)
-{
-	if (*s == '#')
-		s++;
-	if (strlen(s) != 6)
-		return -1;
-	for (int i = 0; i < 6; i++)
-		if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f') || (s[i] >= 'A' && s[i] <= 'F')))
-			return -1;
-	*out = FL_HEX(strtoul(s, NULL, 16));
-	return 0;
-}
 
 int fl_accent_find(const char *id)
 {
@@ -57,68 +49,23 @@ int fl_accent_find(const char *id)
 /* The accent in desktop.conf, as shown on a dark or light theme. */
 fl_color fl_accent_current(int dark)
 {
-	const char *v = fl_conf_get("accent", "green");
-	int i = fl_accent_find(v);
-	if (i >= 0)
-		return dark ? fl_accents[i].dark : fl_accents[i].light;
-	fl_color c;
-	if (parse_hex(v, &c) == 0)
-		return dark ? c : fl_mix(c, FL_HEX(0x000000), 56);
-	return dark ? fl_accents[0].dark : fl_accents[0].light;
+	return flpal_accent(fl_conf_get("accent", "green"), dark);
 }
 
-static unsigned chan_lin(unsigned c8)
+static void pal_to_theme(const struct flpal *p)
 {
-	/* sRGB to linear, scaled to 0..1000 */
-	float c = (float)c8 / 255.0f;
-	c = c <= 0.04045f ? c / 12.92f : __builtin_powf((c + 0.055f) / 1.055f, 2.4f);
-	return (unsigned)(c * 1000.0f);
-}
-
-static unsigned lum(fl_color c)
-{
-	return (2126 * chan_lin(c >> 16 & 255) + 7152 * chan_lin(c >> 8 & 255) + 722 * chan_lin(c & 255)) / 10000;
-}
-
-/* the text colour with the better contrast on a fill */
-static fl_color on_fill(fl_color fill, fl_color dark_text, fl_color light_text)
-{
-	unsigned l = lum(fill) + 50, d = lum(dark_text) + 50, w = lum(light_text) + 50;
-	unsigned cd = l > d ? l * 100 / d : d * 100 / l, cw = l > w ? l * 100 / w : w * 100 / l;
-	return cd >= cw ? dark_text : light_text;
-}
-
-static void theme_base(int dark)
-{
-	if (dark) {
-		fl_th = (fl_theme){
-			.bg = FL_HEX(0x1d2125), .panel = FL_HEX(0x272c33), .raised = FL_HEX(0x343a43),
-			.line = FL_HEX(0x3a4048), .text = FL_HEX(0xd8dce0), .dim = FL_HEX(0x8a9199),
-			.accent = FL_HEX(0x3f9b63), .on_accent = FL_HEX(0x0e1a13), .select = FL_HEX(0x2f4a3b),
-			.strong = FL_HEX(0xf0f2f4), .term_bg = FL_HEX(0x16191c), .err = FL_HEX(0xe06c6c), .dark = 1,
-		};
-	} else {
-		fl_th = (fl_theme){
-			.bg = FL_HEX(0xdfe3e7), .panel = FL_HEX(0xf4f5f7), .raised = FL_HEX(0xffffff),
-			.line = FL_HEX(0xc6ccd3), .text = FL_HEX(0x1d2125), .dim = FL_HEX(0x565e67),
-			.accent = FL_HEX(0x2c7a4b), .on_accent = FL_HEX(0xffffff), .select = FL_HEX(0xcfe6d8),
-			.strong = FL_HEX(0x1d2125), .term_bg = FL_HEX(0x16191c), .err = FL_HEX(0xb83b3b), .dark = 0,
-		};
-	}
+	fl_th = (fl_theme){
+		.bg = p->bg, .panel = p->panel, .raised = p->raised, .line = p->line, .text = p->text,
+		.dim = p->dim, .accent = p->accent, .on_accent = p->on_accent, .select = p->select,
+		.strong = p->strong, .term_bg = p->term_bg, .err = p->err, .dark = p->dark,
+	};
 }
 
 void fl_theme_set(int dark)
 {
-	theme_base(dark);
-	/* the user's accent (the default green leaves the tokens above exactly as they were) */
-	const char *v = fl_conf_get("accent", NULL);
-	if (!v || !*v || !strcmp(v, "green"))
-		return;
-	fl_color a = fl_accent_current(dark);
-	fl_th.accent = a;
-	fl_th.on_accent = dark ? on_fill(a, FL_HEX(0x0e1418), FL_HEX(0xf0f2f4))
-	                       : on_fill(a, FL_HEX(0x0e1418), FL_HEX(0xffffff));
-	fl_th.select = fl_mix(fl_th.panel, a, dark ? 70 : 56);
+	struct flpal p;
+	flpal_make(&p, dark, fl_conf_get("accent", NULL));
+	pal_to_theme(&p);
 }
 
 /* ---- the file ----------------------------------------------------------------- */
@@ -186,10 +133,34 @@ static void read_file(void)
 	fclose(f);
 }
 
+/* the non-colour look settings (desktop.conf: font, font_size, buttons, titlebar, panel_*,
+ * animations, animation_speed); fonts follow at once through fl_text_set_look */
+static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+static void look_apply(void)
+{
+	fl_look l = {.font_px = 13, .title_h = 34, .panel_h = 44, .panel_icon = 20, .anim = 2, .anim_speed = 1.0f};
+	const char *v = fl_conf_get("font", "");
+	snprintf(l.ui_font, sizeof l.ui_font, "%s", *v ? v : "IBM Plex Sans");
+	l.font_px = (float)clampi(fl_conf_int("font_size", 13), 10, 18);
+	l.buttons_left = !strcmp(fl_conf_get("buttons", "right"), "left");
+	l.title_h = !strcmp(fl_conf_get("titlebar", "normal"), "compact") ? 28 : 34;
+	l.panel_h = clampi(fl_conf_int("panel_height", 44), 36, 64);
+	l.panel_top = !strcmp(fl_conf_get("panel_position", "bottom"), "top");
+	l.panel_icon = clampi(fl_conf_int("panel_icon_size", 20), 16, 28);
+	v = fl_conf_get("animations", "on");
+	l.anim = !strcmp(v, "off") || !strcmp(v, "0") ? 0 : !strcmp(v, "reduced") ? 1 : 2;
+	float sp = (float)atof(fl_conf_get("animation_speed", "1"));
+	l.anim_speed = sp < 0.1f ? 0.1f : sp > 4.0f ? 4.0f : sp;
+	fl_lk = l;
+	fl_text_set_look(l.ui_font, l.font_px / 13.0f);
+}
+
 void fl_conf_load(void)
 {
 	read_file();
 	fl_theme_set(strcmp(fl_conf_get("theme", "dark"), "light") != 0);
+	look_apply();
 }
 
 const char *fl_conf_get(const char *key, const char *def)
@@ -206,10 +177,25 @@ int fl_conf_int(const char *key, int def)
 	return v ? atoi(v) : def;
 }
 
-int fl_conf_set(const char *key, const char *val)
+static void kv_del(const char *k)
+{
+	for (int i = 0; i < nkv; i++)
+		if (!strcmp(kv[i].key, k)) {
+			kv[i] = kv[--nkv];
+			return;
+		}
+}
+
+/* pairs[0], pairs[1] = key, value; a NULL value removes the key. One write, so watchers wake once. */
+int fl_conf_set_many(const char *const *pairs, int n)
 {
 	read_file(); /* keep what others wrote */
-	kv_set(key, val);
+	for (int i = 0; i < n; i++) {
+		if (pairs[2 * i + 1])
+			kv_set(pairs[2 * i], pairs[2 * i + 1]);
+		else
+			kv_del(pairs[2 * i]);
+	}
 	const char *path = fl_conf_path();
 	char dir[512], tmp[560];
 	snprintf(dir, sizeof dir, "%s", path);
@@ -235,7 +221,20 @@ int fl_conf_set(const char *key, const char *val)
 		return -1;
 	}
 	fl_theme_set(strcmp(fl_conf_get("theme", "dark"), "light") != 0);
+	look_apply();
 	return 0;
+}
+
+int fl_conf_set(const char *key, const char *val)
+{
+	const char *p[2] = {key, val};
+	return fl_conf_set_many(p, 1);
+}
+
+int fl_conf_unset(const char *key)
+{
+	const char *p[2] = {key, NULL};
+	return fl_conf_set_many(p, 1);
 }
 
 /* ---- watching it ------------------------------------------------------------------ */
@@ -262,7 +261,10 @@ static void watch_ready(void *ud, int fd, short rev)
 	}
 	if (!hit)
 		return;
+	int old_title = fl_lk.title_h;
 	fl_conf_load();
+	if (fl_lk.title_h != old_title)
+		fl_wins_relayout(w->app);
 	fl_win_redraw_all(w->app);
 	if (w->cb)
 		w->cb(w->ud);

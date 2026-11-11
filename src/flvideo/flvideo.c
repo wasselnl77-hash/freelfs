@@ -12,13 +12,18 @@
 #include <limits.h>
 #include <math.h>
 #include <poll.h>
+#include <signal.h>
+#include <spawn.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <dbus/dbus.h>
 
 #include <mpv/client.h>
 #include <mpv/render.h>
@@ -30,7 +35,7 @@
 #define HIDE_MS 2800
 
 enum { ID_VIDEO = 1, ID_PLAY, ID_BACK, ID_FWD, ID_SEEK, ID_SPEED, ID_AUDIO, ID_SUBS, ID_MUTE, ID_VOL, ID_FULL,
-       ID_MENU = 100 };
+       ID_OPEN, ID_MENU = 100 };
 
 struct trk {
 	int id, sel;
@@ -72,6 +77,11 @@ struct V {
 	double start_at;
 	int start_paused;
 	char resume_path[PATH_MAX];
+	/* the file picker: a child process (flvideo --pick-file) asks the portal and prints the path */
+	pid_t pick_pid;
+	int pick_fd;
+	char pick_buf[PATH_MAX + 8];
+	size_t pick_len;
 };
 
 static long long now_ms(void)
@@ -532,6 +542,257 @@ static void toggle_fullscreen(struct V *v)
 	fl_timer_arm(v->swap_timer, 1, 0);
 }
 
+/* ---- open a file: the portal's file dialog (flportal) -------------------------------------- */
+
+/* "flvideo --pick-file": ask xdg-desktop-portal's FileChooser for one video and print its path.
+ * Runs as a child process of the player so the window never waits for the dialog. Exit 0: path
+ * on stdout, 1: cancelled, 2: no dialog available (message on stderr). */
+static void put_str(DBusMessageIter *it, const char *k, int type, const char *sig, const void *val)
+{
+	DBusMessageIter e, var;
+	dbus_message_iter_open_container(it, DBUS_TYPE_DICT_ENTRY, NULL, &e);
+	dbus_message_iter_append_basic(&e, DBUS_TYPE_STRING, &k);
+	dbus_message_iter_open_container(&e, DBUS_TYPE_VARIANT, sig, &var);
+	dbus_message_iter_append_basic(&var, type, val);
+	dbus_message_iter_close_container(&e, &var);
+	dbus_message_iter_close_container(it, &e);
+}
+
+static void put_filters(DBusMessageIter *opts)
+{
+	/* filters: a(sa(us)); (0, glob) or (1, mime type) */
+	static const struct { const char *name, *pat; unsigned kind; } f[] = {
+		{"Videos", "video/*", 1}, {"All files", "*", 0},
+	};
+	DBusMessageIter e, var, arr;
+	const char *k = "filters";
+	dbus_message_iter_open_container(opts, DBUS_TYPE_DICT_ENTRY, NULL, &e);
+	dbus_message_iter_append_basic(&e, DBUS_TYPE_STRING, &k);
+	dbus_message_iter_open_container(&e, DBUS_TYPE_VARIANT, "a(sa(us))", &var);
+	dbus_message_iter_open_container(&var, DBUS_TYPE_ARRAY, "(sa(us))", &arr);
+	for (size_t i = 0; i < sizeof f / sizeof *f; i++) {
+		DBusMessageIter st, pats, ps;
+		dbus_message_iter_open_container(&arr, DBUS_TYPE_STRUCT, NULL, &st);
+		dbus_message_iter_append_basic(&st, DBUS_TYPE_STRING, &f[i].name);
+		dbus_message_iter_open_container(&st, DBUS_TYPE_ARRAY, "(us)", &pats);
+		dbus_message_iter_open_container(&pats, DBUS_TYPE_STRUCT, NULL, &ps);
+		dbus_uint32_t kind = f[i].kind;
+		dbus_message_iter_append_basic(&ps, DBUS_TYPE_UINT32, &kind);
+		dbus_message_iter_append_basic(&ps, DBUS_TYPE_STRING, &f[i].pat);
+		dbus_message_iter_close_container(&pats, &ps);
+		dbus_message_iter_close_container(&st, &pats);
+		dbus_message_iter_close_container(&arr, &st);
+	}
+	dbus_message_iter_close_container(&var, &arr);
+	dbus_message_iter_close_container(&e, &var);
+	dbus_message_iter_close_container(opts, &e);
+}
+
+static void uri_to_path(const char *uri, char *out, size_t cap)
+{
+	if (!strncmp(uri, "file://", 7))
+		uri += 7;
+	size_t n = 0;
+	for (; *uri && n + 1 < cap; uri++) {
+		if (*uri == '%' && uri[1] && uri[2]) {
+			char h[3] = {uri[1], uri[2], 0}, *end;
+			long c = strtol(h, &end, 16);
+			if (!*end) {
+				out[n++] = (char)c;
+				uri += 2;
+				continue;
+			}
+		}
+		out[n++] = *uri;
+	}
+	out[n] = 0;
+}
+
+static int pick_child(void)
+{
+	DBusError err;
+	dbus_error_init(&err);
+	DBusConnection *c = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
+	if (!c) {
+		fprintf(stderr, "flvideo: no session bus: %s\n", err.message ? err.message : "?");
+		return 2;
+	}
+	dbus_connection_set_exit_on_disconnect(c, FALSE);
+	char sender[96], token[48], rpath[256], rule[400];
+	const char *me = dbus_bus_get_unique_name(c);
+	snprintf(sender, sizeof sender, "%s", me && *me ? me + 1 : "x");
+	for (char *p = sender; *p; p++)
+		if (*p == '.')
+			*p = '_';
+	snprintf(token, sizeof token, "flvideo%d", (int)getpid());
+	snprintf(rpath, sizeof rpath, "/org/freedesktop/portal/desktop/request/%s/%s", sender, token);
+	snprintf(rule, sizeof rule,
+	         "type='signal',interface='org.freedesktop.portal.Request',member='Response',path='%s'", rpath);
+	dbus_bus_add_match(c, rule, &err);
+	if (dbus_error_is_set(&err)) {
+		fprintf(stderr, "flvideo: %s\n", err.message);
+		return 2;
+	}
+	DBusMessage *m = dbus_message_new_method_call("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+	                                              "org.freedesktop.portal.FileChooser", "OpenFile");
+	const char *parent = "", *title = "Open a video";
+	DBusMessageIter it, opts;
+	dbus_message_iter_init_append(m, &it);
+	dbus_message_iter_append_basic(&it, DBUS_TYPE_STRING, &parent);
+	dbus_message_iter_append_basic(&it, DBUS_TYPE_STRING, &title);
+	dbus_message_iter_open_container(&it, DBUS_TYPE_ARRAY, "{sv}", &opts);
+	const char *tok = token;
+	put_str(&opts, "handle_token", DBUS_TYPE_STRING, "s", &tok);
+	dbus_bool_t no = FALSE;
+	put_str(&opts, "multiple", DBUS_TYPE_BOOLEAN, "b", &no);
+	put_filters(&opts);
+	dbus_message_iter_close_container(&it, &opts);
+	DBusMessage *r = dbus_connection_send_with_reply_and_block(c, m, 30000, &err);
+	dbus_message_unref(m);
+	if (!r) {
+		fprintf(stderr, "flvideo: the file dialog is not available: %s\n", err.message ? err.message : "?");
+		return 2;
+	}
+	dbus_message_unref(r);
+	for (;;) {
+		DBusMessage *sm;
+		while ((sm = dbus_connection_pop_message(c))) {
+			if (!dbus_message_is_signal(sm, "org.freedesktop.portal.Request", "Response")) {
+				dbus_message_unref(sm);
+				continue;
+			}
+			DBusMessageIter si, dict;
+			dbus_uint32_t resp = 2;
+			if (!dbus_message_iter_init(sm, &si))
+				return 2;
+			dbus_message_iter_get_basic(&si, &resp);
+			if (resp != 0)
+				return resp == 1 ? 1 : 2;
+			dbus_message_iter_next(&si);
+			dbus_message_iter_recurse(&si, &dict);
+			for (; dbus_message_iter_get_arg_type(&dict) == DBUS_TYPE_DICT_ENTRY; dbus_message_iter_next(&dict)) {
+				DBusMessageIter e, var, arr;
+				const char *k = NULL;
+				dbus_message_iter_recurse(&dict, &e);
+				dbus_message_iter_get_basic(&e, &k);
+				if (!k || strcmp(k, "uris"))
+					continue;
+				dbus_message_iter_next(&e);
+				dbus_message_iter_recurse(&e, &var);
+				dbus_message_iter_recurse(&var, &arr);
+				if (dbus_message_iter_get_arg_type(&arr) == DBUS_TYPE_STRING) {
+					const char *uri;
+					char path[PATH_MAX];
+					dbus_message_iter_get_basic(&arr, &uri);
+					uri_to_path(uri, path, sizeof path);
+					printf("%s\n", path);
+					fflush(stdout);
+					return 0;
+				}
+			}
+			return 1;
+		}
+		if (!dbus_connection_read_write(c, -1)) {
+			fprintf(stderr, "flvideo: lost the session bus\n");
+			return 2;
+		}
+	}
+}
+
+/* load FILE in the running player */
+static void open_path(struct V *v, const char *path)
+{
+	char real[PATH_MAX];
+	if (!v->mpv)
+		return;
+	if (!realpath(path, real)) {
+		say(v, 1, "Cannot open %s: %s", path, strerror(errno));
+		return;
+	}
+	save_position(v);
+	snprintf(v->path, sizeof v->path, "%s", real);
+	v->loaded = v->ended = v->msg_err = 0;
+	v->pos = v->dur = 0;
+	v->naud = v->nsub = 0;
+	v->vvalid = 0;
+	v->title[0] = 0;
+	v->menu = 0;
+	fl_win_set_title(v->win, "Videos");
+	double at = resume_get(v->path);
+	char start[32];
+	snprintf(start, sizeof start, "%.2f", at > 0 ? at : 0.0);
+	set_prop(v, "start", start);
+	const char *args[] = {"loadfile", v->path, "replace", NULL};
+	mpv_command_async(v->mpv, 0, args);
+	v->msg[0] = 0;
+	fl_win_redraw(v->win);
+}
+
+static void pick_done(struct V *v)
+{
+	fl_fd_remove(v->app, v->pick_fd);
+	close(v->pick_fd);
+	int st = 0;
+	while (waitpid(v->pick_pid, &st, 0) < 0 && errno == EINTR)
+		;
+	v->pick_pid = 0;
+	v->pick_fd = -1;
+	int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 2;
+	char *nl = memchr(v->pick_buf, '\n', v->pick_len);
+	if (nl)
+		*nl = 0;
+	else
+		v->pick_buf[v->pick_len] = 0;
+	if (rc == 0 && v->pick_buf[0])
+		open_path(v, v->pick_buf);
+	else if (rc != 1)
+		say(v, 1, "The file dialog did not open (needs the desktop portal). Open the file from Files instead.");
+	fl_win_redraw(v->win);
+}
+
+static void on_pick_fd(void *ud, int fd, short rev)
+{
+	struct V *v = ud;
+	ssize_t n = read(fd, v->pick_buf + v->pick_len, sizeof v->pick_buf - 1 - v->pick_len);
+	if (n > 0) {
+		v->pick_len += (size_t)n;
+		if (v->pick_len < sizeof v->pick_buf - 1)
+			return;
+	} else if (n < 0 && (errno == EINTR || errno == EAGAIN)) {
+		return;
+	}
+	pick_done(v);
+}
+
+extern char **environ;
+
+/* Open action: the dialog runs in a child process; nothing happens while one is already open */
+static void pick_start(struct V *v)
+{
+	if (v->pick_pid)
+		return;
+	int p[2];
+	if (pipe2(p, O_CLOEXEC) < 0)
+		return;
+	posix_spawn_file_actions_t fa;
+	posix_spawn_file_actions_init(&fa);
+	posix_spawn_file_actions_adddup2(&fa, p[1], 1);
+	char *argv[] = {"flvideo", "--pick-file", NULL};
+	pid_t pid;
+	int rc = posix_spawn(&pid, "/proc/self/exe", &fa, NULL, argv, environ);
+	posix_spawn_file_actions_destroy(&fa);
+	close(p[1]);
+	if (rc) {
+		close(p[0]);
+		say(v, 1, "Cannot start the file dialog: %s", strerror(rc));
+		return;
+	}
+	v->pick_pid = pid;
+	v->pick_fd = p[0];
+	v->pick_len = 0;
+	fl_fd_add(v->app, p[0], POLLIN, on_pick_fd, v);
+}
+
 static void draw(fl_ui *ui, void *ud);
 static void on_close(fl_win *w, void *ud);
 
@@ -766,6 +1027,12 @@ static void keys(fl_ui *ui, struct V *v)
 		set_prop(v, "speed", s);
 		break;
 	}
+	case XKB_KEY_o:
+		if (ctrl)
+			pick_start(v);
+		else
+			handled = 0;
+		break;
 	case XKB_KEY_q: fl_app_quit(v->app); break;
 	default: handled = 0;
 	}
@@ -817,7 +1084,7 @@ static void draw(fl_ui *ui, void *ud)
 	}
 	if (!v->path[0] || !v->mpv) {
 		fl_text_in(cv, ui->f_reg, video, FL_CENTER, 0, fl_th.dim,
-		           v->mpv ? "Open a video from Files, or run flvideo FILE" : "The video engine did not start");
+		           v->mpv ? "Open a video: the Open button or Ctrl+O" : "The video engine did not start");
 	} else if (!v->loaded && !v->msg_err) {
 		fl_text_in(cv, ui->f_reg, video, FL_CENTER, 0, fl_th.dim, "Opening...");
 	}
@@ -885,6 +1152,9 @@ static void draw(fl_ui *ui, void *ud)
 		if (flat_button(ui, ID_FWD, fl_r(x, row2.y, 52, 34), "+10 s"))
 			seek_rel(v, 10);
 		x += 60;
+		if (flat_button(ui, ID_OPEN, fl_r(x, row2.y, 52, 34), "Open"))
+			pick_start(v);
+		x += 56;
 		/* the right side */
 		int rx = row2.x + row2.w;
 		rx -= 88;
@@ -951,15 +1221,19 @@ static void draw(fl_ui *ui, void *ud)
 
 static void usage(void)
 {
-	fprintf(stderr, "usage: flvideo [--start SECONDS] [--pause] FILE\n"
-	                "Play a video. Space pauses, F is fullscreen, V and A switch subtitles and audio.\n");
+	fprintf(stderr, "usage: flvideo [--start SECONDS] [--pause] [FILE]\n"
+	                "Play a video. Space pauses, F is fullscreen, V and A switch subtitles and audio,\n"
+	                "Ctrl+O or the Open button picks a file.\n");
 }
 
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !strcmp(argv[1], "--pick-file"))
+		return pick_child();
 	struct V *v = calloc(1, sizeof *v);
 	if (!v)
 		return 1;
+	v->pick_fd = -1;
 	const char *file = NULL;
 	int explicit_start = 0;
 	for (int i = 1; i < argc; i++) {
@@ -1026,6 +1300,8 @@ int main(int argc, char **argv)
 	fl_app_watch_conf(v->app, NULL, NULL);
 	fl_app_run(v->app);
 	save_position(v);
+	if (v->pick_pid)
+		kill(v->pick_pid, SIGTERM);
 	if (v->rc)
 		mpv_render_context_free(v->rc);
 	if (v->mpv)

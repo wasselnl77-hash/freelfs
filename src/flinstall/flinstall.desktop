@@ -7,3 +7,5 @@ Exec=flinstall
 TryExec=/run/live
 Categories=System;
 X-FreeLFS-Glyph=↓
+# an icon on the desktop too (flpanel, deskicons.c)
+X-FreeLFS-Desktop-Icon=true

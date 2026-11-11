@@ -20,6 +20,8 @@ What is in it (all read with ordinary user rights; what needs more is left out):
                   a name lookup, a TLS request to example.com with timings, the server's clock
   config/         desktop.conf, FreeBWS settings, keyboard, rc.conf, fstab, flpkg.conf, iwd
   mounts.txt, processes.txt, packages.txt (flpkg, Flatpak), audio.txt, crashes.txt
+  memory.txt      MemTotal - MemAvailable, PSS totals of the processes you may read and the biggest 20,
+                  and on the live system the size of the overlay upper layer (RAM) and its biggest places
 
 Not in it: passwords, Wi-Fi keys, browser history, bookmarks, file contents outside config/.
 It does hold network names, device ids and MAC addresses; look before you pass it on.

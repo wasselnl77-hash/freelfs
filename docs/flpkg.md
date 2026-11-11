@@ -25,7 +25,7 @@ Subcommands, with pacman-style flags as aliases.
 | `flpkg build [DIR]` | | Build the recipe in DIR into packages |
 | `flpkg repo add REPO PKGFILE...` | | Add packages to a repo and re-sign its index |
 | `flpkg key generate NAME` | | Create a signing key pair |
-| `flpkg fix-owners` | | Apply ownership that a rootless install could not set |
+| `flpkg fix-owners [--keep]` | | Apply ownership that a rootless install could not set. Opens the database read-only when nothing is pending; `--keep` (live system) leaves the list in place so the database is never written |
 | `flpkg history` | | Show past transactions |
 
 Common options: `--root DIR` (operate on another root), `--config FILE`,
@@ -47,7 +47,7 @@ release=1
 summary="The GNU Compiler Collection"
 url=https://gcc.gnu.org/
 license=(GPL-3.0-or-later)
-arch=(x86_64 aarch64)           # or (any)
+arch=(x86_64)                   # or (any); a recipe must list the machine it builds for
 groups=(base-devel)
 source=(https://ftp.gnu.org/gnu/gcc/gcc-$version/gcc-$version.tar.xz
         gcc-fix.patch)
@@ -167,9 +167,16 @@ from the signatures, not from the transport: `flpkg sync` checks
 format, Ed25519), and every download is checked against the sha256 in the
 signed index and against its own `.sig`. The trusted comment of a signature
 names the file, so a signature cannot be moved to another file. A tampered
-or unknown-key index or package is refused and deleted. (Not covered: an
-attacker who can serve an old but validly signed index; the index carries no
-expiry yet.)
+or unknown-key index or package is refused and deleted.
+
+The signed comment of `index.zst.sig` also carries a `serial` (rises with every
+signing) and `valid-until` (default 14 days, `repo add --valid-days N`). `flpkg
+sync` and `check-updates` refuse an expired index and one whose serial is lower than
+the last accepted (kept in `/var/lib/flpkg/index-serial.REPO`), with a message that
+says what to do; so a mirror cannot freeze or roll back a machine. The repo must
+therefore be re-signed (re-run `70-repo.sh`) before it runs out. Several public keys
+may be trusted, and a new key can be introduced by the old one (`flpkg key introduce`,
+`flpkg key list`): see docs/SECURITY.md.
 
 - `flpkg sync` (`-Sy`): fetch and verify the indexes into `/var/cache/flpkg/repos`.
 - `flpkg search`, `flpkg info --repo`: read those indexes.
