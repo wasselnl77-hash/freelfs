@@ -1,0 +1,3 @@
+tokens { color { brand: #3949ab; extra: red } }
+.b { color: color.brand; background: color.extra }
+@media dark { tokens { color { brand: #fff } } }

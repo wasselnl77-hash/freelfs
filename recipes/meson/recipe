@@ -1,0 +1,20 @@
+pkgname=meson
+version=1.12.0
+release=1
+summary="The Meson build system"
+url=https://mesonbuild.com/
+license=(Apache-2.0)
+arch=(any)
+groups=(base)
+depends=(python ninja)
+source=(https://github.com/mesonbuild/meson/releases/download/$version/meson-$version.tar.gz)
+sha256=(88afe0c20e52030218924ac37d0c81c59b4b5f3ae3752c8c6d7470c7d365886c)
+build_style=python
+
+package() {
+	pip3 install --root="$pkgdir" --ignore-installed --no-deps --no-index \
+		--no-warn-script-location --find-links dist meson
+	install -Dm644 data/shell-completions/bash/meson \
+		"$pkgdir/usr/share/bash-completion/completions/meson"
+	install -Dm644 data/shell-completions/zsh/_meson "$pkgdir/usr/share/zsh/site-functions/_meson"
+}

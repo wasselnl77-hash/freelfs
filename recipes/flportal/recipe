@@ -1,0 +1,27 @@
+# flportal, from src/flportal in the FreeLFS tree: the FreeLFS backend of xdg-desktop-portal
+# (file chooser, app chooser, access question, notifications, settings, screenshots).
+# xdg-desktop-portal (the frontend, recipes/xdg-desktop-portal) starts it through D-Bus
+# activation: the .service file and freelfs.portal/portals.conf come from here.
+pkgname=flportal
+version=0.1
+release=1
+summary="FreeLFS backend for xdg-desktop-portal (Flatpak file dialogs, settings, notifications)"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib flui wayland xdg-desktop-portal)
+makedepends=(flui glib)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flportal" "$srcdir/flportal"
+	cd "$srcdir/flportal"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flportal"
+	make DESTDIR="$pkgdir" install
+}

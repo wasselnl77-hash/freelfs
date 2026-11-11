@@ -1,0 +1,5 @@
+color: red
+.a { color: blue }
+@media dark { color: red }
+@layer base { padding: 1 }
+

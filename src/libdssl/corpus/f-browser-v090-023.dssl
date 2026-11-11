@@ -1,0 +1,1 @@
+.cell { display: inline-block; width: 40px; height: 20px; margin: 4px; background: #345; aura-particle: #fc4 count 100 life 700 speed 30 dir up from top } .cell.x { aura: none }

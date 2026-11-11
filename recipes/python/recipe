@@ -1,0 +1,46 @@
+pkgname=python
+version=3.14.7
+release=1
+summary="The Python programming language"
+url=https://www.python.org/
+license=(PSF-2.0)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc expat libffi openssl zlib bzip2 xz sqlite mpdecimal gdbm ncurses
+	readline libxcrypt)
+worksrc=Python-$version
+source=(https://www.python.org/ftp/python/$version/Python-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/Python-$version-openssl_4-1.patch)
+sha256=(3b48dac8fb59f62eaa67ac83c1eb12bda1b7a08406dd286e252c11a66be27f81
+        707a0c457192ac2f3b5b8a51481bc5ebd12db22d57c1dbe0256138ee6e070792)
+
+prepare() {
+	patch -Np1 -i "$srcdir/Python-$version-openssl_4-1.patch"
+}
+
+# No --enable-optimizations: profile-guided optimisation depends on the
+# timing of a training run, so it cannot give reproducible builds. No test
+# suite either: not needed on a system, and a few of its .pyc files are not
+# reproducible.
+build() {
+	./configure --prefix=/usr \
+		--enable-shared \
+		--with-system-expat \
+		--disable-test-modules \
+		--without-static-libpython
+	make
+}
+
+check() {
+	make test TESTOPTS="--timeout 120"
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir/etc"
+	cat > "$pkgdir/etc/pip.conf" <<-EOF
+		[global]
+		root-user-action = ignore
+		disable-pip-version-check = true
+	EOF
+}

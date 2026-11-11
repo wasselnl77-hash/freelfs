@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-dssl-reset><head><meta charset="utf-8"><title>FreeBWS DSSL test</title>
+<!-- No CSS anywhere on this page. Everything you see comes from the DSSL engine
+     that FreeBWS bundles (/usr/share/freebws/dssl) and injects into pages that
+     carry DSSL tags. Without it this is plain black text on white. -->
+<link rel="stylesheet" type="text/dssl" href="freebws-dssl://engine/styles/tokens.dssl">
+<link rel="stylesheet/dssl" href="freebws-dssl://engine/examples/hello.dssl">
+<style type="text/dssl">
+tokens {
+  color {
+    fl-bg: #1d2125
+    fl-panel: #272c33
+    fl-line: #3a4148
+    fl-text: #e6e9ec
+    fl-dim: #8b949e
+    fl-green: #3f9b63
+  }
+  radius { box: 8 }
+  shadow { lift: 0 8 22 #000/45 }
+}
+
+body {
+  background: color.fl-bg
+  color: color.fl-text
+  font-family: "IBM Plex Sans", sans-serif
+  padding: 28 36
+}
+h1 { font-size: fluid 24 38; margin: 0 0 6; color: color.fl-text }
+h1 span { color: color.fl-green }
+p { color: color.fl-dim; margin: 0 0 18 }
+code { font-family: "IBM Plex Mono", monospace; color: color.fl-text }
+
+.bar { row: gap 12 between center; margin: 0 0 18 }
+.pill {
+  background: color.fl-green
+  color: #fff
+  radius: full
+  padding: 4 14
+  font-size: 13
+}
+.pill.wait { background: color.fl-line }
+
+.grid { grid: 3 gap 16 }
+.card {
+  background: color.fl-panel
+  border: 1 solid color.fl-line
+  color: color.fl-text
+  radius: box
+  padding: 18
+  transition: 160
+  hover { background: #313840; box-shadow: lift; border-color: color.fl-green }
+}
+.card b { color: color.fl-green }
+
+.wood {
+  background: #b98a52
+  color: #fff4e0
+  texture: wood
+  border-color: #6b4a22
+}
+.wood b, .wood code { color: #fff }
+
+button {
+  background: color.fl-green
+  color: #fff
+  radius: 6
+  padding: 8 16
+  border: 0
+  margin-top: 10
+  hover { background: #4cb374 }
+}
+</style></head>
+<body>
+<div class="bar">
+<div><h1>FreeBWS <span>+ DSSL</span></h1>
+<p>Tokens, layout words, states, <code>texture: wood</code> and fluid type, written in a style language, not CSS.</p></div>
+<div class="pill wait" id="status">waiting for the DSSL engine</div>
+</div>
+<div class="grid">
+<div class="card"><b>row / grid</b><br>This grid is <code>grid: 3 gap 16</code>; the bar above is <code>row: gap 12 between center</code>.</div>
+<div class="card"><b>hover</b><br>A nested <code>hover { }</code> block lifts the card and tints its border.<br><button>Button</button></div>
+<div class="card wood"><b>texture</b><br><code>texture: wood</code> over a plain brown <code>background</code>.</div>
+</div>
+<script>
+addEventListener('dssl-ready', function (e) {
+  var s = document.getElementById('status');
+  s.textContent = 'DSSL ' + e.detail.version + ' ready';
+  s.className = 'pill';
+});
+</script>
+</body></html>

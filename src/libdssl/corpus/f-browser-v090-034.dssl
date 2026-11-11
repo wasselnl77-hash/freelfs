@@ -1,0 +1,1 @@
+#g1 { width: 300px; margin: 20px; slider: graph 20 40 70 90 60 30 50 95 40 65 80 45, graph-height 56, graph-gap 3, fill #77ccff, track 3 #34445a, thumb 14 #ffffff, shape bar }

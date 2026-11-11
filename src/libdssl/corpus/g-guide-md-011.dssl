@@ -1,0 +1,3 @@
+.floor { background-color: #8a5f33; texture: oak-planks symmetrical }     // mirrored both ways
+.bar   { texture: walnut symmetrical x }                                 // only left to right
+.post  { texture: noise symmetrical y }                                  // only top to bottom

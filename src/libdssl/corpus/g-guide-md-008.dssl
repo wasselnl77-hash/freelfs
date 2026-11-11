@@ -1,0 +1,3 @@
+.card   { background: #c9a66b; texture: wood }
+.sheet  { background: linear-gradient(135deg, #ff7a00, #7a1fff); texture: grain intensity 0.6 }
+.poster { background: #e9e2d0; texture: paper, scanlines intensity 0.1 }   // a comma stacks layers

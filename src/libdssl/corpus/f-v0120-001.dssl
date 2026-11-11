@@ -1,0 +1,8 @@
+fonts {
+  Fraunces: 500 700 800
+  "Hanken Grotesk": 400 700 italic
+  Inter: 100..900 display optional
+  Brand: from "/fonts/brand.woff2" 400
+  Brand: from "/fonts/brand-bold.woff" 700 italic
+}
+.a { font-family: "Fraunces", serif }

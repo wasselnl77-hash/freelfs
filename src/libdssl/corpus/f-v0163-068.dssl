@@ -1,0 +1,2 @@
+.a, .b { ::before { content: ""
+ hover { color: red } } }

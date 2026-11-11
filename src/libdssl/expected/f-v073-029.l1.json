@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v073-029.dssl","hint":"every \"{\" needs a matching \"}\" - the CSS captured so far is discarded","line":1,"message":"the raw { } block was never closed with \"}\""}],"tree":{"children":[{"children":[],"css":" @font-face {\n","kind":"raw","line":1}],"kind":"root"}}

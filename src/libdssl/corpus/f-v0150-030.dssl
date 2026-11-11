@@ -1,0 +1,2 @@
+#r { rotate: 5 }
+#b { display: block; width: 100px; height: 40px; ::after { content: "!"; opacity: 0; hover { opacity: 1 } } }

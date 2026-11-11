@@ -1,0 +1,4 @@
+div { color: #000 }
+@signal screen in (menu, shop) { #a { color: #f00 } }
+@signal screen not in (menu, shop) { #b { color: #00f } }
+@signal screen != menu { #c::before { content: "neq" } }

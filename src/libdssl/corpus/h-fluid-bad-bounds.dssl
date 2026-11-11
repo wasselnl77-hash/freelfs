@@ -1,0 +1,7 @@
+.a { font-size: fluid 16 24 400rem 800 }
+.b { font-size: fluid 16 24 2000 }
+.c { font-size: fluid 16 24 400 }
+.d { font-size: fluid 16 }
+.e { font-size: fluid }
+.f { fluid: }
+

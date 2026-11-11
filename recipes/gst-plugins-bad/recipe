@@ -1,0 +1,19 @@
+pkgname=gst-plugins-bad
+version=1.28.6
+release=1
+summary="GStreamer bad plugins: only the libraries WebKit needs (mpegts, codecparsers)"
+url=https://gstreamer.freedesktop.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gstreamer gst-plugins-base orc)
+makedepends=(meson ninja python)
+source=(https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad-$version.tar.xz)
+sha256=(6636f2c2289ceda52c4aba971338c81e2b5780d3381bd3673c1c116ec87587c3)
+build_style=meson
+# WebKit links gstmpegts and gstcodecparsers; both libraries are built even
+# with every plugin off. Plugins: parsers and the MPEG-TS demuxer only.
+configure_args=(-D auto_features=disabled -D introspection=disabled -D doc=disabled -D tests=disabled
+	-D examples=disabled -D tools=disabled -D nls=disabled -D orc=enabled
+	-D videoparsers=enabled -D mpegtsdemux=enabled -D mpegtsmux=disabled)
+check() { :; }

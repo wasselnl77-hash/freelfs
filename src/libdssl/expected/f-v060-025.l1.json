@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"children":[{"kind":"decl","line":1,"prop":"gradient-flow","value":"3s"}],"kind":"pseudo","line":1,"name":"after"}],"kind":"selector","line":1,"sel":".card"}],"kind":"root"}}

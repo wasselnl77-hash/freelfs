@@ -1,0 +1,15 @@
+pkgname=woff2
+version=1.0.2
+release=1
+summary="WOFF2 font decoder (web fonts)"
+url=https://github.com/google/woff2
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc brotli gcc)
+makedepends=(cmake ninja)
+source=(https://github.com/google/woff2/archive/v$version/woff2-$version.tar.gz)
+sha256=(add272bb09e6384a4833ffca4896350fdb16e0ca22df68c0384773c67a175594)
+build_style=cmake
+configure_args=(-D CMAKE_POLICY_VERSION_MINIMUM=3.5 -D BUILD_SHARED_LIBS=ON -D CMAKE_CXX_FLAGS="-include cstdint")
+check() { :; }

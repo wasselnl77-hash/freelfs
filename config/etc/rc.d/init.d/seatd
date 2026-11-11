@@ -1,0 +1,15 @@
+#!/bin/bash
+# /etc/rc.d/init.d/seatd -- the seat manager: hands the screen, GPU and
+# input devices to the session of whoever sits at the machine (members of
+# the seat group)
+
+. /etc/rc.d/functions
+
+start_seatd() {
+	setsid /usr/bin/seatd -g seat < /dev/null > /dev/null 2>&1 &
+	echo $! > /run/seatd.pid
+	sleep 0.2
+	pid_alive /run/seatd.pid
+}
+
+daemon_service "$1" "seat manager" /run/seatd.pid start_seatd

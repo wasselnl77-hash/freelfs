@@ -1,0 +1,15 @@
+pkgname=man-db
+version=2.13.1
+release=1
+summary="The man page system: man, apropos, mandb"
+url=https://man-db.nongnu.org/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc gdbm groff less libpipeline zlib)
+source=(https://download.savannah.gnu.org/releases/man-db/man-db-$version.tar.xz)
+sha256=(8afebb6f7eb6bb8542929458841f5c7e6f240e30c86358c1fbcefbea076c87d9)
+build_style=autotools
+configure_args=(--docdir=/usr/share/doc/man-db-$version --sysconfdir=/etc --disable-setuid
+	--enable-cache-owner=bin --with-browser=/usr/bin/lynx --with-vgrind=/usr/bin/vgrind
+	--with-grap=/usr/bin/grap --with-systemdtmpfilesdir= --with-systemdsystemunitdir=)

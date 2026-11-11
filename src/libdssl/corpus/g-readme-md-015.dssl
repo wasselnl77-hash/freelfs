@@ -1,0 +1,4 @@
+body { overlap: auto }      // engine watches opacity in (0, 1) and shoves
+.ghost { overlap: deny }    // this one NEVER sits on anything
+.veil  { overlap: allow     // exempt, and while you are at it:
+         pointer-events: none }  // stop eating clicks and text selection too

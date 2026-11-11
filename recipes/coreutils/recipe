@@ -1,0 +1,36 @@
+pkgname=coreutils
+version=9.11
+release=1
+summary="The GNU core utilities"
+url=https://www.gnu.org/software/coreutils/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc acl attr libcap gmp openssl)
+source=(https://ftpmirror.gnu.org/coreutils/coreutils-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/coreutils-$version-i18n-1.patch)
+sha256=(394024eda0a5955217ceda9cd1201e65dc8fa3aa29c2951135a49521d57c3cc3
+        7c2aecf9ae24b87b019595e382b9f41d2c96de7f95abe95ad8cacc7e2ce1bbcc)
+
+prepare() {
+	patch -Np1 -i "$srcdir/coreutils-$version-i18n-1.patch"
+	autoreconf -f
+	automake -af
+}
+
+build() {
+	FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr
+	make
+}
+
+check() {
+	make check-root
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir"/usr/{sbin,share/man/man8}
+	mv "$pkgdir/usr/bin/chroot" "$pkgdir/usr/sbin"
+	mv "$pkgdir/usr/share/man/man1/chroot.1" "$pkgdir/usr/share/man/man8/chroot.8"
+	sed -i 's/"1"/"8"/' "$pkgdir/usr/share/man/man8/chroot.8"
+}

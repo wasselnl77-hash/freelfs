@@ -1,0 +1,1 @@
+.menu { display: none; column: gap 2 } .other { display: block; stack: center }

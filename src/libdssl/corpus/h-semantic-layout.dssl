@@ -1,0 +1,42 @@
+.toolbar { row: gap 8 between center }
+.board   { grid: 3 gap 12 }
+.pane    { stack: center }
+.hero    { center: both }
+.r1 { row: wrap reverse inline gap 4 start }
+.r2 { column: center center }
+.r3 { row: between around }
+.r4 { row: center start end }
+.r5 { row: gap }
+.r6 { row: wibble stretch baseline }
+.r7 { row: start start }
+.r8 { row: center center center }
+.r9 { column: stretch baseline center }
+.r10 { row: end between stretch }
+.r11 { row: nowrap }
+.r12 { row: gap 4 gap 8 }
+.r13 { row: }
+.g1 { grid: auto-fill 200 gap 4 rows 3 }
+.g2 { grid: 200px 1fr }
+.g3 { grid: }
+.g4 { grid: auto-fit }
+.g5 { grid: rows 40 gap }
+.g6 { grid: 1fr 2fr 3 rows 3rem }
+.s1 { stack: wat }
+.s2 { stack: }
+.p1 { place: start }
+.p2 { place: zzzz }
+.c1 { center: x }
+.c2 { center: Y }
+.c3 { center: z }
+.c4 { center: }
+.a1 { align: stretch }
+.a2 { align: strech }
+.i1 { size: 40 }
+.i2 { size: 40 20 }
+.i3 { size: }
+.i4 { circle: 32 }
+.i5 { z: 3; grow; shrink: 0; basis: 20 }
+.i6 { cover; sticky }
+.i7 { cover: fixed; sticky: 10 }
+.i8 { truncate; visually-hidden }
+

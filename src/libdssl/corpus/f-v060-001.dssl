@@ -1,0 +1,7 @@
+
+    .a { bend: 20 }
+    .b { bend-y: -12.5 }
+    .c { bend-up: 14deg }
+    .d { fold: 30 }
+    .e { bend: 0 }
+  

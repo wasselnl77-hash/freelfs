@@ -1,0 +1,9 @@
+label: gpt
+label-id: 8A3D2C11-7A5B-4F0A-9C57-3D2B1F6E0002
+device: /dev/sdb
+unit: sectors
+first-lba: 2048
+last-lba: 15633374
+sector-size: 512
+
+/dev/sdb1 : start=        2048, size=     1675264, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, uuid=0A1B2C3D-0000-4000-8000-0000000000b1, name="FREELFS_LIVE"

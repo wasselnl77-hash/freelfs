@@ -1,0 +1,1 @@
+.btn { ::after { focus { color: red } } }

@@ -1,0 +1,6 @@
+raw {
+  a:hover,
+  a:focus { color: red; }
+  .grid { grid-template-areas: "a b"
+    "c d"; }
+}

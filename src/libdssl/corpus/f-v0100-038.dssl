@@ -1,0 +1,5 @@
+.a { background: color.paper; texture: oak }
+.b { background: #222; texture: grain, scanlines }
+.c { background: linear-gradient(red, blue); texture: grain }
+.d { texture: noise animate 100 }
+.e { background: #fff; texture: noise color color.ink }

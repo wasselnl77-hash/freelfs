@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":3,"prop":"background","value":"linear-gradient( to bottom, red, blue )"},{"kind":"decl","line":6,"prop":"color","value":"color.ink"}],"kind":"selector","line":1,"sel":".card, .panel"}],"kind":"root"}}

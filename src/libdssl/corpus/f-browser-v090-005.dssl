@@ -1,0 +1,1 @@
+.src { position: absolute; left: 300px; top: 400px; width: 80px; height: 40px; background: #345; aura: glow #f80 30, particles #fc4 count 40 life 800 speed 50 dir up from top }

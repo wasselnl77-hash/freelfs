@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXfont2
+version=2.0.7
+release=1
+summary="X font library (the server's font code)"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc freetype libfontenc zlib)
+makedepends=(xorgproto xtrans)
+source=(https://www.x.org/pub/individual/lib/libXfont2-2.0.7.tar.xz)
+sha256=(8b7b82fdeba48769b69433e8e3fbb984a5f6bf368b0d5f47abeec49de3e58efb)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-devel-docs --without-xmlto --without-fop --without-xsltproc --disable-bzip2)
+check() { :; }

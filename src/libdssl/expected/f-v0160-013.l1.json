@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"padding","value":"env(safe-area-inset-top, 20) env(safe-area-inset-right, 0) max(env(safe-area-inset-bottom), 12) 0"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

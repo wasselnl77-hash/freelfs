@@ -1,0 +1,1 @@
+.nav-links { display: none } .nav-links.open { column: gap 2 }

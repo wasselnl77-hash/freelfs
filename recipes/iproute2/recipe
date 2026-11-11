@@ -1,0 +1,25 @@
+pkgname=iproute2
+version=7.1.0
+release=1
+summary="IP routing and network configuration (ip, ss, tc, ...)"
+url=https://wiki.linuxfoundation.org/networking/iproute2
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc libelf libcap)
+source=(https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-$version.tar.xz)
+sha256=(fd9fa1b95809417157ca83dd72957e3261bdbce896353cb936f80af0b33a4b5c)
+
+prepare() {
+	sed -i /ARPD/d Makefile
+	rm -f man/man8/arpd.8
+}
+
+build() {
+	make NETNS_RUN_DIR=/run/netns
+}
+
+package() {
+	make DESTDIR="$pkgdir" SBINDIR=/usr/sbin install
+	install -Dm644 COPYING README* -t "$pkgdir/usr/share/doc/iproute2-$version"
+}

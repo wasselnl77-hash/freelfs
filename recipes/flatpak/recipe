@@ -1,0 +1,68 @@
+# Flatpak: the app catalog of FreeLFS (Flathub). Per-user installs only:
+#   flatpak --user ...    (what the Packages app and the first-login Flathub
+#                          setup run; apps and runtimes live in
+#                          ~/.local/share/flatpak)
+# which needs no root and no polkit. So:
+#   -D system_helper=disabled  no flatpak-system-helper, so no polkit (which
+#                              would drag in mozjs or duktape). Without it
+#                              `flatpak --system` can only be used as root.
+#   -D systemd=disabled        no libsystemd; the D-Bus services are started
+#                              by the session bus (dbus-daemon) from their
+#                              .service files, as on any non-systemd system.
+# The rest is switched off for what FreeLFS does not have: dconf,
+# malcontent, SELinux, X11 authority (no X11), GObject introspection, docs,
+# man pages (docbook-xsl) and tests. bwrap, xdg-dbus-proxy and fusermount3
+# come from their own packages (no bundled copies, which would be
+# subprojects fetched from git).
+#
+# Homes in FreeLFS are under /usr (/usr/NAME), and Flatpak refuses to export
+# anything inside /usr into a sandbox ("Path /usr is reserved by Flatpak"):
+# apps ran, but --filesystem=home and the per-app data directory
+# ~/.var/app/ID were not bound into the sandbox. See docs/PLAN.md, M8.
+# flatpak-1.18.4-home-under-usr.patch (release 2) lets the user's own $HOME
+# and what is below it through, and nothing else under /usr:
+#  - common/flatpak-exports.c: the "reserved" test skips /usr for a path in
+#    $HOME when $HOME is /usr/something and its mount point is ready. The
+#    mount point is an empty directory that flatpak_exports_prepare_home_under_usr
+#    makes in the runtime's files (bwrap cannot make one in the read-only /usr it
+#    is given; a per-user install owns that directory) just before the runtime is
+#    bound as /usr. In the sandbox $HOME is then a tmpfs (--tmpfs instead of
+#    --dir), so ~/.var/app/ID and the like can be created below it, or the host
+#    directory itself when --filesystem=home is given.
+#  - common/flatpak-run.c: one call to prepare it, before /usr is bound and before
+#    the exports are worked out. If the directory cannot be made, nothing changes.
+# Written by reading the source; not built or run yet.
+pkgname=flatpak
+version=1.18.4
+release=2
+summary="Application sandboxing and distribution framework"
+url=https://flatpak.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib json-glib ostree libxml2 curl libarchive gpgme gnupg appstream gdk-pixbuf
+	libseccomp libcap zstd bubblewrap xdg-dbus-proxy fuse3 wayland ca-certificates dbus)
+makedepends=(meson ninja pyparsing wayland-protocols bison gettext python)
+source=(https://github.com/flatpak/flatpak/releases/download/$version/flatpak-$version.tar.xz)
+sha256=(b899a7a00c48d2c626cb8ec33fe556720b376c25805d7222430c0fdca4c6ac8d)
+prepare() { patch -Np1 -i "$startdir/flatpak-$version-home-under-usr.patch"; }
+build_style=meson
+configure_args=(--wrap-mode=nodownload --sysconfdir=/etc --localstatedir=/var
+	-D system_helper=disabled -D systemd=disabled -D selinux_module=disabled -D dconf=disabled
+	-D malcontent=disabled -D gir=disabled -D gtkdoc=disabled -D docbook_docs=disabled
+	-D man=disabled -D tests=false -D xauth=disabled -D libzstd=enabled -D seccomp=enabled
+	-D wayland_security_context=enabled
+	-D system_bubblewrap=/usr/bin/bwrap -D system_dbus_proxy=/usr/bin/xdg-dbus-proxy
+	-D system_fusermount=/usr/bin/fusermount3)
+
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	# no systemd, no tmpfiles/sysusers hooks (flpkg has no package scripts)
+	rm -rf "${pkgdir:?}"/usr/lib/systemd "${pkgdir:?}"/usr/lib/tmpfiles.d "${pkgdir:?}"/usr/lib/sysusers.d
+	# FreeLFS's own XDG_DATA_DIRS snippet (it runs before desktop.sh and does
+	# not start a program on every login) replaces Flatpak's flatpak.sh
+	rm -f "$pkgdir/etc/profile.d/flatpak.sh"
+	install -Dm644 "$startdir/10-flatpak.sh" "$pkgdir/etc/profile.d/10-flatpak.sh"
+}

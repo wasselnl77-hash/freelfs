@@ -1,0 +1,18 @@
+# Library only (ostree and flatpak read tar and other archives with it); GNU
+# tar stays the tar. No xar (libxml2/expat), no extra tools.
+pkgname=libarchive
+version=3.8.11
+release=1
+summary="Multi-format archive and compression library"
+url=https://libarchive.org/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib bzip2 xz zstd lz4 openssl acl attr)
+makedepends=()
+source=(https://github.com/libarchive/libarchive/releases/download/v$version/libarchive-$version.tar.xz)
+sha256=(a3dc0872b1b39da34dc18ef1b944f0f11ffd37425d70ae04be679279f1cf43d2)
+build_style=autotools
+configure_args=(--disable-static --disable-bsdtar --disable-bsdcat --disable-bsdcpio
+	--disable-bsdunzip --without-xml2 --without-expat)
+check() { :; }

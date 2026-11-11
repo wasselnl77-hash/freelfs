@@ -1,0 +1,30 @@
+# fllock, from src/fllock in the FreeLFS tree: the lock screen and fllock-check,
+# the setuid helper that checks the person's own password (not root: the screen is
+# locked by flcomp itself, see fl_shell lock).
+pkgname=fllock
+version=0.1
+release=2
+summary="FreeLFS lock screen: clock, date and password; the compositor holds the lock"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland libxcrypt flcomp)
+# the checker runs as root for the group seat, like flpower in flpanel
+owner=("/usr/libexec/fllock-check 0 98 4750")
+makedepends=(flui libxcrypt)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/fllock" "$srcdir/fllock"
+	# the protocol belongs to flcomp
+	cp "$startdir/../../src/flcomp/protocol/fl-shell.xml" "$srcdir/fllock/fl-shell.xml"
+	cd "$srcdir/fllock"
+	make clean
+	make PROTO=fl-shell.xml
+}
+
+package() {
+	cd "$srcdir/fllock"
+	make PROTO=fl-shell.xml DESTDIR="$pkgdir" install
+}

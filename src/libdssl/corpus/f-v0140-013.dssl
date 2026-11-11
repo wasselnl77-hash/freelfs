@@ -1,0 +1,1 @@
+.a { paint-order: stroke fill; background: conic-gradient(from 0deg, red, blue) }

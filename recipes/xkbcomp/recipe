@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xkbcomp
+version=1.4.7
+release=1
+summary="XKB keymap compiler (Xwayland runs it)"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11 libxkbfile)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/app/xkbcomp-1.4.7.tar.xz)
+sha256=(0a288114e5f44e31987042c79aecff1ffad53a8154b8ec971c24a69a80f81f77)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

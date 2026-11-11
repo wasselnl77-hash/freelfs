@@ -1,0 +1,30 @@
+pkgname=libffi
+version=3.8.0
+release=1
+summary="Foreign function interface library"
+url=https://sourceware.org/libffi/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com/libffi/libffi/releases/download/v$version/libffi-$version.tar.gz)
+sha256=(7da3e2d9a171eb0a038f592ecad3ff2bb2550f3496d87b3b29ad0cf4430c0db4)
+
+build() {
+	# the architecture's baseline, not the build machine's CPU
+	local cpu
+	case $CARCH in
+		x86_64) cpu=x86-64 ;;
+		aarch64) cpu=armv8-a ;;
+	esac
+	./configure --prefix=/usr --disable-static --with-gcc-arch=$cpu
+	make
+}
+
+check() {
+	make check
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,1 @@
+.a:is(.x, .y) { .c { color: red } }

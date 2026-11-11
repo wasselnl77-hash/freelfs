@@ -1,0 +1,4 @@
+.card { background: red; hover { background: blue } padding: 4 }
+.a { color: red }.b { color: blue }
+.x{y{color:red}}
+

@@ -1,0 +1,71 @@
+# Split: gcc-libs holds the run-time libraries (libgcc_s, libstdc++, ...)
+# that programs need without the compiler.
+pkgname=(gcc gcc-libs)
+pkgbase=gcc
+version=16.2.0
+release=1
+summary="The GNU Compiler Collection (C and C++)"
+url=https://gcc.gnu.org/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+source=(https://ftpmirror.gnu.org/gcc/gcc-$version/gcc-$version.tar.xz)
+sha256=(e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e)
+
+prepare() {
+	case $CARCH in
+		x86_64) sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64 ;;
+	esac
+}
+
+build() {
+	mkdir -p build
+	cd build
+	../configure --prefix=/usr \
+		LD=ld \
+		--enable-languages=c,c++ \
+		--enable-default-pie \
+		--enable-default-ssp \
+		--enable-host-pie \
+		--enable-targets=all \
+		--disable-multilib \
+		--disable-bootstrap \
+		--disable-fixincludes \
+		--with-system-zlib
+	make
+}
+
+check() {
+	cd build
+	ulimit -s -H unlimited 2> /dev/null || ulimit -s "$(ulimit -H -s)"
+	make -k check
+}
+
+package_gcc() {
+	depends=(gcc-libs binutils glibc gmp mpfr mpc zlib zstd)
+	cd build
+	make DESTDIR="$pkgdir" install
+	ln -sr "$pkgdir/usr/bin/cpp" "$pkgdir/usr/lib/cpp"
+	ln -s gcc "$pkgdir/usr/bin/cc"
+	ln -s gcc.1 "$pkgdir/usr/share/man/man1/cc.1"
+	install -d "$pkgdir/usr/lib/bfd-plugins"
+	ln -sr "$pkgdir/usr/libexec/gcc/$(gcc -dumpmachine)/$version/liblto_plugin.so" \
+		"$pkgdir/usr/lib/bfd-plugins/"
+	install -d "$pkgdir/usr/share/gdb/auto-load/usr/lib"
+	mv "$pkgdir"/usr/lib/*gdb.py "$pkgdir/usr/share/gdb/auto-load/usr/lib"
+
+	# The versioned run-time libraries go to gcc-libs; the unversioned
+	# development links stay here.
+	install -d "$srcdir/gcc-libs/usr/lib"
+	local f
+	for f in "$pkgdir"/usr/lib/lib{gcc_s,stdc++,atomic,gomp,itm,quadmath,asan,hwasan,lsan,tsan,ubsan}.so.[0-9]*; do
+		[ -e "$f" ] || [ -L "$f" ] || continue
+		mv "$f" "$srcdir/gcc-libs/usr/lib/"
+	done
+}
+
+package_gcc-libs() {
+	summary="GCC run-time libraries (libgcc_s, libstdc++, libgomp, ...)"
+	depends=(glibc)
+	cp -a "$srcdir/gcc-libs/." "$pkgdir/"
+}

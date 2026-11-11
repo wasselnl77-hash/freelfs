@@ -1,0 +1,16 @@
+pkgname=libevdev
+version=1.13.6
+release=1
+summary="Wrapper library for Linux evdev input devices"
+url=https://www.freedesktop.org/wiki/Software/libevdev/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(python)
+source=(https://www.freedesktop.org/software/libevdev/libevdev-$version.tar.xz)
+sha256=(73f215eccbd8233f414737ac06bca2687e67c44b97d2d7576091aa9718551110)
+build_style=meson
+configure_args=(-D documentation=disabled -D tests=disabled)
+
+check() { :; } # tests need check(1), which the base does not have

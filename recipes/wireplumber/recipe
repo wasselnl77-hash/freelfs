@@ -1,0 +1,20 @@
+pkgname=wireplumber
+version=0.5.15
+release=1
+summary="Session and policy manager for PipeWire"
+url=https://pipewire.pages.freedesktop.org/wireplumber/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib pipewire lua)
+makedepends=(python)
+source=(https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/$version/wireplumber-$version.tar.bz2)
+sha256=(fb192f5d884155aedd6f01438e94cc12b263f482f0f39e5706c1e2cff9ad0c6d)
+build_style=meson
+# The system lua (5.4); no systemd/elogind units (sysvinit), no GObject
+# introspection, docs or tests.
+configure_args=(-D system-lua=true -D systemd=disabled -D elogind=disabled
+	-D systemd-user-service=false -D introspection=disabled -D doc=disabled
+	-D tests=false -D dbus-tests=false)
+
+check() { :; } # tests are not built

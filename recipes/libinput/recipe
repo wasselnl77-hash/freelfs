@@ -1,0 +1,19 @@
+pkgname=libinput
+version=1.31.3
+release=1
+summary="Input device handling library for Wayland compositors"
+url=https://www.freedesktop.org/wiki/Software/libinput/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc udev libevdev mtdev)
+makedepends=(python)
+source=(https://gitlab.freedesktop.org/libinput/libinput/-/archive/$version/libinput-$version.tar.gz)
+sha256=(b6749bf6f1890f6631c0a70a027c35fec9d2e096a39f720548896e41474a9854)
+build_style=meson
+# No libwacom, no GUI debug tool, no tests or docs. Lua plugins are off so
+# the result does not depend on whether lua was built first.
+configure_args=(-D libwacom=false -D debug-gui=false -D tests=false
+	-D documentation=false -D udev-dir=/usr/lib/udev -D lua-plugins=disabled)
+
+check() { :; } # tests are not built

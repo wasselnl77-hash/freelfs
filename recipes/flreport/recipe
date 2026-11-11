@@ -1,0 +1,22 @@
+# flreport, from src/flreport in the FreeLFS tree: collects logs and hardware info into
+# ~/freelfs-report-DATE.tar.gz (Settings > About > Save a report runs it).
+pkgname=flreport
+version=0.1
+release=1
+summary="Collects logs, kernel messages and hardware info into one archive for bug reports"
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(coreutils tar gzip util-linux iproute2 procps-ng curl)
+source=()
+sha256=()
+
+check() {
+	cd "$startdir/../../src/flreport"
+	sh -n flreport
+}
+
+package() {
+	cd "$startdir/../../src/flreport"
+	make DESTDIR="$pkgdir" install
+}

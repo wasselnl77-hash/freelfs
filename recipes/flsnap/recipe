@@ -1,0 +1,31 @@
+# flsnap: btrfs snapshots of the system, from src/flsnap in the FreeLFS tree.
+# The flpkg hook 10-flsnap takes one before every transaction; flboot lists them.
+pkgname=flsnap
+version=0.1
+release=1
+summary="Btrfs snapshots of the system before updates, and going back to one"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc btrfs-progs util-linux flpkg)
+# setuid root for the group seat, like fltime-set: Settings > Snapshots uses it
+owner=("/usr/bin/flsnap 0 98 4750")
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsnap" "$srcdir/flsnap"
+	cd "$srcdir/flsnap"
+	make clean
+	make
+}
+
+check() {
+	cd "$srcdir/flsnap"
+	make check
+}
+
+package() {
+	cd "$srcdir/flsnap"
+	make DESTDIR="$pkgdir" install
+}

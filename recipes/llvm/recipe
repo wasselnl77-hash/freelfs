@@ -1,0 +1,46 @@
+# LLVM, for Mesa: radeonsi (AMD GPUs), llvmpipe (fast software rendering)
+# and lavapipe. Core libraries only, no clang: nothing needs it yet. Linking
+# runs one job at a time, so 8 GB of memory is enough.
+pkgname=llvm
+version=22.1.8
+release=1
+worksrc=llvm-project-$version.src
+summary="Compiler infrastructure (for Mesa's AMD and software drivers)"
+url=https://llvm.org/
+license=(Apache-2.0-WITH-LLVM-exception)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc zlib zstd libffi ncurses)
+makedepends=(cmake ninja python)
+source=(https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz
+        https://www.linuxfromscratch.org/patches/blfs/13.1/llvm-$version-upstream_fix-1.patch)
+sha256=(922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a9965888
+        4a2084f9714f2f3babc0ed58065c3a6b83cd2828ea19aec1518995a6d2376187)
+
+prepare() {
+	patch -Np1 -i "$srcdir/llvm-$version-upstream_fix-1.patch"
+	sed 's/utility/tool/' -i llvm/utils/FileCheck/CMakeLists.txt
+}
+
+build() {
+	CC=gcc CXX=g++ cmake -S llvm -B build -G Ninja \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+		-D CMAKE_BUILD_TYPE=Release \
+		-D CMAKE_SKIP_INSTALL_RPATH=ON \
+		-D LLVM_TARGETS_TO_BUILD="host;AMDGPU" \
+		-D LLVM_BUILD_LLVM_DYLIB=ON \
+		-D LLVM_LINK_LLVM_DYLIB=ON \
+		-D LLVM_ENABLE_RTTI=ON \
+		-D LLVM_ENABLE_FFI=ON \
+		-D LLVM_BINUTILS_INCDIR=/usr/include \
+		-D LLVM_INCLUDE_BENCHMARKS=OFF \
+		-D LLVM_INCLUDE_EXAMPLES=OFF \
+		-D LLVM_INCLUDE_TESTS=OFF \
+		-D LLVM_BUILD_DOCS=OFF \
+		-D LLVM_PARALLEL_LINK_JOBS=1
+	ninja -C build ${NINJAJOBS:+-j$NINJAJOBS}
+}
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+}

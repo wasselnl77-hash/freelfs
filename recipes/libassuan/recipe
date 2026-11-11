@@ -1,0 +1,15 @@
+pkgname=libassuan
+version=3.0.2
+release=1
+summary="IPC library used by GnuPG and gpgme"
+url=https://gnupg.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libgpg-error)
+makedepends=()
+source=(https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-$version.tar.bz2)
+sha256=(d2931cdad266e633510f9970e1a2f346055e351bb19f9b78912475b8074c36f6)
+build_style=autotools
+configure_args=(--disable-static --disable-doc)
+check() { :; }

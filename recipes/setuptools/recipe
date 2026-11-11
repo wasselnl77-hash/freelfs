@@ -1,0 +1,12 @@
+pkgname=setuptools
+version=84.0.0
+release=1
+summary="Python package build tools"
+url=https://setuptools.pypa.io/
+license=(MIT)
+arch=(any)
+groups=(base)
+depends=(python)
+source=(https://pypi.org/packages/source/s/setuptools/setuptools-$version.tar.gz)
+sha256=(f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73)
+build_style=python

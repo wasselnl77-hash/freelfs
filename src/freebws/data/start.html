@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>New tab</title>
+<link rel="stylesheet" href="freebws://res/ui.css">
+<style>
+body { min-height: 100vh; display: grid; place-items: center; }
+main { width: min(560px, 90vw); text-align: center; margin-top: -8vh; }
+h1 { font-weight: 600; font-size: 44px; letter-spacing: -.01em; margin: 0 0 26px; }
+h1 span { color: var(--accent); }
+form { display: flex; }
+input[type=text] { flex: 1; font-size: 16px; padding: 11px 14px; }
+form button { padding: 0 20px; background: var(--accent); border-color: var(--accent); color: #fff; font-size: 15px; }
+form button:hover { background: var(--accent-hi); }
+.hint { color: var(--dim); margin-top: 10px; font-size: 13px; }
+#tiles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 34px; }
+#tiles a { width: 124px; padding: 10px 8px; background: var(--panel); border: 1px solid var(--line); color: var(--text); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tiles a:hover { background: var(--raised); text-decoration: none; }
+#tiles a b { display: block; font-size: 17px; color: var(--accent); }
+</style></head>
+<body><main>
+<h1>Free<span>BWS</span></h1>
+<form action="@ACTION@" method="get">
+<input type="text" name="@PARAM@" placeholder="Search with @NAME@" autofocus autocomplete="off"><button>Search</button></form>
+<div class="hint">or type an address in the bar above</div>
+<div id="tiles"></div>
+</main>
+<script src="freebws://res/ui.js"></script>
+<script>
+fb('bm.list').then(function (l) {
+	if (!l) return;
+	var t = $('#tiles'), n = 0;
+	l.forEach(function (b) {
+		if (b.parent !== 0 || b.folder || n >= 8) return;
+		n++;
+		t.appendChild(el('a', { href: b.url, title: b.url }, [el('b', { text: (b.title || hostOf(b.url)).charAt(0).toUpperCase() }), document.createTextNode(b.title || hostOf(b.url))]));
+	});
+});
+</script></body></html>

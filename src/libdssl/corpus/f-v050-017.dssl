@@ -1,0 +1,6 @@
+
+    body { overlap: auto }
+    .badge { overlap: deny }
+    .scrim { overlap: allow }
+    .off { overlap: none }
+  

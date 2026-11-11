@@ -1,0 +1,5 @@
+.s { position: absolute; top: 100px; width: 60px; height: 60px; background: #222 }
+#dia { left: 40px; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); aura-particle: #ff5 count 30 life 8000 size 4 speed 0 from outline essential }
+#orb { left: 160px; aura-particle: #7cf count 12 life 6000 size 4 speed 0 orbit 90 from outline essential }
+#wind { left: 300px; aura-particle: #fff count 12 life 5000 size 4 speed 0 wind 600 from center essential }
+#conf { left: 520px; aura-particle: #f00 #0f0 #00f count 60 life 3000 size 10 shape confetti palette dir up spread 60 speed 70 from top essential }

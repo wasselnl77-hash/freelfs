@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXrandr
+version=1.5.4
+release=1
+summary="XRandR extension library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11 libXext libXrender)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXrandr-1.5.4.tar.xz)
+sha256=(1ad5b065375f4a85915aa60611cc6407c060492a214d7f9daf214be752c3b4d3)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

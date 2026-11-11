@@ -1,0 +1,80 @@
+fledit -- the FreeLFS text editor
+=================================
+
+    fledit [FILE...]
+
+Tabs, syntax colours, line numbers, find and replace (plain text or regular
+expressions), go to line, auto-indent, bracket matching, and the open files with
+their cursor positions remembered. A file that does not exist yet opens as an
+empty document with that name.
+
+Keys
+  Ctrl-T / Ctrl-N new tab      Ctrl-W close tab        Ctrl-Tab, Ctrl-Shift-Tab
+  or Ctrl-PgDn / Ctrl-PgUp next / previous tab         Alt-1 .. Alt-9 tab by number
+  Ctrl-O open (in a new tab; a file that is open is just shown)
+  Ctrl-S save   Ctrl-Shift-S save as   Ctrl-Q quit (asks about every tab with changes)
+  Ctrl-Z undo   Ctrl-Y or Ctrl-Shift-Z redo   Ctrl-C / X / V clipboard   Ctrl-A select all
+  Ctrl-F find (Enter, F3 next; Shift-F3 previous; Esc closes)
+  Ctrl-H find and replace: Tab switches between the two fields, Enter replaces the
+         current match and moves on, Ctrl-Enter replaces all (one undo step)
+  Ctrl-G go to line: 120, or 120:8 for line and column
+  Tab / Shift-Tab indent / dedent the selected lines (one tab or the file's number of spaces)
+  Ctrl-Left/Right by word      Home: first character, then column 0
+
+Tabs: a dot instead of the cross marks a tab with unsaved changes. Middle click
+closes a tab. Two files with the same name show their folder as well.
+
+Find: "Aa" makes the search case sensitive (it is not by default), ".*" turns on
+POSIX extended regular expressions (GNU extensions such as \b, \w, \< work). A
+pattern is matched one line at a time, so ^ and $ mean the line. In the
+replacement, \1 to \9 are groups, \0 the whole match, \n a newline, \t a tab.
+The bar shows how many matches there are (up to 100000).
+
+Syntax colours (by file name, or the #! line): C and C++ (also Java, C#), shell
+(also Makefile and the recipes; here-documents included), Python, JavaScript and
+TypeScript and JSON, HTML and XML (with the script and style parts coloured as
+JavaScript and CSS), CSS, DSSL, Markdown, and conf/ini/desktop/yaml/toml. Others are
+plain text. The colours are the FreeLFS palette (green is the accent, nothing
+purple) in a dark and a light variant. They come from syntax.c, a lexer per
+language that works on one line at a time and carries only a small state to the
+next line (an open comment, string, here-document, tag, CSS block). The state at
+the start of every line is kept (2 bytes a line) and only the lines in view are
+coloured, so a big file costs nothing extra. Above 16 MB colouring is off; lines
+longer than 20000 bytes are drawn plain.
+
+Auto-indent: a new line keeps the indentation of the line above and adds a level
+after { ( [ in C, JavaScript, CSS and DSSL, after a colon in Python, after then,
+do, else, { in shell. Enter between { and } opens the block. A closing bracket typed
+on a blank line steps back a level. In Markdown a list item or "> " quote continues
+on the next line (Enter on an empty item ends the list). Tabs or spaces: whatever
+the first lines of the file use, else tabs (C, shell), 4 spaces (Python) or 2
+spaces (web, DSSL, Markdown, config). Backspace in the indentation removes a level.
+
+Bracket matching: with the cursor beside ( ) [ ] { } the partner is outlined
+(brackets in strings and comments are skipped; an unmatched one is outlined red).
+
+Remembered: $XDG_STATE_HOME/freelfs/fledit/session (default ~/.local/state/...)
+lists the open files and the active tab, and the cursor and scroll position of the
+last 100 files. Started without a file name, fledit opens the files of last time;
+started with file names it opens those (at their remembered position) and leaves
+the list alone, so a window opened from Files does not replace it. The file is
+written when a tab opens or closes, when the window loses focus, two seconds after
+the cursor moved, and on quit. Unsaved text is not remembered.
+
+Text is UTF-8. Bytes that are not valid UTF-8 are shown as a replacement
+character and written back unchanged. A UTF-8 byte order mark and CRLF line
+endings (when every line has one) are kept on save. Files with NUL bytes are
+refused. Save writes a temporary file next to the target and renames it over,
+so a failed save never leaves half a file.
+
+Open and Save as ask for a path in a field; Tab completes the name.
+
+Memory: the text is one buffer plus an array of line starts (8 bytes a line) and
+the colour states (2 bytes a line), so a 5 MB file takes about 24 MB resident, an
+idle window with a small file well under 25 MB. Only the lines in view are drawn.
+Columns are fixed-width cells; wide characters (CJK) count two. The editor keeps
+every edit for undo until the tab closes.
+
+make check runs the lexer tests (tests/syntax_test.c, no display; SAN=1 for
+AddressSanitizer). tests/fledit_test.py drives the real editor in a headless flcomp
+(see its header).

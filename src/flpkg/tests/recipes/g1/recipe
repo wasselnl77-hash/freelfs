@@ -1,0 +1,8 @@
+# Test package in group testgrp.
+pkgname=g1
+version=1.0
+release=1
+summary="flpkg test group member"
+arch=(any)
+groups=(testgrp)
+package() { mkdir -p "$pkgdir/usr/share/g1" && echo g1 > "$pkgdir/usr/share/g1/x"; }

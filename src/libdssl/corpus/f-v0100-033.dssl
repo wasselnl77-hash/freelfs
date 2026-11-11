@@ -1,0 +1,1 @@
+.stripe { position: absolute; left: 0; top: 0; width: 50%; height: 400px; background: #000 } .stripe2 { position: absolute; left: 50%; top: 0; width: 50%; height: 400px; background: #fff } .g { position: absolute; left: 440px; top: 100px; width: 120px; height: 100px; glass: 18 saturate 1 tint none }

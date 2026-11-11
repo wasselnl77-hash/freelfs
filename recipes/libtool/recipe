@@ -1,0 +1,17 @@
+pkgname=libtool
+version=2.6.2
+release=1
+summary="Generic library support script"
+url=https://www.gnu.org/software/libtool/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc bash sed tar)
+source=(https://ftpmirror.gnu.org/libtool/libtool-$version.tar.xz)
+sha256=(2ef1067c16c97db930fd740cc9bc3d3ba9a583804ae5ac42cc3e8719e49e191e)
+build_style=autotools
+
+package() {
+	make DESTDIR="$pkgdir" install
+	rm -f "$pkgdir/usr/lib/libltdl.a"
+}

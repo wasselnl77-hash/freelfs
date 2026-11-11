@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"font-variant-numeric","value":"lining-nums slashed-zero"},{"kind":"decl","line":1,"prop":"font-variant-caps","value":"all-small-caps"},{"kind":"decl","line":1,"prop":"font-variant-ligatures","value":"no-common-ligatures"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

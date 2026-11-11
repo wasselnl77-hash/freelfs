@@ -1,0 +1,24 @@
+# flsetup, from src/flsetup in the FreeLFS tree.
+pkgname=flsetup
+version=0.1
+release=2
+summary="First boot keyboard choice for the FreeLFS desktop"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsetup" "$srcdir/flsetup"
+	cd "$srcdir/flsetup"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flsetup"
+	make DESTDIR="$pkgdir" install
+}

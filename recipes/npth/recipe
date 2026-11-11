@@ -1,0 +1,15 @@
+pkgname=npth
+version=1.8
+release=1
+summary="The New GNU Portable Threads library (used by GnuPG)"
+url=https://gnupg.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://www.gnupg.org/ftp/gcrypt/npth/npth-$version.tar.bz2)
+sha256=(8bd24b4f23a3065d6e5b26e98aba9ce783ea4fd781069c1b35d149694e90ca3e)
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

@@ -1,0 +1,20 @@
+pkgname=libxml2
+version=2.15.3
+release=1
+summary="XML parser library"
+url=https://gitlab.gnome.org/GNOME/libxml2
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib icu)
+makedepends=(meson ninja)
+source=(https://download.gnome.org/sources/libxml2/2.15/libxml2-$version.tar.xz)
+sha256=(78262a6e7ac170d6528ebfe2efccdf220191a5af6a6cd61ea4a9a9a5042c7a07)
+# the meson.build runs git to label development builds; there is no git here
+prepare() {
+	sed -i "/^r = run_command(.git./,/^endif/d" meson.build
+}
+build_style=meson
+configure_args=(-D history=disabled -D icu=enabled -D python=disabled -D readline=disabled
+	-D docs=disabled)
+check() { :; }

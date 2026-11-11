@@ -1,0 +1,16 @@
+pkgname=libyaml
+version=0.2.5
+release=1
+summary="YAML parser (for Ruby)"
+url=https://pyyaml.org/wiki/LibYAML
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://github.com/yaml/libyaml/releases/download/$version/yaml-$version.tar.gz)
+sha256=(c642ae9b75fee120b2d96c712538bd2cf283228d2337df2cf2988e3c02678ef4)
+worksrc=yaml-0.2.5
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

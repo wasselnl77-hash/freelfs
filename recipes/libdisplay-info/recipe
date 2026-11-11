@@ -1,0 +1,20 @@
+pkgname=libdisplay-info
+version=0.4.0
+release=1
+summary="EDID and DisplayID library (needed by mpv's DRM support, which VA-API decoding hangs off)"
+url=https://gitlab.freedesktop.org/emersion/libdisplay-info
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja python)
+source=(https://gitlab.freedesktop.org/-/project/14497/uploads/289d58230e2981b51f23d31faf25bef9/libdisplay-info-$version.tar.xz pnp.ids)
+sha256=(43b180baa143e2035654759d84e2b2f5ee77d5fe817c423838c7fe59c0d68459 2eb3c05e6efb80ba2e460c4acd8d842a045eb1beee0f2a7ab80f83ba2cdea409)
+build_style=meson
+# The vendor name table normally comes from the hwdata package; FreeLFS has none, so a
+# short list of common vendors (pnp.ids next to this recipe) stands in for it. Only
+# the "manufacturer name" of a monitor in mpv's DRM output depends on it.
+prepare() {
+	sed -i "s|files('/usr/share/hwdata/pnp.ids')|files('$srcdir/pnp.ids')|" meson.build
+}
+check() { :; }

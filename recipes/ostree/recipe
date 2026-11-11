@@ -1,0 +1,24 @@
+# libostree and the ostree tool: the content-addressed store Flatpak keeps its
+# apps and runtimes in. Downloads through curl (Flatpak needs libcurl anyway,
+# so libsoup is not used), checksums through OpenSSL, GPG through gpgme. No
+# systemd, SELinux, Avahi, composefs, rofiles-fuse, introspection or man
+# pages.
+pkgname=ostree
+version=2026.6
+release=1
+summary="Operating system and container binary deployment and upgrades (libostree)"
+url=https://ostreedev.github.io/ostree/
+license=(LGPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gpgme libgpg-error libarchive curl openssl xz zlib e2fsprogs util-linux)
+makedepends=(bison)
+worksrc=libostree-$version
+source=(https://github.com/ostreedev/ostree/releases/download/v$version/libostree-$version.tar.xz)
+sha256=(164b8226aea6a0e6601036de02a5e3b62307bae25890ed557fb4e19020bd5974)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-man
+	--disable-rofiles-fuse --enable-introspection=no --with-curl --without-soup --without-soup3
+	--with-crypto=openssl --without-libsystemd --without-selinux --without-avahi
+	--without-composefs)
+check() { :; }

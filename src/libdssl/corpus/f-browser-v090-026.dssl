@@ -1,0 +1,1 @@
+DSSL.apply('tokens { color { tint: #00ff55 } }', { name: 'x', replace: true })

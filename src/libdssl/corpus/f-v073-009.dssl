@@ -1,0 +1,2 @@
+@supports (display:grid) { .a { display: grid } }
+.b { color: blue }

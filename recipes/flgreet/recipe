@@ -1,0 +1,24 @@
+# flgreet, from src/flgreet in the FreeLFS tree.
+pkgname=flgreet
+version=0.1
+release=5
+summary="FreeLFS login screen: runs on tty1, flcomp plus a password check, then login"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland libxcrypt flcomp shadow util-linux)
+makedepends=(flui libxcrypt)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flgreet" "$srcdir/flgreet"
+	cd "$srcdir/flgreet"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flgreet"
+	make DESTDIR="$pkgdir" install
+}

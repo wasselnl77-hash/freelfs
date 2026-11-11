@@ -1,0 +1,28 @@
+pkgname=dejavu-fonts-ttf
+version=2.37
+release=1
+summary="DejaVu TrueType fonts (Sans, Serif, Mono)"
+url=https://dejavu-fonts.github.io/
+license=(Bitstream-Vera)
+arch=(any)
+groups=(desktop)
+depends=(fontconfig)
+source=(https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_${version//./_}/dejavu-fonts-ttf-$version.tar.bz2)
+sha256=(fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7)
+
+package() {
+	install -d "$pkgdir/usr/share/fonts/dejavu"
+	install -m644 ttf/*.ttf "$pkgdir/usr/share/fonts/dejavu/"
+
+	# fontconfig snippets: shipped in conf.avail, enabled by symlink as
+	# fontconfig's own ones are
+	install -d "$pkgdir/usr/share/fontconfig/conf.avail" "$pkgdir/etc/fonts/conf.d"
+	local c
+	for c in fontconfig/*.conf; do
+		install -m644 "$c" "$pkgdir/usr/share/fontconfig/conf.avail/"
+		ln -s "../../../usr/share/fontconfig/conf.avail/${c##*/}" \
+			"$pkgdir/etc/fonts/conf.d/${c##*/}"
+	done
+
+	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/dejavu-fonts-ttf/LICENSE"
+}

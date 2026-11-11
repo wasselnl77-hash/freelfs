@@ -1,0 +1,26 @@
+pkgname=sysvinit
+version=3.14
+release=1
+summary="System V init: init, shutdown, halt, killall5, ..."
+url=https://github.com/slicer69/sysvinit
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com/slicer69/sysvinit/releases/download/$version/sysvinit-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/sysvinit-$version-consolidated-1.patch)
+sha256=(c90874b8c054a35991fb8c4d30c443ed1e9b1815ff6165c7b483f558be4e4b53
+        a8d870f357aaae5f07478ea2953a76c245fc0b4d14cfbe1762ba5277308d4a89)
+
+prepare() {
+	patch -Np1 -i "$srcdir/sysvinit-$version-consolidated-1.patch"
+}
+
+build() {
+	make
+}
+
+package() {
+	# /bin and /sbin are links into /usr
+	make ROOT="$pkgdir" base_bindir=/usr/bin base_sbindir=/usr/sbin install
+}

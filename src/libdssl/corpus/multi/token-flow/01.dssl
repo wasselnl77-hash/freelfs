@@ -1,0 +1,2 @@
+tokens { color { brand: #c2185b } space { 9: 96 } }
+.a { color: color.brand; padding: space.9 }

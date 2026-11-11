@@ -1,0 +1,15 @@
+# Reading and writing FAT images without mounting them (the rootless image
+# build fills the EFI system partition this way).
+pkgname=mtools
+version=4.0.50
+release=1
+summary="Tools to access FAT file systems without mounting them"
+url=https://www.gnu.org/software/mtools/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://ftp.gnu.org/gnu/mtools/mtools-$version.tar.gz)
+sha256=(7f078accae7551c6b3a316ccd8296357329f7bbbc09583dcd1a2bbaeb081a7a4)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --disable-floppyd --without-x)

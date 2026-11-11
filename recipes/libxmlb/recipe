@@ -1,0 +1,16 @@
+pkgname=libxmlb
+version=0.3.29
+release=1
+summary="Library to help create and query binary XML blobs"
+url=https://github.com/hughsie/libxmlb
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib xz zstd)
+makedepends=(meson ninja)
+source=(https://github.com/hughsie/libxmlb/releases/download/$version/libxmlb-$version.tar.xz)
+sha256=(448294be33bfae62f00fa66e506f1cae80237ce71b7ab6530aefa75005eeb08a)
+build_style=meson
+configure_args=(--wrap-mode=nodownload -D gtkdoc=false -D introspection=false -D tests=false
+	-D cli=false -D stemmer=false)
+check() { :; }

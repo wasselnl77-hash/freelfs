@@ -1,0 +1,2 @@
+motion pop { from { opacity: 0 } to { opacity: 1 } }
+.card::before { content: "x"; animate: pop 400 }

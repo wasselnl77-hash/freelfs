@@ -1,0 +1,10 @@
+
+    tokens {
+      font {
+        display: JetBrains Mono, monospace
+        quote: Iowan Old Style
+      }
+    }
+    .card { font-family: Public Sans, serif }
+    .quoted { font-family: "JetBrains Mono", monospace }
+  

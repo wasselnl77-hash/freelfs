@@ -1,0 +1,15 @@
+.btn {
+  ::after {
+    content: ""
+    opacity: 0
+    hover { opacity: 1 }
+  }
+  ::before { content: }
+  ::wat { color: red }
+  ::-webkit-scrollbar { width: 4 }
+  ::selection { color: red; bend: 3 }
+  ::after { seen { color: red } .x { color: red } }
+}
+::selection { color: red }
+.a, .b { ::before { content: "x"; hover { color: red } } }
+

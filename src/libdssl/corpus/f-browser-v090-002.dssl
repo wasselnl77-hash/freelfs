@@ -1,0 +1,1 @@
+.src { position: absolute; left: 300px; top: 400px; width: 60px; height: 40px; background: #333; aura-particle: #ffffff count 40 size 4 life 1000 speed 60 dir up spread 0 from bottom seed 3 }

@@ -1,0 +1,2 @@
+motion w { 120% { opacity: 1 } }
+.x { animate: w 1 }

@@ -1,0 +1,2 @@
+motion a { from { opacity: 1 } to { opacity: .5 } }
+motion b { from { translate: 0 0 } to { translate: 0 8 } }

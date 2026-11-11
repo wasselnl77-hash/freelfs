@@ -1,0 +1,9 @@
+.card,
+.panel {
+  background: linear-gradient(
+    to bottom, red, blue
+  )
+  color:
+    color.ink
+}
+

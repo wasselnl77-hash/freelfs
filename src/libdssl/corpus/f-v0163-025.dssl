@@ -1,0 +1,2 @@
+tokens { radius { xl: 32 } }
+.a { radius: xl }

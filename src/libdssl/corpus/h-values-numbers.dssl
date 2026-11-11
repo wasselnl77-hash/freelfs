@@ -1,0 +1,22 @@
+.a {
+  padding: 0
+  margin: 0 auto
+  opacity: 0.5
+  line-height: 1.5
+  transition-delay: 200
+  width: calc(100% - 24)
+  top: -4
+  left: +4
+  right: .5
+  bottom: 10PX
+  z-index: 3
+  flex: 1 1 0
+  background: oklch(62% 0.19 35)
+  grid-template-columns: repeat(4, 1fr)
+  grid-template-rows: repeat(auto-fill, minmax(100, 1fr))
+  transform: scale(1.2) rotate(5deg) translate(3, 4)
+  filter: blur(4) brightness(1.2) drop-shadow(0 2 4 black)
+  margin-top: max(4, 2vw)
+  animation: spin 1 infinite
+}
+

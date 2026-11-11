@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>FreeBWS ad blocker test</title>
+<style>
+body { font: 14px/1.5 "IBM Plex Sans", sans-serif; margin: 0; background: #1d2125; color: #d8dce0; }
+main { max-width: 760px; margin: 28px auto; padding: 0 20px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+p { color: #8a9199; margin: 0 0 18px; }
+table { width: 100%; border-collapse: collapse; background: #272c33; }
+td { padding: 7px 12px; border-bottom: 1px solid #3a4048; }
+td:last-child { width: 90px; font-weight: 600; }
+.ok { color: #3f9b63; } .bad { color: #d96c5f; } .wait { color: #8a9199; }
+code { font: 12px "IBM Plex Mono", monospace; color: #8a9199; }
+#sum { margin-top: 14px; font-weight: 600; }
+</style></head><body><main>
+<h1>Ad blocker test</h1>
+<p>Each line asks for something an ad blocker should stop (or, for the controls, must let through).</p>
+<table id="t"></table>
+<div id="sum"></div>
+<!-- cosmetic filters: generic selectors from EasyList (only on web pages: serve this file over http to test them) -->
+<div class="ad_banner" id="cos1" style="height:20px">hidden by a generic cosmetic rule (.ad_banner)</div>
+<div id="google_ads" style="height:20px">hidden by a generic cosmetic rule (#google_ads)</div>
+<script>
+var tests = [
+	['script', 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', 'block'],
+	['script', 'https://www.google-analytics.com/analytics.js', 'block'],
+	['script', 'https://connect.facebook.net/en_US/fbevents.js', 'block'],
+	['script', 'https://static.hotjar.com/c/hotjar-1.js', 'block'],
+	['image', 'https://ad.doubleclick.net/favicon.ico', 'block'],
+	['image', 'https://www.googletagservices.com/tag/js/gpt.js', 'block'],
+	['script', 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js', 'allow'],
+	['script', 'https://code.jquery.com/jquery-3.7.1.min.js', 'allow'],
+];
+var t = document.getElementById('t'), done = 0, good = 0;
+tests.forEach(function (x) {
+	var tr = document.createElement('tr');
+	tr.innerHTML = '<td><code>' + x[1] + '</code></td><td>' + x[2] + '</td><td class="wait">...</td>';
+	t.appendChild(tr);
+	var el = document.createElement(x[0] === 'image' ? 'img' : 'script');
+	function fin(loaded) {
+		var pass = (x[2] === 'allow') === loaded;
+		tr.lastChild.textContent = pass ? 'pass' : 'FAIL';
+		tr.lastChild.className = pass ? 'ok' : 'bad';
+		done++; if (pass) good++;
+		document.getElementById('sum').textContent = good + ' of ' + tests.length + ' as expected' + (done < tests.length ? ' ...' : '');
+		if (done === tests.length) document.title = 'test done ' + good + '/' + tests.length;
+	}
+	el.onload = function () { fin(true); };
+	el.onerror = function () { fin(false); };
+	el.src = x[1] + (x[1].indexOf('?') < 0 ? '?' : '&') + 'fbtest=' + Date.now();
+	document.body.appendChild(el);
+});
+setTimeout(function () {
+	var c = document.getElementById('cos1'), d = document.getElementById('google_ads');
+	var hid = getComputedStyle(c).display === 'none', hid2 = getComputedStyle(d).display === 'none';
+	var p = document.createElement('div');
+	p.style.marginTop = '8px';
+	p.textContent = 'cosmetic: ' + (hid ? 'pass' : 'FAIL') + ' (.ad_banner), ' + (hid2 ? 'pass' : 'FAIL') + ' (#google_ads)';
+	document.querySelector('main').appendChild(p);
+}, 1500);
+</script>
+</main></body></html>

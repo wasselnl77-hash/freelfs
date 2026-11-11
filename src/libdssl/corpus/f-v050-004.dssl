@@ -1,0 +1,6 @@
+
+    @media 768 {
+      .nav::-webkit-scrollbar-thumb:hover { background: color.ink/45 }
+    }
+    .card:hover::before { background: color.accent }
+  

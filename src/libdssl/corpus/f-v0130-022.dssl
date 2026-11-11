@@ -1,0 +1,2 @@
+tokens { color { c: #123 } }
+.a { color: color.c }

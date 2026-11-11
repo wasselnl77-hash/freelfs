@@ -1,0 +1,39 @@
+# xdg-desktop-portal: the D-Bus services Flatpak apps use to reach the
+# desktop (file chooser, open URI, settings, notifications, screenshots...),
+# plus the document portal (a FUSE file system, /run/user/UID/doc) and the
+# permission store. D-Bus activates them from the session bus on first use.
+#
+# It is the frontend only. A portal needs a *backend* for what the desktop
+# itself shows (file chooser, screenshots, ...): xdg-desktop-portal-gtk and
+# -gnome need GTK, -kde needs Qt, -wlr needs wlroots protocols. FreeLFS has its
+# own, written on libflui: recipes/flportal (src/flportal), selected by
+# freelfs-portals.conf / portals.conf, which that package installs. The session
+# script (src/flcomp/session) sets XDG_CURRENT_DESKTOP=FreeLFS for the bus.
+pkgname=xdg-desktop-portal
+version=1.22.1
+release=1
+summary="Desktop integration portals for sandboxed apps (frontend)"
+url=https://flatpak.github.io/xdg-desktop-portal/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib json-glib fuse3 gdk-pixbuf gstreamer gst-plugins-base gst-plugins-good pipewire
+	bubblewrap dbus)
+makedepends=(meson ninja gettext)
+source=(https://github.com/flatpak/xdg-desktop-portal/releases/download/$version/xdg-desktop-portal-$version.tar.xz)
+sha256=(d4879ddb3d65ff1a8f19187497e6f13dc5d267bcac404a5d501218be355753d3)
+build_style=meson
+# No systemd, geoclue or gudev; the Flatpak interface XML is not needed. Image
+# and sound validation run in bwrap, as upstream wants.
+configure_args=(--wrap-mode=nodownload --sysconfdir=/etc --localstatedir=/var
+	-D systemd=disabled -D geoclue=disabled -D gudev=disabled -D tests=disabled
+	-D installed-tests=false -D documentation=disabled -D man-pages=disabled
+	-D flatpak-interfaces=disabled -D sandboxed-image-validation=enabled
+	-D sandboxed-sound-validation=enabled)
+
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	rm -rf "${pkgdir:?}"/usr/lib/systemd
+}

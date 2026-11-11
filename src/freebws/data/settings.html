@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Settings</title>
+<link rel="stylesheet" href="freebws://res/ui.css">
+<style>
+.lists .row { padding: 7px 14px; min-height: 38px; }
+.sites .row { padding: 6px 14px; min-height: 36px; }
+.inl { display: flex; gap: 8px; flex: 1; }
+.inl input { flex: 1; }
+#status { white-space: pre-line; }
+</style></head>
+<body><div class="page">
+<div class="head"><h1>Settings</h1><span class="sp"></span><a href="freebws://bookmarks">Bookmarks</a><a href="freebws://downloads">Downloads</a></div>
+
+<h2>Search</h2>
+<div class="box"><div class="row"><div class="grow">Search engine<div class="sub">Used by the address bar and the start page</div></div>
+<select id="engine"></select></div></div>
+
+<h2>Ad blocker</h2>
+<div class="box">
+<div class="row"><div class="grow">Block ads, trackers and annoyances<div class="sub" id="status">...</div></div><span id="adb-sw"></span></div>
+<div class="row"><div class="grow">Filter lists<div class="sub">Updated by the browser once a week while it is online</div></div><button id="upd" class="small">Update now</button></div>
+</div>
+<div class="box lists" id="lists" style="margin-top:8px"></div>
+<h2>Sites where the blocker is off</h2>
+<div class="box sites" id="adb-off"></div>
+<p class="dim" style="margin-top:6px;font-size:12.5px">Turn it off for the site you are on with the shield button in the toolbar.</p>
+
+<h2>Appearance</h2>
+<div class="box">
+<div class="row"><div class="grow">Force dark mode<div class="sub">Dark colours on light pages. Pages that are dark already are left alone.</div></div><span id="dark-sw"></span></div>
+</div>
+<div class="box sites" id="dark-sites" style="margin-top:8px"></div>
+<div class="box" style="margin-top:8px">
+<div class="row"><div class="grow">Show the bookmarks bar<div class="sub">Ctrl+Shift+B</div></div><span id="bar-sw"></span></div>
+</div>
+
+<h2>Downloads</h2>
+<div class="box"><div class="row"><div class="grow">Save files to<div class="sub">Written as you type, folders are created when needed</div></div>
+<div class="inl"><input type="text" id="dldir" spellcheck="false"></div></div></div>
+
+<h2>About</h2>
+<p class="dim">FreeBWS on WPE WebKit. Filter lists: EasyList, EasyPrivacy (GPL-3.0-or-later or CC BY-SA 3.0) and uBlock filters (GPL-3.0-or-later).</p>
+</div>
+<script src="freebws://res/ui.js"></script>
+<script>
+var S = null;
+function siteList(box, csv, empty, remove) {
+	box.textContent = '';
+	var items = csv.split(',').filter(Boolean);
+	if (!items.length) { box.appendChild(el('div', { class: 'empty', text: empty })); return; }
+	items.forEach(function (h) {
+		box.appendChild(el('div', { class: 'row' }, [el('div', { class: 'grow mono', text: h }),
+			el('button', { class: 'small', text: 'Remove', onclick: function () { remove(h); } })]));
+	});
+}
+function render(s) {
+	S = s;
+	var e = $('#engine');
+	if (!e.options.length) {
+		s.engines.forEach(function (x) { e.appendChild(el('option', { value: x.id, text: x.name })); });
+		e.addEventListener('change', function () { fb('set', { key: 'search', value: e.value }).then(render); });
+	}
+	e.value = s.search;
+	var a = s.adblock;
+	$('#adb-sw').textContent = '';
+	$('#adb-sw').appendChild(sw(!!a.enabled, function (on) { fb('set', { key: 'adblock', value: on ? '1' : '0' }).then(render); }));
+	$('#status').textContent = !a.enabled ? 'Off' : a.building ? (a.ready && a.rules ? a.rules.toLocaleString() + ' network rules active; newer lists are being prepared in the background...' : 'Preparing the filters (one time, takes a moment)...') :
+		a.ready && a.rules ? a.rules.toLocaleString() + ' network rules in ' + a.chunks + ' filters. Lists: ' + (a.updated ? 'updated ' + fmtDate(a.updated) : 'the package snapshot') :
+		'Starting...';
+	var L = $('#lists');
+	L.textContent = '';
+	a.lists.forEach(function (l) {
+		L.appendChild(el('div', { class: 'row' }, [el('div', { class: 'grow', text: l.name }), el('span', { class: 'tag', text: l.license }),
+			el('span', { class: 'dim', text: l.kb + ' kB' })]));
+	});
+	siteList($('#adb-off'), a.off, 'No exceptions', function (h) { fb('adb', { op: 'site', host: h, off: 0 }).then(render); });
+	$('#dark-sw').textContent = '';
+	$('#dark-sw').appendChild(sw(!!s.dark, function (on) { fb('set', { key: 'dark', value: on ? '1' : '0' }).then(render); }));
+	var ds = $('#dark-sites'), on = s.dark_on.split(',').filter(Boolean), off = s.dark_off.split(',').filter(Boolean);
+	ds.textContent = '';
+	if (!on.length && !off.length) ds.appendChild(el('div', { class: 'empty', text: 'No per-site choices. Use the menu button in the toolbar on a page.' }));
+	on.concat(off).forEach(function (h) {
+		ds.appendChild(el('div', { class: 'row' }, [el('div', { class: 'grow mono', text: h }),
+			el('span', { class: 'tag', text: on.indexOf(h) >= 0 ? 'always dark' : 'never dark' }),
+			el('button', { class: 'small', text: 'Remove', onclick: function () { fb('dark-site', { host: h, mode: 0 }).then(render); } })]));
+	});
+	$('#bar-sw').textContent = '';
+	$('#bar-sw').appendChild(sw(!!s.bookmarks_bar, function (on) { fb('set', { key: 'bookmarks_bar', value: on ? '1' : '0' }).then(render); }));
+	if (document.activeElement !== $('#dldir')) $('#dldir').value = s.downloads_dir;
+}
+$('#upd').addEventListener('click', function () { fb('adb', { op: 'update' }).then(render); $('#status').textContent = 'Looking for newer lists...'; });
+var tm = null;
+$('#dldir').addEventListener('input', function () {
+	clearTimeout(tm);
+	var v = $('#dldir').value;
+	tm = setTimeout(function () { fb('set', { key: 'downloads_dir', value: v }); }, 500);
+});
+fb('state').then(render);
+setInterval(function () { fb('state').then(render); }, 3000);
+</script></body></html>

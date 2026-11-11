@@ -1,0 +1,1 @@
+.y { animation: foo 400ms; animation-delay: 200ms }

@@ -1,0 +1,953 @@
+// =========================================================================
+// docs.dssl, language reference layout (also used by the spec view)
+// =========================================================================
+
+.page-head {
+  padding: space.7 0 space.4
+}
+
+.page-title {
+  font-size: fluid 34 56
+  font-weight: 760
+  line-height: 1.04
+  letter-spacing: -0.032em
+  margin: 0 0 space.3
+  font-variation-settings: "wdth" 88
+  text-wrap: balance
+}
+
+.page-sub {
+  color: color.muted
+  font-size: 19
+  line-height: 1.6
+  max-width: 660
+  margin: 0
+}
+
+.docs-layout {
+  display: grid
+  grid-template-columns: 236 minmax(0, 1fr)
+  gap: fluid 24 64
+  align-items: start
+  padding-bottom: space.7
+}
+
+.docs-side {
+  position: sticky
+  top: 88
+  column: gap 1
+  max-height: calc(100vh - 110)
+  overflow-y: auto
+  padding-right: 6
+  scrollbar-width: thin
+}
+
+// v0.3.3 fix: this block MUST come after the .docs-side rule above:
+// `column:` expands to display:flex, and "later wins" in the cascade,
+// so an earlier display:none silently loses (same gotcha as the mobile
+// nav sheet in v0.3.0). Here it lives after, so the sidebar actually
+// disappears on small screens instead of pinning over the body text.
+@media (width <= 920) {
+  .docs-layout {
+    grid-template-columns: 1fr
+  }
+  .docs-side {
+    display: none
+  }
+}
+
+.side-head {
+  font-size: 14
+  font-weight: 700
+  color: color.ink
+  padding: 0 12
+  margin: space.5 0 6
+}
+
+.side-head:first-child {
+  margin-top: 0
+}
+
+.docs-side a {
+  padding: 6 12
+  radius: 0
+  font-size: 14.5
+  color: color.muted
+  transition: 130
+  border-left: 2 solid color.line
+  line-height: 1.4
+}
+
+.docs-side a:hover {
+  color: color.ink
+  border-left-color: color.accent
+}
+
+.docs-body {
+  min-width: 0
+  column: gap space.7
+}
+
+.doc-block {
+  column: gap space.3
+  scroll-margin-top: 92
+}
+
+.doc-lead {
+  color: color.muted
+  font-size: 17
+  line-height: 1.7
+  margin: 0
+  max-width: 720
+}
+
+// live example well
+.demo-box {
+  display: grid
+  place: center
+  gap: 12
+  border: 1 dashed color.line
+  radius: md
+  padding: space.5
+  background:
+    radial-gradient(color.line/45 1, transparent 1)
+  background-size: 16 16
+  min-height: 96
+}
+
+// tables (semantic property reference, spec votes, …)
+// v0.5, display: block + fit-content + internal scroll: the raw table's
+// min-content width (705px) used to push the whole page past 360px viewports
+//, the last un-swept overflow on this page. Same rules, now owned by the
+// stylesheet that actually styles the table, so last-word-wins stays honest.
+.tbl {
+  display: block
+  width: fit-content
+  max-width: 100%
+  overflow-x: auto
+  border-collapse: collapse
+  font-size: 13.5
+}
+
+.tbl th {
+  text-align: left
+  padding: 9 12
+  border-bottom: 2 solid color.ink
+  font-size: 14
+  font-weight: 700
+  color: color.ink
+}
+
+.tbl td {
+  padding: 10 12
+  border-bottom: 1 solid color.line
+  vertical-align: top
+  line-height: 1.55
+  color: color.ink/90
+}
+
+.tbl tr:hover td {
+  background: color.ink/4
+}
+
+.tbl code {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.ink
+  background: color.ink/8
+  padding: 1 6
+  radius: sm
+  white-space: nowrap
+}
+
+.tbl-note {
+  font-size: 12.5
+  color: color.muted
+  margin: 8 0 0
+}
+
+// callouts
+.note {
+  border-left: 3 solid color.accent
+  background: color.ink/5
+  radius: 0 md md 0
+  padding: space.3 space.4
+  font-size: 14
+  line-height: 1.65
+  color: color.ink/90
+}
+
+.note-warn {
+  border-left-color: color.tape
+  background: color.tape/22
+}
+
+.note b {
+  font-weight: 700
+}
+
+// docs live-demo widgets
+.doc-btn {
+  padding: 10 18
+  radius: sm
+  background: color.card
+  border: 1 solid color.ink/45
+  font-weight: 600
+  font-size: 14
+  cursor: pointer
+  transition: 150
+  color: color.ink
+}
+
+.doc-btn:hover {
+  border-color: color.accent/50
+  background: color.card
+  shadow: sm
+}
+
+.doc-card {
+  width: 250
+  padding: space.4
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  shadow: sm
+  transition: 200
+  column: gap 8
+  font-size: 13.5
+}
+
+.doc-card:hover {
+  shadow: md
+  border-color: color.ink/38
+}
+
+.doc-card-title {
+  font-weight: 700
+  font-size: 14.5
+}
+
+.doc-card-sub {
+  color: color.muted
+  font-size: 12.5
+  line-height: 1.5
+}
+
+.motion-box {
+  padding: space.4 space.5
+  radius: md
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
+  font-size: 13.5
+  min-width: 220
+  text-align: center
+}
+
+.signal-box {
+  padding: space.4 space.5
+  radius: md
+  border: 1 solid color.line
+  background: color.card
+  font-size: 14
+  font-weight: 600
+  transition: 250
+  color: color.muted
+}
+
+@signal docdemo == hot {
+  .signal-box {
+    background: color.accent
+    border-color: color.accent
+    color: color.accent-ink
+    shadow: md
+  }
+}
+
+.tok-demo {
+  row: gap 10 center
+}
+
+.tok-dot {
+  display: inline-grid
+  size: 34
+  circle: 34
+  center: both
+  font-family: font.mono
+  font-size: 11
+  border: 1 solid color.line
+  background: color.card
+  color: color.muted
+  transition: 200
+  cursor: pointer
+}
+
+.tok-dot:hover {
+  shadow: sm
+  border-color: color.accent/40
+  color: color.accent
+}
+
+.scale-bar {
+  row: gap 6
+  align-items: flex-end
+}
+
+.scale-step {
+  width: 34
+  background: color.accent/70
+  radius: 4 4 0 0
+  transition: 150
+}
+
+.scale-step:hover {
+  background: color.accent
+}
+
+// motion demo, replayed via DSSL.replay()
+motion pop {
+  from {
+    opacity: 0
+    translate: 0 16
+    scale: 0.9
+  }
+}
+
+.motion-box {
+  animate: pop 500 snap
+}
+
+// fluid type demo
+.fluid-demo {
+  fluid: 20, 44
+  font-weight: 800
+  letter-spacing: -0.02em
+  line-height: 1.15
+  text-align: center
+}
+
+.fine-print {
+  font-size: 13
+}
+
+// =========================================================================
+// cheat sheet (v0.3), one-page quick reference
+// =========================================================================
+
+.cheat-grid {
+  display: grid
+  grid-template-columns: 1fr 1fr
+  gap: space.4
+  padding-bottom: space.7
+  align-items: start
+}
+
+.cheat-wide {
+  grid-column: 1 / -1
+}
+
+@media (width <= 860) {
+  .cheat-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.cheat-card {
+  border-top: 2 solid color.ink
+  padding: space.3 0 0
+  column: gap 10
+  min-width: 0
+}
+
+.cheat-card h3 {
+  font-size: 15
+  font-weight: 700
+  margin: 0
+}
+
+.cheat-k {
+  font-size: 12.5
+  font-weight: 700
+  color: color.accent-ink
+  background: color.accent
+  padding: 2 8
+  radius: sm
+  align-self: start
+}
+
+.cheat-p {
+  font-size: 13
+  color: color.muted
+  line-height: 1.6
+  margin: 0
+}
+
+.cheat-p code {
+  font-family: font.mono
+  font-size: 12
+  color: color.ink
+  background: color.ink/8
+  padding: 1 5
+  radius: sm
+}
+
+.cheat-p a {
+  color: color.ink
+  font-weight: 600
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
+}
+
+.cheat-list {
+  column: gap 7
+}
+
+.cheat-list .cr {
+  row: gap 10
+  align-items: baseline
+}
+
+.cheat-list code {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.ink
+  background: color.ink/8
+  padding: 1 6
+  radius: sm
+  white-space: nowrap
+}
+
+.cheat-list span {
+  color: color.muted
+  font-size: 13
+  line-height: 1.5
+}
+
+// ---------------------------------------------------- v0.4.0 · power tools
+
+// scoped tokens live demo, inside this box, --color.accent re-declares the
+// accent token as color.ok. The tok-dots run the same rules as the palette
+// demo above, but the var() references inherit our override, so they go green.
+.tok-scope {
+  --color.accent: color.ok
+  padding: space.4
+  border: 1 dashed color.line
+  radius: md
+  background: color.card
+  column: gap 10
+}
+
+// seen + stagger live demo, four cards that cascade in when you scroll here
+motion rise-in {
+  from {
+    opacity: 0
+    translate: 0 14
+  }
+}
+
+.pt-grid {
+  display: grid
+  grid-template-columns: repeat(4, 1fr)
+  gap: space.3
+  stagger: 70
+}
+
+@media (width <= 920) {
+  .pt-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+}
+
+@media (width <= 560) {
+  .pt-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.pt-card {
+  padding: space.4 space.3
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  column: gap 6
+  seen {
+    animate: rise-in 420 snap
+  }
+}
+
+.pt-num {
+  font-family: font.mono
+  font-size: 18
+  font-weight: 700
+  color: color.ink
+}
+
+.pt-card span:last-child {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.muted
+}
+
+// =========================================================================
+// v0.5, the pseudo-elements section's live demo. The rules below are
+// written in the FULL-SELECTOR form (.pe-tag::before), the spelling that
+// used to compile ok and then match nothing. The demo renders right only
+// if the trap stays closed. The dot is also the site's first `infinite`
+// animation, so v0.5 dogfoods both headline features at once.
+// =========================================================================
+
+motion pe-pulse {
+  from { opacity: 1 }
+  to { opacity: 0.2 }
+}
+
+.pe-demo {
+  row: gap 12 center wrap
+  padding: space.4 space.5
+  background: color.card
+  border: 1 solid color.line
+  radius: sm
+}
+
+.pe-tag {
+  font: 13 color.muted
+}
+
+.pe-tag::before {
+  content: ""
+  display: inline-block
+  size: 10
+  background: color.accent
+  radius: 3
+  margin-inline-end: 8
+}
+
+.pe-dot {
+  size: 12
+  radius: full
+  background: color.accent
+  animate: pe-pulse 1200 infinite alternate
+}
+
+.pe-tail {
+  font: 12 color.muted
+  font-style: italic
+}
+
+// =========================================================================
+// v0.5, the overlap section's live demo. The ghost is a real 45%-opacity
+// element; the site-wide `body { overlap: auto }` policy shoves it out of
+// the card after layout. The toggle grants the ghost its own
+// `overlap: allow`, the same opt-out a scrim or translucent nav uses.
+// The ghost's transition sits on the translate channel, the same channel
+// the engine's nudge writes, so the escape glides instead of teleporting.
+// =========================================================================
+
+.ov-stage {
+  position: relative
+  width: 100%
+  min-height: 250
+}
+
+.ov-card {
+  width: min(430, 74%)
+  display: grid
+  gap: 8
+  padding: space.4
+  background: color.card
+  border: 1 solid color.line
+  radius: md
+  shadow: sm
+}
+
+.ov-card-title {
+  font-weight: 700
+  font-size: 14
+}
+
+.ov-card-sub {
+  font: 12.5 color.muted
+  line-height: 1.5
+}
+
+.ov-ghost {
+  position: absolute
+  left: 30%
+  top: 30%
+  padding: 5 11
+  radius: 999
+  background: color.accent/30
+  border: 1 solid color.accent
+  color: color.ink
+  font: 11.5 font.mono
+  white-space: nowrap
+  opacity: 0.45
+  transition: 340 snap translate
+}
+
+// the documented opt-out: the ghost's own policy beats the body's
+.ov-stage[data-ov-off] .ov-ghost {
+  overlap: allow
+}
+
+// =========================================================================
+// v0.6.0, the deform section's live demos. The button genuinely flexes
+// under the pointer (:active bend + stretch riding the transform channel),
+// the chip row is a real bend-around container re-laid on resize, and the
+// two mini cards bend-up / fold on hover with edge pivots baked into the
+// transform. One transform string carries all of it.
+// =========================================================================
+
+.df-row {
+  row: gap 14 center wrap
+}
+
+.df-btn {
+  padding: 12 22
+  radius: md
+  background: color.accent
+  color: color.accent-ink
+  font-weight: 700
+  font-size: 14
+  cursor: pointer
+  border: 0
+  shadow: sm
+  transition: 200 snap transform
+  hover {
+    bend: 5
+    shadow: md
+  }
+  active {
+    bend: 16
+    stretch: 0.94
+  }
+}
+
+.df-mini {
+  width: 128
+  padding: 14
+  display: grid
+  place: center
+  background: color.card
+  border: 1 solid color.line
+  radius: md
+  font: 12.5 color.muted
+  font-family: font.mono
+  text-align: center
+  transition: 260 snap transform
+}
+
+.df-up { hover { bend-up: 14 } }
+
+.df-fold { hover { fold: 14 } }
+
+// narrow screens scroll the arc horizontally instead of stretching the page
+// (max-width tames the grid-item minimum size, overflow-x does the scrolling)
+.df-arc {
+  row: gap 20 center
+  padding: 28 space.5 space.4
+  background: color.card
+  border: 1 solid color.line
+  radius: sm
+  bend-around: -22
+  max-width: 100%
+  overflow-x: auto
+}
+
+.df-chip {
+  padding: 6 14
+  radius: full
+  background: color.ink/6
+  border: 1 solid color.line
+  font: 12.5 font.mono color.muted
+}
+
+// =========================================================================
+// v0.6.0, the gradient section's live demos. The banner flows forever
+// (gradient-flow loops background-position through WAAPI and sizes the
+// background to 200% itself), the headline clips a gradient into the
+// glyphs, and the swatches are the three kinds, one line each.
+// =========================================================================
+
+.gd-banner {
+  padding: space.5
+  radius: md
+  gradient: linear 120, color.accent -> color.ok -> color.accent
+  gradient-flow: 7s alternate
+  color: white
+  font-weight: 700
+  font-size: 15
+  shadow: sm
+}
+
+.gd-headline {
+  gradient-text: linear to right, color.accent, color.ink
+  font-size: 26
+  font-weight: 800
+  letter-spacing: -0.5
+}
+
+.gd-sw-row {
+  row: gap 14 wrap
+}
+
+.gd-sw {
+  size: 72
+  radius: md
+  border: 1 solid color.line
+  shadow: sm
+}
+
+.gd-lin { gradient: linear 135, color.accent -> color.ok }
+
+.gd-rad { gradient: radial circle at 30% 20%, color.card -> color.ink }
+
+.gd-con { gradient: conic from 45, color.accent, color.line, color.card, color.accent }
+
+// v0.7, performance chapter sub-heads (dssl-ready / freeze / explain)
+.doc-h3 {
+  font-weight: 650
+  font-size: 18
+  letter-spacing: -0.01em
+  margin: space.4 0 space.1
+  scroll-margin-top: 92
+}
+
+// =========================================================================
+// v0.9.0: texture, aura and slider demos
+// =========================================================================
+
+.tx-wall {
+  display: grid
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr))
+  gap: 12
+  justify-self: stretch
+}
+
+// a demo box whose content should span the whole box instead of sitting centred
+.demo-box.wide { display: grid; justify-content: stretch }
+
+.tx-cell {
+  column: gap 6
+  font-size: 13
+}
+
+.tx {
+  height: 64
+  radius: md
+  background-color: #b8a58a
+  border: 1 solid color.line
+}
+
+// the swatch for each preset is the preset, written as DSSL. This block is generated.
+// <generated: texture swatches. Run scripts/gen-site-vocab.mjs, do not edit by hand>
+.tx-grain { texture: grain }
+.tx-noise { texture: noise }
+.tx-rough { texture: rough }
+.tx-sand { texture: sand }
+.tx-paper { texture: paper }
+.tx-cloud { texture: cloud }
+.tx-concrete { texture: concrete }
+.tx-stone { texture: stone }
+.tx-crumpled { texture: crumpled }
+.tx-glitter { texture: glitter }
+.tx-frost { texture: frost }
+.tx-marble { texture: marble }
+.tx-wood { texture: wood }
+.tx-oak { texture: oak }
+.tx-walnut { texture: walnut }
+.tx-cherry { texture: cherry }
+.tx-maple { texture: maple }
+.tx-pine { texture: pine }
+.tx-mahogany { texture: mahogany }
+.tx-ebony { texture: ebony }
+.tx-birch { texture: birch }
+.tx-oak-planks { texture: oak-planks }
+.tx-walnut-planks { texture: walnut-planks }
+.tx-bark { texture: bark }
+.tx-leather { texture: leather }
+.tx-brushed { texture: brushed }
+.tx-canvas { texture: canvas }
+.tx-linen { texture: linen }
+.tx-denim { texture: denim }
+.tx-carbon { texture: carbon }
+.tx-scanlines { texture: scanlines }
+.tx-halftone { texture: halftone }
+.tx-dots { texture: dots }
+.tx-lines { texture: lines }
+.tx-grid { texture: grid }
+.tx-checker { texture: checker }
+.tx-crosshatch { texture: crosshatch }
+.tx-stripes { texture: stripes }
+.tx-waves { texture: waves }
+.tx-hex { texture: hex }
+.tx-bricks { texture: bricks }
+.tx-bricks-old { texture: bricks-old }
+.tx-herringbone { texture: herringbone }
+.tx-plaid { texture: plaid }
+.tx-tartan { texture: tartan }
+.tx-gingham { texture: gingham }
+.tx-scales { texture: scales }
+.tx-mermaid { texture: mermaid }
+.tx-shingles { texture: shingles }
+.tx-chevron { texture: chevron }
+.tx-argyle { texture: argyle }
+.tx-lowpoly { texture: lowpoly }
+.tx-tiles { texture: tiles }
+.tx-blueprint { texture: blueprint }
+.tx-granite { texture: granite }
+.tx-slate { texture: slate }
+.tx-sandstone { texture: sandstone }
+.tx-terrazzo { texture: terrazzo }
+.tx-confetti { texture: confetti }
+.tx-rust { texture: rust }
+.tx-corrugated { texture: corrugated }
+.tx-cork { texture: cork }
+.tx-kraft { texture: kraft }
+.tx-felt { texture: felt }
+.tx-burlap { texture: burlap }
+.tx-stucco { texture: stucco }
+.tx-starfield { texture: starfield }
+.tx-snow { texture: snow }
+.tx-grass { texture: grass }
+.tx-water { texture: water }
+.tx-rain { texture: rain }
+.tx-lava { texture: lava }
+.tx-topo { texture: topo }
+// </generated>
+
+// ---- aura: the recipes from the guide, written here exactly as a reader would write them
+behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70 shape flame glowing behind
+}
+
+behavior ki {
+  aura-glow: #ffe14a 50 pulse 700 depth 0.45 flicker 0.15
+  aura-particle: #fff7b0 -> #ffd21f -> rgba(255,180,0,0) count 90 size 4 12 life 500 900 speed 90 220 dir up spread 55 from edge gravity -120 turbulence 120 shape spark glowing behind
+}
+
+behavior embers {
+  aura-glow: #ff5a1f 22 pulse 2200 flicker 0.2
+  aura-particle: #ffb347 -> #ff4d00 -> rgba(120,10,0,0) count 36 size 2 5 life 1800 3200 speed 20 60 dir up spread 70 from bottom gravity -10 drag 0.4 turbulence 30 shape circle glowing
+}
+
+behavior electric {
+  aura-glow: #6cf 26 flicker 0.85 pulse 260
+  aura-particle: #d8f1ff -> #4db8ff -> rgba(77,184,255,0) count 36 size 3 7 life 140 320 speed 120 320 dir out spread 360 from edge shape spark glowing
+}
+
+behavior snow {
+  aura-particle: #ffffff -> rgba(210,235,255,0) count 90 size 2 6 life 2600 4200 speed 14 42 dir down spread 40 from top turbulence 22 shape circle
+}
+
+.au-stage {
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))
+  gap: 56
+  padding: 64 24 48
+  background: #0b0a12
+  radius: lg
+  width: 100%
+}
+
+.au {
+  height: 96
+  radius: lg
+  background: #1c1a28
+  color: #d9d4e6
+  display: grid
+  place-items: center
+  font-size: 14
+}
+
+.au-fire { use fire }
+.au-ki { use ki }
+.au-embers { use embers }
+.au-electric { use electric }
+.au-snow { use snow }
+
+// ---- sliders
+.sl-demo {
+  column: gap 34
+  width: 100%
+  padding: 28 24
+  background: #101018
+  radius: lg
+}
+
+.sl-plain {
+  slider: track 6 #445566 radius full, fill #ff7a00, thumb 22 #ffffff, ring 3 #ff7a00, glow #ff7a00 14, ticks 10 #8890a0
+}
+
+.sl-graph {
+  slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 52, graph-gap 3, fill #77ccff, track 3 #34445a, thumb 14 #ffffff, shape bar
+}
+
+.sl-diamond {
+  slider: track 10 #2b3040 radius 3, fill #5be2a0, thumb 24 #5be2a0, shape diamond
+  aura-particle: #bfffe0 -> rgba(91,226,160,0) count 40 size 5 life 700 speed 30 70 dir up spread 50 from thumb glowing
+}
+
+.sl-label {
+  color: #a79eba
+  font-size: 13
+  margin: 0 0 6
+}
+
+.doc-list {
+  margin: 0
+  padding-left: 22
+  column: gap 8
+  max-width: 720
+}
+
+.doc-list li {
+  line-height: 1.65
+}
+
+// ---- 0.10.0: glass and tilt demo
+.fx-scene {
+  position: relative
+  overflow: hidden
+  width: 100%
+  radius: lg
+  padding: 36 28
+  background: linear-gradient(135deg, #ff7a00, #c2185b 55%, #3949ab)
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr))
+  gap: 20
+}
+
+.fx-blob { position: absolute; radius: full }
+.fx-blob-a { width: 150; height: 150; left: 6%; top: -34; background: #ffe14a }
+.fx-blob-b { width: 120; height: 120; right: 12%; bottom: -26; background: #40e0d0 }
+
+.fx-pane {
+  position: relative
+  column: gap 6
+  min-height: 130
+  padding: 20
+  glass: 18 saturate 1.6
+  tilt: 10 lift 1.04 glare
+  border: 1 solid white/35
+  radius: lg
+  color: white
+  font-size: 13.5
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}
+
+.fx-pane b { font-size: 17 }
+
+// ---- 0.12.0: more gradient forms
+.gd-stripes { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.gd-srgb { gradient: linear 90, #ff0055 -> #00d4ff }
+.gd-oklch { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.gd-band { gradient: linear 90, #ff7a1a 0 30%, #3949ab 30% 100% }
+.gd-mesh { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+
+// spacing helpers for the few paragraphs that sit tight under the one above
+.gap-14 { margin-top: 14 }
+.gap-18 { margin-top: 18 }

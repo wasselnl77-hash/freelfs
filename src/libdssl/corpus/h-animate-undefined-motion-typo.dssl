@@ -1,0 +1,4 @@
+motion fade { from { opacity: 0 } }
+.a { animate: fadee 400 }
+.b { animate: zzzzzzzz 400 }
+

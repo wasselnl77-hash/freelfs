@@ -1,0 +1,32 @@
+flpdf -- the FreeLFS document viewer ("Documents")
+==================================================
+
+    flpdf [--page N] [--zoom PERCENT] [--find TEXT] [--no-contents] FILE
+
+PDF, XPS, EPUB and CBZ through MuPDF (recipe mupdf: static libraries, no X11/GL
+viewer, no CJK fallback fonts). Pages are laid out in one continuous column;
+only the pages on screen are drawn, from cached display lists (8 pages), straight
+into the window buffer. MuPDF's store is capped at 24 MB. Idle RSS is about 17 MB
+for a small PDF.
+
+Keys
+  Down, Up, wheel         scroll                 Space, Page Down/Up   one screen
+  Home, End               start, end             N / P                 next, previous page
+  + / - / Ctrl+wheel      zoom (wheel: at the pointer)
+  0                       fit width              9   fit page          1   100 %
+  Ctrl+F or /             search                 Enter, F3, Ctrl+G     next match (Shift: previous)
+  C or F9                 show or hide Contents  Escape                clear the search, then quit
+Mouse: drag pans; a click on a link follows it (internal links jump, a web address
+is copied to the clipboard); the page box takes a page number and Enter; clicking an
+entry in Contents goes to its page.
+
+Search runs one page at a time as you step through matches, and highlights every
+hit on the pages in view. Page sizes are measured on timer ticks after the first
+page is up, so a large document opens at once.
+
+Not done: password-protected files (reported, not opened), text selection and copy,
+annotations and forms, printing.
+
+Test: make check (python3; no compositor). tests/mkpdf.py writes the PostScript for
+the report with bookmarks and links used for the screenshots (ghostscript turns it
+into a PDF).

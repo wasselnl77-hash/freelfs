@@ -1,0 +1,8 @@
+# Test package providing a virtual name.
+pkgname=libfoo
+version=1.0
+release=1
+summary="flpkg test provider"
+arch=(any)
+provides=("libfoo.so=1")
+package() { mkdir -p "$pkgdir/usr/lib" && echo foo > "$pkgdir/usr/lib/libfoo.txt"; }

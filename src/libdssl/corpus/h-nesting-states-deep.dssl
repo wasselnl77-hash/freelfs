@@ -1,0 +1,5 @@
+.a { hover { focus { color: red } } }
+.a, .b { hover { color: red } }
+hover { color: red }
+seen { opacity: 1 }
+

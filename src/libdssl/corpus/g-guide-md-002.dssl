@@ -1,0 +1,7 @@
+.toolbar { row: gap 8 between center }
+.sidebar { column: gap 16 }
+.board   { grid: 3 gap 12 }        // 3 columns, 1fr each, gap 12
+.board   { grid: auto-fill 220 }   // responsive columns
+.gallery { grid: 2 rows 3 gap 8 }  // rows N is a word too
+.modal   { stack: center }         // grid place-items center
+.hero    { center: both }

@@ -1,0 +1,19 @@
+pkgname=wayland
+version=1.26.0
+release=1
+summary="Wayland display protocol: libraries and wayland-scanner"
+url=https://wayland.freedesktop.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libffi expat)
+makedepends=(python)
+source=(https://gitlab.freedesktop.org/wayland/wayland/-/releases/$version/downloads/wayland-$version.tar.xz)
+sha256=(64176eaa46e4969903e286f8e5ef8331affc17fdf03ac9b58381d2b23162b7a3)
+build_style=meson
+# BLFS lists libxml2 as required, but it is only used to validate protocol
+# XML against the DTD (dtd_validation) and by the tests; wayland-scanner
+# itself parses with expat. libxml2 is not in the base system, so both off.
+configure_args=(-D documentation=false -D dtd_validation=false -D tests=false)
+
+check() { :; } # tests are not built

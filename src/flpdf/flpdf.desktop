@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Documents
+Comment=Read PDF and e-book files
+Exec=flpdf %f
+Categories=Office;Viewer;
+MimeType=application/pdf;application/epub+zip;application/x-cbz;application/oxps;
+X-FreeLFS-Glyph=▭

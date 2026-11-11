@@ -1,0 +1,24 @@
+# flfiles, from src/flfiles in the FreeLFS tree.
+pkgname=flfiles
+version=0.1
+release=2
+summary="FreeLFS file manager: places, drives, icon grid, trash"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flfiles" "$srcdir/flfiles"
+	cd "$srcdir/flfiles"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flfiles"
+	make DESTDIR="$pkgdir" install
+}

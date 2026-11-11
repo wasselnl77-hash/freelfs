@@ -1,0 +1,7 @@
+#plain { padding: 10 }
+#one { padding: 10 12 14 16; margin-top: 9; yield: padding-top }
+#fam { padding: 3; yield: padding }
+#env { padding-bottom: 7; yield: padding-bottom }
+#none { padding: 10; yield: padding-top; yield: none }
+#late { padding: 10; color: #00f }
+#late:not(.off) { yield: padding-top }

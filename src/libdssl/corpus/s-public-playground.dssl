@@ -1,0 +1,266 @@
+// =========================================================================
+// playground.dssl, the live editor view
+// =========================================================================
+
+.pg-layout {
+  display: grid
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+  gap: space.4
+  align-items: stretch
+}
+
+@media (width <= 940) {
+  .pg-layout {
+    grid-template-columns: 1fr
+  }
+}
+
+.pg-pane {
+  background: color.card
+  border: 1 solid color.line
+  radius: lg
+  overflow: hidden
+  display: flex
+  flex-direction: column
+  min-height: 560
+}
+
+.pg-head {
+  row: gap 8 between
+  align: center
+  padding: 10 14
+  border-bottom: 1 solid color.line
+  font-family: font.mono
+  font-size: 12
+  color: color.muted
+  background: color.card
+}
+
+.pg-head-tools {
+  row: gap 8 center
+}
+
+.pg-select {
+  font-family: font.mono
+  font-size: 12
+  background: color.card
+  color: color.ink
+  border: 1 solid color.ink/45
+  radius: sm
+  padding: 5 8
+  cursor: pointer
+}
+
+.pg-editor {
+  flex: 1
+  width: 100%
+  min-height: 420
+  border: none
+  outline: none
+  resize: vertical
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
+  font-size: 13
+  line-height: 1.7
+  padding: space.4
+  tab-size: 2
+  white-space: pre
+  overflow-wrap: normal
+  overflow-x: auto
+}
+
+.pg-canvas-wrap {
+  flex: 1
+  display: flex
+  flex-direction: column
+  min-height: 420
+}
+
+.pg-canvas {
+  flex: 1
+  padding: space.5
+  background:
+    conic-gradient(color.line/30 25%, transparent 0 50%, color.line/30 0 75%, transparent 0)
+  background-size: 18 18
+  overflow: auto
+}
+
+.pg-canvas-title {
+  font-size: 14
+  font-weight: 700
+  color: color.ink
+  margin: 0 0 space.3
+}
+
+.pg-status {
+  row: gap 8 center
+  padding: 8 14
+  font-family: font.mono
+  font-size: 12
+  border-top: 1 solid color.line
+  background: color.card
+  color: color.muted
+}
+
+.pg-status-ok { color: color.ok }
+.pg-status-err { color: color.err }
+
+.pg-errors {
+  column: gap 8
+  padding: 12 14
+  background: color.tape
+  border-top: 0
+  max-height: 240
+  overflow-y: auto
+  scrollbar-width: thin
+}
+
+.pg-error {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.tape-ink
+  line-height: 1.55
+  column: gap 2
+}
+
+.pg-error-hint {
+  color: color.tape-ink
+  font-size: 12
+}
+
+.pg-error-hint em {
+  color: color.tape-ink
+  font-style: normal
+  font-weight: 700
+  text-decoration: underline
+}
+
+// playground canvas starts empty, that's the point.
+// The hint below shows only while nothing has been matched yet.
+.pg-hint {
+  place-self: center
+  text-align: center
+  color: color.muted
+  font-size: 14
+  line-height: 1.7
+  max-width: 380
+  padding: space.5
+  border: 1 dashed color.line
+  radius: md
+  background: color.card/70
+}
+
+.pg-hint code {
+  font-family: font.mono
+  color: color.ink
+  font-size: 13
+}
+
+// stat chips under the editor
+.pg-stats {
+  row: gap 8
+  flex-wrap: wrap
+}
+
+.stat-chip {
+  font-family: font.mono
+  font-size: 11.5
+  color: color.muted
+  border: 1 solid color.line
+  background: color.card
+  radius: full
+  padding: 4 10
+}
+
+.stat-chip b {
+  color: color.ink
+  font-weight: 700
+}
+
+.pg-note {
+  padding: 8 14
+  font-size: 13.5
+  color: color.ink
+  background: color.ink/6
+  border-bottom: 1 solid color.line
+}
+
+// ---- 0.10.0: tabs, warnings and the CSS view
+.pg-tabs {
+  row: gap 2
+}
+
+.pg-tab {
+  font-family: font.mono
+  font-size: 12
+  color: color.muted
+  background: transparent
+  border: 0
+  border-bottom: 2 solid transparent
+  padding: 4 8
+  cursor: pointer
+  hover { color: color.ink }
+  focus-visible { outline: 2 solid color.accent; outline-offset: 2 }
+}
+
+.pg-tab-on {
+  color: color.ink
+  border-bottom-color: color.accent
+  font-weight: 700
+}
+
+.pg-warns {
+  column: gap 6
+  padding: 10 14
+  background: color.card
+  border-top: 1 solid color.line
+  max-height: 160
+  overflow-y: auto
+}
+
+.pg-warn {
+  font-family: font.mono
+  font-size: 12
+  color: color.ink
+  line-height: 1.55
+  column: gap 2
+  border-left: 4 solid color.tape
+  padding-left: 10
+}
+
+.pg-warn-hint { color: color.muted }
+
+.pg-out-wrap {
+  flex: 1
+  column: gap 0
+  min-height: 420
+  background: color.code-bg
+}
+
+.pg-out-bar {
+  row: gap 8 between
+  align: center
+  padding: 8 14
+  font-family: font.mono
+  font-size: 12
+  color: color.code-ink
+  border-bottom: 1 solid color.code-ink/15
+}
+
+.pg-out {
+  flex: 1
+  margin: 0
+  padding: space.4
+  overflow: auto
+  font-family: font.mono
+  font-size: 12.5
+  line-height: 1.65
+  color: color.code-ink
+  white-space: pre
+  tab-size: 2
+}
+
+.pg-head { flex-wrap: wrap }
+.pg-tab, .pg-head-tools .doc-btn { white-space: nowrap }
+.pg-head-tools { flex-wrap: wrap }

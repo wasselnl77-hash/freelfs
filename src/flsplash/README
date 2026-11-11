@@ -1,0 +1,61 @@
+flsplash -- the FreeLFS boot screen
+
+The one glossy thing in FreeLFS, on purpose: the logo of docs/logo.svg (three
+bars tilted 6 degrees) as beveled, glossy green slabs with an extruded side
+and a gel highlight, a soft glow behind, a faded mirror image on a dark floor,
+a light band that sweeps across, and "FreeLFS" (IBM Plex Sans, spaced, one
+size) fading in under it. About 3.8 s, then it holds.
+
+How: nothing is drawn at boot, only composited. genart.c renders the layers
+once at build time (bevel normals, diffuse and specular light, a fake studio
+environment, the highlight, 6 x 6 or 4 x 4 supersampling) in six sizes,
+deflated into flsplash.dat, which is built into the binary (about 0.5 MB).
+At boot the size that fits the screen height is picked (up to 40% of it), so
+nothing is ever scaled: no blur. The word is part of the art and never drawn
+again, so the last frame is exactly what stays on screen until the login
+screen takes over. Only the logo region is composited per frame, in
+premultiplied integer math, two channels per 32 bit word. The clock is
+CLOCK_MONOTONIC from the first picture: a slow machine drops frames, never time.
+
+It draws into KMS dumb buffers (a legacy SETCRTC on every connected
+connector), or /dev/fb0 when there is no DRM device. No compositor, no
+libdrm: the ioctls are called directly. With two buffers each frame is a page
+flip on the vertical blank (the next frame starts when the flip event
+arrives); where flips do not work (simpledrm) the region alone is copied
+into the buffer on screen, paced at 60 Hz.
+
+  flsplash             started by rc.sysinit as root; forks, exits 0 always
+  flsplash --handover  waits for the animation to end, drops DRM master (the
+                       last picture stays in the scanout) and returns; flgreet
+                       and the first-boot step of rc.sysinit run it before
+                       flcomp. flsplash exits 6 s later.
+  flsplash --text      the boot text now (also puts the console back to text)
+  flsplash --render MS W H FILE.ppm
+                       the picture at MS ms on a W x H screen, written to a
+                       PPM; needs no screen (how to look at it while tuning
+                       genart.c)
+
+Signals: USR1 hands the screen over, USR2 or TERM show the text. Esc shows
+the text too (tty0 is read in raw mode); a failed `step` sends USR2. Kernel
+option `nosplash` turns it off. With KD_GRAPHICS set on tty0, the status lines
+of rc go to the console buffer only (the serial console still gets them).
+
+When the DRM device goes away (simpledrm giving way to the real driver) the
+card is opened again and drawing continues at the right point: /dev and
+/dev/dri are watched with inotify, vanished cards answer ENODEV, and mappings
+of an unplugged card raise SIGBUS, which is caught. If no screen shows up
+within 4 s it exits and the boot stays text. Nobody taking over within 3
+minutes also means text.
+
+Files in /run: flsplash.pid, .done (animation over), .released (handed over),
+.log (what happened, in ms).
+
+Build: make (genart needs FreeType and the IBM Plex Sans font, flsplash needs
+zlib); make install (PREFIX, DESTDIR). The art file is generated, not kept in
+the tree.
+
+Wallpaper colours: `genart -W -a RRGGBB -w FILE` renders only the wallpaper (the 3D F without the
+word) with the hue of the green material replaced (HSV: saturation and brightness stay, white
+highlights stay white). The Makefile makes wallpaper-teal/blue/amber/orange/rose.flw this way next to
+the green wallpaper.flw (same ids and colours as libflui's accents); Settings > Display > Wallpaper
+offers them and flcomp loads the chosen one. The boot logo itself stays green.

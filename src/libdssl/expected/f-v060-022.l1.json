@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"transition","value":"200 snap bend, 150 stretch, 100 fold"}],"kind":"selector","line":1,"sel":".btn"}],"kind":"root"}}

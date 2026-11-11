@@ -1,0 +1,7 @@
+
+    motion wave {
+      from { bend: 0 }
+      to { bend: 30; fold: 20 }
+    }
+    .x { animate: wave 500 }
+  

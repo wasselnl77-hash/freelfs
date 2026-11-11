@@ -1,0 +1,2 @@
+@supports (a: b) { .a { color: red }
+

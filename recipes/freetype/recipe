@@ -1,0 +1,27 @@
+pkgname=freetype
+version=2.14.3
+release=1
+summary="TrueType and OpenType font rendering library"
+url=https://freetype.org/
+license=("FTL OR GPL-2.0-or-later")
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib bzip2 libpng)
+source=(https://downloads.sourceforge.net/freetype/freetype-$version.tar.xz)
+sha256=(36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f)
+build_style=autotools
+# This is the "first pass" of the freetype/harfbuzz cycle, but no second pass
+# is needed: as in BLFS, --with-harfbuzz=dynamic makes freetype dlopen
+# libharfbuzz at run time when it is installed, so freetype is built once,
+# before harfbuzz.
+configure_args=(--disable-static --enable-freetype-config --with-harfbuzz=dynamic
+	--with-zlib=yes --with-bzip2=yes --with-png=yes --with-brotli=no)
+
+prepare() {
+	# GX/AAT and OpenType table validation, and subpixel rendering (see the
+	# patent note on freetype.org/patents.html)
+	sed -ri "s:.*(AUX_MODULES.*valid):\1:" modules.cfg
+	sed -r "s:.*(#.*SUBPIXEL_RENDERING) .*:\1:" -i include/freetype/config/ftoption.h
+}
+
+check() { :; } # no test suite

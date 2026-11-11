@@ -1,0 +1,4 @@
+fonts {
+  // the display face
+  Lora: 400 // regular
+}

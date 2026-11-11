@@ -1,0 +1,64 @@
+#!/bin/sh
+# flcrash-test -- crash the desktop on purpose, to see the real "Something went wrong" screen.
+# SPDX-License-Identifier: MIT
+#
+# Sends a signal to your own flcomp (no root needed). /etc/profile.d/desktop.sh, which
+# started flcomp on tty1, then does exactly what it does for a real crash and runs
+# flcrash. Run it in a terminal inside the desktop or from another tty. Every program
+# of the desktop is closed.
+
+usage() {
+	cat <<'END' >&2
+usage: flcrash-test KIND
+
+  segv        FL-SIGSEGV       kill -SEGV flcomp (a real crash)
+  abort       FL-SIGABRT       kill -ABRT
+  bus         FL-SIGBUS        kill -BUS
+  ill         FL-SIGILL        kill -ILL
+  fpe         FL-SIGFPE        kill -FPE
+  kill        FL-SIGKILL       kill -KILL (what the out-of-memory killer does)
+  hup         FL-SIGHUP        kill -HUP
+  other       FL-SIG24         kill -XCPU (any signal without a name of its own)
+  exit        FL-EXIT-3        flcomp exits with status 3 (SIGUSR2 is its test hook)
+  startfail   FL-START-FAILED  flcomp ends, and the session script treats it as a desktop
+                               that stopped within two seconds
+  noseat      FL-NO-SEAT       same, with flcomp's "cannot open a seat" message in the log
+  nodisplay   FL-NO-DISPLAY    same, with "no usable display found"
+  loop        FL-RESTART-LOOP  a crash that counts as the third within a minute
+END
+	exit 2
+}
+
+[ $# = 1 ] || usage
+rt=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+sim=
+case $1 in
+segv) sig=SEGV ;;
+abort) sig=ABRT ;;
+bus) sig=BUS ;;
+ill) sig=ILL ;;
+fpe) sig=FPE ;;
+kill) sig=KILL ;;
+hup) sig=HUP ;;
+other) sig=XCPU ;;
+exit) sig=USR2 ;;
+startfail | noseat | nodisplay) sig=USR2 sim=$1 ;;
+loop) sig=SEGV sim=loop ;;
+-h | --help) usage ;;
+*)
+	echo "flcrash-test: unknown kind '$1'" >&2
+	usage
+	;;
+esac
+
+pid=$(pgrep -u "$(id -u)" -x flcomp | head -n 1)
+if [ -z "$pid" ]; then
+	echo "flcrash-test: no flcomp is running for you" >&2
+	exit 1
+fi
+echo "Crashing flcomp (pid $pid) with $sig in 3 seconds. Every program on the desktop will close. Ctrl-C cancels."
+sleep 3
+if [ -n "$sim" ]; then
+	[ -d "$rt" ] && echo "$sim" >"$rt/flcrash-simulate"
+fi
+kill -"$sig" "$pid"

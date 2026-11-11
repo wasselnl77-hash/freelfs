@@ -1,0 +1,49 @@
+# /etc/shadow and /etc/gshadow belong to no package (like /etc/passwd);
+# the installer creates them with pwconv and grpconv.
+pkgname=shadow
+version=4.20.2
+release=1
+summary="Password and account management (login, passwd, useradd, ...)"
+url=https://github.com/shadow-maint/shadow
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc acl attr libxcrypt)
+source=(https://github.com/shadow-maint/shadow/releases/download/$version/shadow-$version.tar.xz)
+sha256=(b89f432b75ae55a2d852b446d0365484795fdf533ab97d550e325fa15594a224)
+
+prepare() {
+	find man -name Makefile.in -exec sed -i 's/getspnam\.3 / /' {} \;
+	find man -name Makefile.in -exec sed -i 's/passwd\.5 / /' {} \;
+	sed -e 's:#ENCRYPT_METHOD SHA512:ENCRYPT_METHOD YESCRYPT:' \
+		-e 's:/var/spool/mail:/var/mail:' \
+		-e '/PATH=/{s@/sbin:@@;s@/bin:@@}' \
+		-i etc/login.defs
+}
+
+build() {
+	./configure --sysconfdir=/etc \
+		--disable-static \
+		--with-{b,yes}crypt \
+		--without-libbsd \
+		--disable-logind \
+		--with-group-name-max-length=32
+	make
+}
+
+package() {
+	make exec_prefix=/usr DESTDIR="$pkgdir" install
+	make -C man DESTDIR="$pkgdir" install-man
+	install -d "$pkgdir/etc/default"
+	cat > "$pkgdir/etc/default/useradd" <<-EOF
+		# useradd defaults
+		GROUP=999
+		HOME=/usr
+		INACTIVE=-1
+		EXPIRE=
+		SHELL=/usr/bin/flsh
+		GROUPS=seat,audio,video,render
+		SKEL=/etc/skel
+		CREATE_MAIL_SPOOL=no
+	EOF
+}

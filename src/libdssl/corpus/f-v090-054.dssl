@@ -1,0 +1,1 @@
+@import url("a.css");@font-face{font-family:X;src:url(x.woff2)}@supports (display:grid){a{display:grid}}

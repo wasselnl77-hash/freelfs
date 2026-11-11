@@ -1,0 +1,1 @@
+input[type=range] { slider: fill #f80, thumb 20 #fff }

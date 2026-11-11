@@ -1,0 +1,2 @@
+tokens { color { 5: #ff0000 } }
+.b { color: color.5 }

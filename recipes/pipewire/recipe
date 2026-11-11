@@ -1,0 +1,32 @@
+pkgname=pipewire
+version=1.6.8
+release=1
+summary="Multimedia server for audio and video (session manager: wireplumber)"
+url=https://pipewire.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc alsa-lib dbus udev readline)
+makedepends=(python)
+source=(https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/$version/pipewire-$version.tar.bz2)
+sha256=(efbaedf80450e5b08bb3196a4ca7ea17850d4a71ec1a8ae321e8937a7c95779e)
+build_style=meson
+# session-managers=[] stops meson from downloading wireplumber as a
+# subproject; wireplumber is its own recipe. ALSA, D-Bus, udev and readline
+# stay on; everything the base does not have is off explicitly so the result
+# does not depend on what happens to be installed. pw-cat/pw-play need
+# libsndfile, which is not in the base, so they are not built.
+configure_args=("-Dsession-managers=[]"
+	-D docs=disabled -D man=disabled -D examples=disabled -D tests=disabled
+	-D alsa=enabled -D dbus=enabled -D udev=enabled -D readline=enabled
+	-D libsystemd=disabled -D logind=disabled -D systemd-user-service=disabled
+	-D selinux=disabled -D gstreamer=disabled -D gstreamer-device-provider=disabled
+	-D bluez5=disabled -D jack=disabled -D libcamera=disabled -D avahi=disabled
+	-D vulkan=disabled -D x11=disabled -D x11-xfixes=disabled -D libcanberra=disabled
+	-D sdl2=disabled -D sndfile=disabled -D libmysofa=disabled -D libpulse=disabled
+	-D roc=disabled -D echo-cancel-webrtc=disabled -D libusb=disabled -D raop=disabled
+	-D lv2=disabled -D opus=disabled -D libffado=disabled -D snap=disabled
+	-D ebur128=disabled -D fftw=disabled -D onnxruntime=disabled
+	-D gsettings=disabled -D gsettings-pulse-schema=disabled)
+
+check() { :; } # tests are not built

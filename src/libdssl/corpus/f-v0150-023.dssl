@@ -1,0 +1,1 @@
+.btn { ::after { .x { color: red } } }

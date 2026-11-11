@@ -1,0 +1,11 @@
+.a { font: 16/1.5 color.ink }
+.b { font: 14 red }
+.c { font: bold 16 }
+.d { font: 700 16px }
+.e { font: 16, Arial }
+.f { font: "Arial" }
+.g { font: }
+.h { font: 20/ }
+.i { font: 2rem/1.2 color.muted }
+.j { font: italic }
+

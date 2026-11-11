@@ -1,0 +1,17 @@
+pkgname=json-glib
+version=1.10.8
+release=1
+summary="JSON parser and generator for GLib"
+url=https://wiki.gnome.org/Projects/JsonGlib
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib)
+makedepends=(meson ninja gettext)
+source=(https://download.gnome.org/sources/json-glib/${version%.*}/json-glib-$version.tar.xz)
+sha256=(55c5c141a564245b8f8fbe7698663c87a45a7333c2a2c56f06f811ab73b212dd)
+build_style=meson
+configure_args=(--wrap-mode=nodownload -D introspection=disabled -D documentation=disabled
+	-D gtk_doc=disabled -D man=false -D tests=false -D installed_tests=false
+	-D conformance=false -D nls=disabled)
+check() { :; }

@@ -1,0 +1,12 @@
+pkgname=wheel
+version=0.48.0
+release=1
+summary="Python wheel packaging"
+url=https://wheel.readthedocs.io/
+license=(MIT)
+arch=(any)
+groups=(base)
+depends=(python packaging)
+source=(https://pypi.org/packages/source/w/wheel/wheel-$version.tar.gz)
+sha256=(94800765601e9171bf5d58d066e640662842bcedcbab982b2c90787a2c987322)
+build_style=python

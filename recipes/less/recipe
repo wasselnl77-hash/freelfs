@@ -1,0 +1,13 @@
+pkgname=less
+version=704
+release=1
+summary="Text file pager"
+url=https://www.greenwoodsoftware.com/less/
+license=(GPL-3.0-or-later BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses)
+source=(https://www.greenwoodsoftware.com/less/less-$version.tar.gz)
+sha256=(20a0b0a2bb2525fa53c7eee9beb854b4c9cf172eabb209af7020743547bfe9fb)
+build_style=autotools
+configure_args=(--sysconfdir=/etc)

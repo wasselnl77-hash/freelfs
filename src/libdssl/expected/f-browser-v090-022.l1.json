@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-browser-v090-022.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"(async () => { const el = document.query\""}],"tree":{"children":[],"kind":"root"}}

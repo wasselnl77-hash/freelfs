@@ -1,0 +1,1 @@
+.t { gradient: linear 180, #e33 -> #a11 + radial-gradient(circle, #fff4 20%, transparent 21%) tile 24 offset 4 4 no-repeat }

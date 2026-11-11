@@ -1,0 +1,12 @@
+pkgname=jinja2
+version=3.1.6
+release=1
+summary="Template engine for Python"
+url=https://jinja.palletsprojects.com/
+license=(BSD-3-Clause)
+arch=(any)
+groups=(base)
+depends=(python markupsafe)
+source=(https://pypi.org/packages/source/J/Jinja2/jinja2-$version.tar.gz)
+sha256=(0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d)
+build_style=python

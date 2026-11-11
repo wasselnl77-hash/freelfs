@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v070-003.dssl","hint":"numeric names are token keys only inside tokens { } - e.g. tokens { space { 9: 96 } } - and then referenced as space.9; property names must start with a letter","line":1,"message":"\"9\" is not a valid property name"}],"tree":{"children":[{"children":[],"kind":"selector","line":1,"sel":".card"}],"kind":"root"}}

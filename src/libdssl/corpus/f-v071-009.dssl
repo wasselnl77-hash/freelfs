@@ -1,0 +1,8 @@
+// header comment
+.nav-links {
+  display: none
+  column: gap 2
+}
+.bad {
+  background: colr.accent
+}

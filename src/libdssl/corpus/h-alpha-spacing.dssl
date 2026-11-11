@@ -1,0 +1,2 @@
+tokens { color { a: red } }
+.x { border: 1 solid color.a/50 dashed; outline: 2px white/ 20% solid; box-shadow: 0 0 4 #000/30, 0 0 8 #fff/ 40 }

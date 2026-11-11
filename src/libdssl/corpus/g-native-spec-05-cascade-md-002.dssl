@@ -1,0 +1,6 @@
+.card {
+  background: color.card
+  hover { background: color.paper }
+  @media dark { background: color.ink }
+  &.on { background: color.accent }
+}

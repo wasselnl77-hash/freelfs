@@ -1,0 +1,52 @@
+# FreeBWS, the FreeLFS web browser, from src/freebws in the FreeLFS tree.
+# Native DSSL through libdssl, with the DSSL style engine bundled as the fallback
+# (see src/freebws/freebws.c).
+# Also bundles the DSSL style engine (MIT, EHS-Studio/dssl, Hugging Face repo
+# pinned to the commit below): its JS modules go to /usr/share/freebws/dssl and
+# FreeBWS serves them to pages that carry DSSL tags (see src/freebws/freebws.c).
+pkgname=freebws
+version=0.1
+release=9
+dssl=0.16.3
+summary="FreeBWS: web browser on WPE WebKit with a libflui toolbar"
+# The program is MIT. The ad blocker's filter lists (data files in /usr/share/freebws/lists, read at
+# run time, not part of the program) keep their own licenses: EasyList and EasyPrivacy GPL-3.0-or-later
+# or CC BY-SA 3.0, uBlock filters GPL-3.0-or-later (see lists/LICENSES and COPYING-GPL3 there).
+license=(MIT GPL3 CCBYSA3)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib libsoup flui libdssl wayland wpewebkit wpebackend-fdo libwpe gst-plugins-good gst-libav shared-mime-info ca-certificates)
+makedepends=(flui libdssl wayland-protocols wpewebkit wpebackend-fdo libwpe libsoup pkgconf xz)
+# dssl-engine.tar.gz is the engine package of commit 0d7ad1f (v0.16.3) of
+# huggingface.co/EHS-Studio/dssl; its LICENSE (MIT) is installed with it.
+source=(https://huggingface.co/EHS-Studio/dssl/resolve/0d7ad1f69d35d45f2be5fac16fb3b4e2b29350cf/public/dssl-engine.tar.gz)
+sha256=(68bfb6820a90f862b4f4a22918fbdbaf41cc70db59f21dde09ddf8083a5e5b18)
+
+build() {
+	cp -r "$startdir/../../src/freebws" "$srcdir/freebws"
+	cd "$srcdir/freebws"
+	make clean
+	# the baked filter list snapshot (src/freebws/data/lists, 2026-11-10; upstream URLs in lists.conf are rolling,
+	# so the snapshot lives in the tree and its sha256 sums are checked here)
+	make check-lists
+	make
+}
+
+check() { :; }
+
+package() {
+	cd "$srcdir/freebws"
+	make DESTDIR="$pkgdir" install
+	# the DSSL engine: the browser modules (not the Node-only server.js) and
+	# the starter token set and example the test page uses
+	local e=$srcdir/dssl-engine d=$pkgdir/usr/share/freebws/dssl f
+	[ -f "$e/dssl/index.js" ] || { echo "freebws: DSSL engine not unpacked" >&2; return 1; }
+	for f in "$e"/dssl/*.js; do
+		case ${f##*/} in server.js) continue ;; esac
+		install -Dm644 "$f" "$d/${f##*/}"
+	done
+	install -Dm644 "$e/styles/tokens.dssl" "$d/styles/tokens.dssl"
+	install -Dm644 "$e/examples/hello.dssl" "$d/examples/hello.dssl"
+	install -Dm644 "$e/LICENSE" "$d/LICENSE"
+	echo "$dssl" > "$d/VERSION"
+}

@@ -1,0 +1,20 @@
+pkgname=ffmpeg
+version=9.0.1
+release=2
+summary="FFmpeg libraries and the ffmpeg/ffprobe tools (decoders for gst-libav and mpv; VA-API; no GPL parts)"
+url=https://ffmpeg.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib gcc libva)
+makedepends=(nasm libva pkgconf)
+source=(https://ffmpeg.org/releases/ffmpeg-$version.tar.xz)
+sha256=(cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635)
+build() {
+	./configure --prefix=/usr --disable-static --enable-shared --disable-debug \
+		--disable-ffplay --disable-doc --disable-autodetect --enable-zlib \
+		--enable-vaapi --enable-pic --disable-avdevice --disable-network
+	make
+}
+check() { :; }
+package() { make DESTDIR="$pkgdir" install; }

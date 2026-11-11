@@ -1,0 +1,4 @@
+tokens { color { ink: #111; accent: #d00 } }
+.a { color: color.ink; background: color.accent/12; border-color: color.accent }
+@media (width < 600) { tokens { color { ink: #eee } } }
+.b { background: color.accent }

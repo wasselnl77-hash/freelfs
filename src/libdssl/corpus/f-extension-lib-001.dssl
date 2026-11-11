@@ -1,0 +1,4 @@
+card {
+  background: #fff
+  hover { background: #f5f0e8 }
+}

@@ -1,0 +1,14 @@
+# Files in the target root that must not be owned by root:root.
+#
+# The rootless chroot maps a single uid, so chown/chgrp to anything but root
+# fails there. Build steps record their exceptions here instead, and the
+# image step applies them. chown clears setuid/setgid bits, so the mode is
+# set again afterwards.
+#
+# Format: path uid gid mode (numeric ids, see config/etc/group)
+#
+# path               uid gid mode
+/var/log/lastlog       0  13 0664   # utmp
+/usr/bin/wall          0   5 2755   # tty, setgid
+/usr/bin/write         0   5 2755   # tty, setgid
+/var/lib/dhcpcd       52  52 0700   # dhcpcd privilege separation user

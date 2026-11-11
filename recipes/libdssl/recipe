@@ -1,0 +1,31 @@
+# libdssl, a native DSSL (EHS-Studio/dssl, MIT) to CSS front end for FreeBWS,
+# from src/libdssl in the FreeLFS tree. C11, no dependencies beyond libc and libm.
+# In the desktop group: FreeBWS links it (native DSSL path) and falls back to the
+# bundled JS engine for sheets it cannot lower (src/freebws/freebws.c).
+pkgname=libdssl
+version=0.1
+release=2
+summary="Native DSSL front end: parser, resolver and DSSL to CSS lowering (library and dssl2css)"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/libdssl" "$srcdir/libdssl"
+	cd "$srcdir/libdssl"
+	make clean
+	make
+}
+
+check() {
+	cd "$srcdir/libdssl"
+	make check
+}
+
+package() {
+	cd "$srcdir/libdssl"
+	make DESTDIR="$pkgdir" install
+}

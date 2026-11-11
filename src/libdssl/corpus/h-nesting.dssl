@@ -1,0 +1,10 @@
+.card {
+  background: color.card
+  hover { background: color.paper }
+  @media dark { background: color.ink }
+  &.on { background: color.accent }
+  .title { font-weight: 700 }
+  > .child { margin: 0 }
+  + .sib { margin: 1 }
+}
+

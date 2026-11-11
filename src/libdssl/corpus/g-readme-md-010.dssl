@@ -1,0 +1,5 @@
+.pe-tag::before {
+  content: ""
+  size: 10
+  background: color.accent
+}

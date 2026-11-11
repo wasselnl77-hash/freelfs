@@ -1,0 +1,22 @@
+pkgname=harfbuzz
+version=14.3.1
+release=2
+summary="OpenType text shaping engine"
+url=https://harfbuzz.github.io/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc freetype zlib icu)
+source=(https://github.com/harfbuzz/harfbuzz/releases/download/$version/harfbuzz-$version.tar.xz)
+sha256=(9dae9538aae2ffdf70cec31f2c27bf68e2aaeeae3112688467697d5faf6194f7)
+build_style=meson
+# Second half of the freetype/harfbuzz pair (freetype loads this at run time,
+# see its recipe). No glib/gobject/cairo/graphite2/introspection: none of
+# them is in the base system yet (glib comes after harfbuzz). That also means
+# no libharfbuzz-gobject and no hb-view. ICU is on (libharfbuzz-icu, which WPE
+# WebKit needs; icu is built later than the base, so this is release 2).
+configure_args=(-D freetype=enabled -D zlib=enabled -D png=disabled
+	-D glib=disabled -D gobject=disabled -D cairo=disabled -D chafa=disabled
+	-D icu=enabled -D introspection=disabled -D tests=disabled -D docs=disabled)
+
+check() { :; } # tests are not built

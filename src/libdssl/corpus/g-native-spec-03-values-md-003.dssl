@@ -1,0 +1,6 @@
+tokens { color { x: #123456 } }
+.a {
+  color: color.x/50
+  background: #ff0000/50
+  border-color: white/12
+}

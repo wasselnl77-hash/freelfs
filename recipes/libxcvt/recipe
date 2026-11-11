@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libxcvt
+version=0.1.3
+release=1
+summary="VESA CVT modeline library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja)
+source=(https://www.x.org/pub/individual/lib/libxcvt-0.1.3.tar.xz)
+sha256=(a929998a8767de7dfa36d6da4751cdbeef34ed630714f2f4a767b351f2442e01)
+build_style=meson
+configure_args=()
+check() { :; }

@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v073-025.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"captured verbatim\""}],"tree":{"children":[{"children":[],"kind":"selector","line":1,"sel":"6a. raw"}],"kind":"root"}}

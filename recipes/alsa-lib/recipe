@@ -1,0 +1,24 @@
+pkgname=alsa-lib
+version=1.2.16.1
+release=1
+summary="ALSA sound library and configuration (with alsa-ucm-conf)"
+url=https://www.alsa-project.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+source=(https://www.alsa-project.org/files/pub/lib/alsa-lib-$version.tar.bz2
+        https://www.alsa-project.org/files/pub/lib/alsa-ucm-conf-$version.tar.bz2)
+sha256=(f740db7f488255944ffd4428416ee3390a96742856916433df468c281436480e
+        cf3d1c07e089a83c4ece2c20f05dd6a8aab7fcd108768c38811386880575492b)
+build_style=autotools
+configure_args=(--disable-static --disable-python)
+
+package() {
+	make DESTDIR="$pkgdir" install
+	# BLFS's recommended alsa-ucm-conf: unpacked into /usr/share/alsa
+	install -d "$pkgdir/usr/share/alsa"
+	cp -r "$srcdir/alsa-ucm-conf-$version"/{ucm,ucm2} "$pkgdir/usr/share/alsa/"
+	install -Dm644 "$srcdir/alsa-ucm-conf-$version/LICENSE" \
+		"$pkgdir/usr/share/licenses/alsa-lib/alsa-ucm-conf-LICENSE"
+}

@@ -1,0 +1,18 @@
+pkgname=libsoup
+version=3.6.6
+release=1
+summary="HTTP client library (libsoup 3)"
+url=https://libsoup.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib glib-networking libpsl libxml2 nghttp2 brotli sqlite zlib)
+makedepends=(meson ninja)
+source=(https://download.gnome.org/sources/libsoup/3.6/libsoup-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/blfs/13.1/libsoup-3.6.6-upstream_fixes-1.patch)
+sha256=(51ed0ae06f9d5a40f401ff459e2e5f652f9a510b7730e1359ee66d14d4872740 fbb882736209700137e49d6a8d161ffe3b20345da79a9353d9b61fd0cc6ea9bb)
+prepare() { patch -Np1 -i "$srcdir/libsoup-3.6.6-upstream_fixes-1.patch"; }
+build_style=meson
+configure_args=(-D introspection=disabled -D vapi=disabled -D docs=disabled -D tests=false
+	-D sysprof=disabled -D gssapi=disabled -D ntlm=disabled -D brotli=enabled -D tls_check=false)
+check() { :; }

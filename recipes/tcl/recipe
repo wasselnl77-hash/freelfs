@@ -1,0 +1,46 @@
+pkgname=tcl
+version=8.6.18
+release=1
+summary="The Tcl scripting language"
+url=https://www.tcl-lang.org/
+license=(TCL)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib)
+worksrc=tcl$version
+source=(https://downloads.sourceforge.net/tcl/tcl$version-src.tar.gz)
+sha256=(14f9af32b1767ff718477a8f974ad03c34341097e6b43f4ce54644ee974e268e)
+
+build() {
+	local src=$PWD tdbc itcl
+	cd unix
+	./configure --prefix=/usr --mandir=/usr/share/man --disable-rpath
+	make
+	tdbc=$(basename "$src"/pkgs/tdbc1*)
+	itcl=$(basename "$src"/pkgs/itcl4*)
+	sed -e "s|$src/unix|/usr/lib|" -e "s|$src|/usr/include|" -i tclConfig.sh
+	sed -e "s|$src/unix/pkgs/$tdbc|/usr/lib/$tdbc|" \
+		-e "s|$src/pkgs/$tdbc/generic|/usr/include|" \
+		-e "s|$src/pkgs/$tdbc/library|/usr/lib/tcl${version%.*}|" \
+		-e "s|$src/pkgs/$tdbc|/usr/include|" \
+		-i "pkgs/$tdbc/tdbcConfig.sh"
+	sed -e "s|$src/unix/pkgs/$itcl|/usr/lib/$itcl|" \
+		-e "s|$src/pkgs/$itcl/generic|/usr/include|" \
+		-e "s|$src/pkgs/$itcl|/usr/include|" \
+		-i "pkgs/$itcl/itclConfig.sh"
+}
+
+check() {
+	cd unix
+	LC_ALL=C.UTF-8 make test
+}
+
+package() {
+	local v=${version%.*}
+	cd unix
+	make DESTDIR="$pkgdir" install install-private-headers
+	chmod 644 "$pkgdir/usr/lib/libtclstub$v.a"
+	chmod u+w "$pkgdir/usr/lib/libtcl$v.so"
+	ln -sf "tclsh$v" "$pkgdir/usr/bin/tclsh"
+	mv "$pkgdir"/usr/share/man/man3/{Thread,Tcl_Thread}.3
+}

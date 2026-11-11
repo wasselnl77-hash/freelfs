@@ -1,0 +1,16 @@
+# Commands for build/vm-run.py (see build/m8-freebws.sh): an account without a
+# password, then restart the login screen so it lists it. The VM's keyboard is
+# German by default and the test types with QEMU's US key names, so the test
+# account and the machine get the US layout (":" and "/" would come out as
+# Oe and Ue otherwise). The run is on a throwaway copy of the image (-snapshot).
+{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null && echo made
+mkdir -p /home/tester/.config/freelfs && printf 'keyboard=us\n' > /home/tester/.config/freelfs/desktop.conf && chown -R tester: /home/tester/.config
+printf 'LAYOUT=us\n' > /etc/keyboard.conf
+# m8mem LABEL: resident (rss) and proportional (pss) size of every process of the browser, their sums, free -m
+printf '%s\n' '#!/bin/sh' 'echo "== $1"; trs=0; tps=0' 'for p in $(pgrep "freebws|flcomp|WPEWebProcess|WPENetworkProce"); do' ' c=$(cat /proc/$p/comm); r=$(grep ^VmRSS /proc/$p/status | tr -s " " | cut -d" " -f2); q=$(grep ^Pss: /proc/$p/smaps_rollup | tr -s " " | cut -d" " -f2)' ' echo "  $p $c rss=$r pss=$q"; trs=$((trs + r)); tps=$((tps + ${q:-0}))' 'done' 'echo "total_kb $1 rss=$trs pss=$tps"; free -m | sed -n 2p' > /usr/bin/m8mem && chmod 755 /usr/bin/m8mem && echo m8mem
+# m8cpu: CPU time of the browser's processes over 20 s of idling, in percent of one CPU
+printf '%s\n' '#!/bin/sh' 't() { for p in $(pgrep "freebws|flcomp|WPEWebProcess|WPENetworkProce"); do set -- $(cut -d" " -f14,15 /proc/$p/stat); echo "$p $(cat /proc/$p/comm) $(($1 + $2))"; done; }' 't > /tmp/c0; sleep 20; t > /tmp/c1' 'paste /tmp/c0 /tmp/c1 | while read p n a p2 n2 b; do echo "  cpu $n $(( (b - a) * 5 / 100 )).$(( (b - a) * 5 % 100 ))% (idle 20 s)"; done' > /usr/bin/m8cpu && chmod 755 /usr/bin/m8cpu && echo m8cpu
+# freebws-env: whatever is in this file is exported when freebws starts (the test sets the discard time with it)
+mv /usr/bin/freebws /usr/bin/freebws.real && printf '%s\n' '#!/bin/sh' '[ -f /tmp/freebws-env ] && . /tmp/freebws-env' 'exec /usr/bin/freebws.real "$@" 2>>/tmp/freebws.err' > /usr/bin/freebws && chmod 755 /usr/bin/freebws && echo wrapper
+sleep 3; pkill -x flcomp; sleep 6; pgrep -x flgreet-ui >/dev/null && echo greeter-again
+free -m | head -2

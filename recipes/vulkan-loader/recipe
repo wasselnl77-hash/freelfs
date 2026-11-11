@@ -1,0 +1,18 @@
+# The Vulkan loader, without X11 support (FreeLFS is Wayland only)
+pkgname=vulkan-loader
+version=1.4.357.0
+release=1
+worksrc=Vulkan-Loader-vulkan-sdk-$version
+summary="Loads Vulkan drivers (libvulkan)"
+url=https://github.com/KhronosGroup/Vulkan-Loader
+license=(Apache-2.0)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc wayland)
+makedepends=(cmake ninja python vulkan-headers)
+source=(https://github.com/KhronosGroup/Vulkan-Loader/archive/vulkan-sdk-$version/Vulkan-Loader-vulkan-sdk-$version.tar.gz)
+sha256=(54f2537df22313768da0317dda2abdaaab7711b4081c48c869a79db343d0ae70)
+build_style=cmake
+configure_args=(-D BUILD_WSI_XCB_SUPPORT=OFF -D BUILD_WSI_XLIB_SUPPORT=OFF
+                -D BUILD_WSI_XLIB_XRANDR_SUPPORT=OFF -D BUILD_WSI_WAYLAND_SUPPORT=ON
+                -D BUILD_TESTS=OFF)

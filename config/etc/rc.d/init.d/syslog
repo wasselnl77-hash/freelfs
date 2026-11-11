@@ -1,0 +1,5 @@
+#!/bin/bash
+# /etc/rc.d/init.d/syslog -- system logger (sysklogd)
+
+. /etc/rc.d/functions
+daemon_service "$1" "system logger" /run/syslogd.pid /usr/sbin/syslogd -m 0

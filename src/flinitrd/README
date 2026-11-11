@@ -1,0 +1,20 @@
+flinitrd -- init of the FreeLFS live initramfs (src/flinitrd)
+
+A static C program, no busybox. build/53-iso.sh packs it as /init of the
+initramfs that flboot hands to the kernel (initrd=\initrd.img).
+
+It waits up to flive.timeout seconds (default 20) for disks, then looks for
+the live system:
+  1. any whole disk or partition (also dm-N) that is ISO 9660 and has
+     /live/root.sfs: a CD, or the ISO written to a stick with dd;
+  2. any partition with an exfat, vfat, ext4 or iso9660 file system holding a
+     file freelfs-live*.iso (top level, or up to 3 directories down): a
+     Ventoy stick.
+It loop-mounts the ISO and live/root.sfs (squashfs), mounts a tmpfs overlay,
+and switches to /sbin/init. If nothing turns up it says so and offers a small
+prompt (r retry, l list disks, p power off, b reboot).
+
+Read-only by construction: each device is set read-only in the kernel
+(BLKROSET) before it is mounted, mounts are MS_RDONLY (ext4 with noload), and
+loop devices are read-only. Boot options: flive.timeout=N, flive.iso=PATTERN,
+flive.debug.

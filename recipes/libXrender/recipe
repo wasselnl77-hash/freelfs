@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXrender
+version=0.9.12
+release=1
+summary="XRender extension library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXrender-0.9.12.tar.xz)
+sha256=(b832128da48b39c8d608224481743403ad1691bf4e554e4be9c174df171d1b97)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

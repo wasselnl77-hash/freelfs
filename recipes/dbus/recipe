@@ -1,0 +1,42 @@
+pkgname=dbus
+version=1.16.2
+release=1
+summary="D-Bus message bus: system and session daemons and libdbus"
+url=https://www.freedesktop.org/wiki/Software/dbus/
+license=("AFL-2.1 OR GPL-2.0-or-later")
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc expat)
+# the system bus user "messagebus" (uid/gid 18) comes from base-files; the
+# launch helper must be setuid root and group messagebus
+owner=("/usr/libexec/dbus-daemon-launch-helper 0 18 4750")
+source=(https://dbus.freedesktop.org/releases/dbus/dbus-$version.tar.xz)
+sha256=(0ba2a1a4b16afe7bceb2c07e9ce99a8c2c3508e5dec290dbb643384bd6beb7e2)
+build_style=meson
+# sysvinit: no systemd/logind support, no X11 autolaunch (dbus-launch needs
+# libX11), no docs. --wrap-mode=nofallback keeps meson from downloading
+# anything. No init script is installed here.
+configure_args=(--wrap-mode=nofallback --sysconfdir=/etc --localstatedir=/var
+	-D runtime_dir=/run -D systemd=disabled -D user_session=false
+	-D x11_autolaunch=disabled -D libaudit=disabled -D selinux=disabled
+	-D apparmor=disabled -D doxygen_docs=disabled -D xml_docs=disabled
+	-D ducktype_docs=disabled -D qt_help=disabled -D modular_tests=disabled)
+
+# The install script chowns the launch helper to group messagebus; rootless
+# builds cannot, and owner= above has flpkg do it.
+prepare() {
+	sed -i 's/^\(\s*\)os.chown(exe_path, 0, dbus_user_data.pw_gid)/\1pass/' meson_post_install.py
+	grep -q 'os.chown(exe_path' meson_post_install.py && return 1 || true
+}
+
+# The unit tests need intrusive/assert builds, not a production build.
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	# meson installs an empty /run/dbus; /run is runtime state that packages
+	# must not ship, the daemon's home (/run/dbus) is made at boot.
+	rmdir "${pkgdir:?}/run/dbus" "${pkgdir:?}/run"
+	# holds machine-id (dbus-uuidgen --ensure, run on the target)
+	install -d -m755 "$pkgdir/var/lib/dbus"
+}

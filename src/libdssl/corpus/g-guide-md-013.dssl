@@ -1,0 +1,6 @@
+tokens { shadow { pop: 0 4 0 #000 }  radius { pill: 99 } }
+.tomato { gradient: radial-gradient(circle, #fff6 18%, transparent 20%) tile 24 offset 4 4 + linear 180, #f55 -> #b11 }   // the dots come FIRST, so they sit ON TOP of the red
+.title  { text-stroke: 6 color.ink; font-size: 48 }              // an outline OUTSIDE the letters
+.badge  { shadow: pop; radius: pill }                             // your own shadow and radius tokens, by bare name
+.ring   { background: conic-gradient(from 0deg, red, blue) }      // from, at, in... all accepted
+.label  { paint-order: stroke fill }                              // stroke and fill are accepted words

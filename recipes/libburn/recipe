@@ -1,0 +1,14 @@
+# libburnia: the library under xorriso (group "live").
+pkgname=libburn
+version=1.5.8
+release=1
+summary="Library for reading and writing optical discs and ISO images"
+url=https://libburnia-project.org/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(live)
+depends=(glibc)
+source=(https://files.libburnia-project.org/releases/libburn-$version.tar.gz)
+sha256=(8e24dd99f5b7cafbecf0116d61b619ee89098e20263e6f47c793aaf4a98d6473)
+build_style=autotools
+configure_args=(--disable-static)

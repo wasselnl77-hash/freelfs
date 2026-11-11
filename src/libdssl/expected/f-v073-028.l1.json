@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v073-028.dssl","hint":"move it out of the enclosing block","line":1,"message":"raw { } must be top-level - it drops verbatim CSS into the page stylesheet"}],"tree":{"children":[{"children":[{"children":[],"kind":"raw","line":1}],"kind":"selector","line":1,"sel":".card"}],"kind":"root"}}

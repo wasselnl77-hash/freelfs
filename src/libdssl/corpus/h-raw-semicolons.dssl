@@ -1,0 +1,16 @@
+raw {
+  .a {
+    color: red
+    padding: 4px
+  }
+  .b { color: blue; }
+  .c {
+    margin: 1px;
+    width: 2px
+  }
+  /* c: d */
+  .e {
+    height: 3px,
+  }
+}
+

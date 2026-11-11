@@ -1,0 +1,24 @@
+pkgname=bc
+version=7.0.3
+release=1
+summary="Arbitrary precision calculator (bc and dc)"
+url=https://git.gavinhoward.com/gavin/bc
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc readline)
+source=(https://github.com/gavinhoward/bc/releases/download/$version/bc-$version.tar.xz)
+sha256=(91eb74caed0ee6655b669711a4f350c25579778694df248e28363318e03c7fc4)
+
+build() {
+	CC='gcc -std=c99' ./configure --prefix=/usr -G -O3 -r
+	make
+}
+
+check() {
+	make test
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,15 @@
+#!/bin/bash
+# /etc/rc.d/init.d/iwd -- Wi-Fi (iwd); needs the D-Bus system bus
+
+. /etc/rc.d/functions
+
+start_iwd() {
+	# the resolvconf stand-in (/etc/resolv.conf from iwd's DHCP) is found only through this PATH
+	# its messages (association, DHCP, DNS) go to /var/log/iwd.log, where flreport finds them
+	PATH=/usr/lib/iwd/bin:$PATH setsid /usr/libexec/iwd < /dev/null >> /var/log/iwd.log 2>&1 &
+	echo $! > /run/iwd.pid
+	sleep 0.2
+	pid_alive /run/iwd.pid
+}
+
+daemon_service "$1" "Wi-Fi (iwd)" /run/iwd.pid start_iwd

@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-designer-browser-004.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"window.postMessage({ type: 'selection', \""}],"tree":{"children":[],"kind":"root"}}

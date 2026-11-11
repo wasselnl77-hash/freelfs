@@ -1,0 +1,32 @@
+# AppStream: the app catalog format and the libappstream that Flatpak (1.18)
+# requires to read Flathub's names, summaries and icons. Only the library and
+# appstreamcli: no compose, Qt, GObject introspection, Vala, systemd, docs or
+# stemming. prepare() drops the two parts of the build that want other tools:
+# the translated copy of appstreamcli's own metainfo (itstool, a Python tool
+# that needs libxml2's Python bindings) and the test programs.
+pkgname=appstream
+version=1.2.2
+release=1
+summary="AppStream metadata library and appstreamcli"
+url=https://www.freedesktop.org/software/appstream/docs/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib libxml2 libfyaml libxmlb curl zstd wayland)
+makedepends=(meson ninja gperf gettext)
+worksrc=AppStream-$version
+source=(https://www.freedesktop.org/software/appstream/releases/AppStream-$version.tar.xz)
+sha256=(2f4f7c29095b905b4347829e39971ef8134d2d5aba663383268bab3bfeab45a9)
+build_style=meson
+configure_args=(--wrap-mode=nodownload -D stemming=false -D systemd=false -D vapi=false -D qt=false
+	-D compose=false -D apt-support=false -D gir=false -D bash-completion=false -D docs=false
+	-D apidocs=false -D install-docs=false -D man=false -D zstd-support=true
+	-D blake3-support=false -D display-detection=wayland)
+
+prepare() {
+	sed -i "/^subdir('tests\/')/d" meson.build
+	sed -i '/^metainfo_with_relinfo = custom_target/,/^# install appstream.conf default template/{/^# install appstream.conf/!d}' data/meson.build
+	! grep -q 'itstool_join\|^subdir(.tests' meson.build data/meson.build
+}
+
+check() { :; }

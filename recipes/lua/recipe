@@ -1,0 +1,63 @@
+pkgname=lua
+version=5.4.8
+release=1
+summary="Lightweight embeddable scripting language"
+url=https://www.lua.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+source=(https://www.lua.org/ftp/lua-$version.tar.gz
+        https://www.linuxfromscratch.org/patches/blfs/13.1/lua-$version-shared_library-1.patch)
+sha256=(4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae
+        44324a802822f0a35d095aaad2f5f58fa7b1821ae87ae44dbcfc8a23fcd2e67e)
+
+# the version of the language (5.4) as opposed to the release (5.4.8)
+_V=${version%.*}
+
+prepare() {
+	# builds liblua.so.5.4.x and links lua/luac against it
+	patch -Np1 -i "$srcdir/lua-$version-shared_library-1.patch"
+}
+
+build() {
+	make linux
+}
+
+check() {
+	make test
+}
+
+package() {
+	make INSTALL_TOP="$pkgdir/usr" \
+		INSTALL_DATA="cp -d" \
+		INSTALL_MAN="$pkgdir/usr/share/man/man1" \
+		TO_LIB="liblua.so liblua.so.$_V liblua.so.$version" \
+		install
+	install -d "$pkgdir/usr/share/doc/lua-$version"
+	cp doc/*.{html,css,gif,png} "$pkgdir/usr/share/doc/lua-$version"
+
+	# pkg-config file (BLFS)
+	install -d "$pkgdir/usr/lib/pkgconfig"
+	cat > "$pkgdir/usr/lib/pkgconfig/lua.pc" <<-EOF
+		V=$_V
+		R=$version
+		prefix=/usr
+		INSTALL_BIN=\${prefix}/bin
+		INSTALL_INC=\${prefix}/include
+		INSTALL_LIB=\${prefix}/lib
+		INSTALL_MAN=\${prefix}/share/man/man1
+		INSTALL_LMOD=\${prefix}/share/lua/\${V}
+		INSTALL_CMOD=\${prefix}/lib/lua/\${V}
+		exec_prefix=\${prefix}
+		libdir=\${exec_prefix}/lib
+		includedir=\${prefix}/include
+
+		Name: Lua
+		Description: An Extensible Extension Language
+		Version: \${R}
+		Requires:
+		Libs: -L\${libdir} -llua -lm -ldl
+		Cflags: -I\${includedir}
+	EOF
+}

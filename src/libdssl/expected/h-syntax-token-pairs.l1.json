@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"children":[{"kind":"decl","line":1,"prop":"a","value":"1"},{"kind":"decl","line":1,"prop":"b","value":"\"x y: z\""},{"kind":"decl","line":1,"prop":"c","value":"calc(1 + 2)"},{"kind":"decl","line":1,"prop":"d","value":"3"}],"kind":"selector","line":1,"sel":"k"}],"kind":"tokens","line":1}],"kind":"root"}}

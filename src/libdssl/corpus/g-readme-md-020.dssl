@@ -1,0 +1,4 @@
+input[type=range] {
+  slider: track 6 color.line radius full, fill color.accent,
+          thumb 24 color.paper, ring 3 color.accent, glow color.accent 14
+}

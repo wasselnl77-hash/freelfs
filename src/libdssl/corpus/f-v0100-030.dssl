@@ -1,0 +1,1 @@
+.t { position: absolute; left: 200px; top: 150px; width: 240px; height: 160px; background: #456 }

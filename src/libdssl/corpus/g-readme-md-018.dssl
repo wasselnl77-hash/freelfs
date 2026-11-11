@@ -1,0 +1,7 @@
+.card   { background: #c9a66b; texture: wood }
+.poster { background: #e9e2d0; texture: paper, scanlines intensity 0.1 }
+
+behavior old-leather {
+  texture: bump scale 6 depth 4 color #1b1008 color2 #6b4a2b blend overlay
+}
+.sofa { background: #5a3a22; use old-leather }

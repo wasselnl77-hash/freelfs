@@ -1,0 +1,19 @@
+pkgname=flex
+version=2.6.4
+release=1
+summary="Fast lexical analyser generator"
+url=https://github.com/westes/flex
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc m4)
+source=(https://github.com/westes/flex/releases/download/v$version/flex-$version.tar.gz)
+sha256=(e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995)
+build_style=autotools
+configure_args=(--disable-static --docdir=/usr/share/doc/flex-$version)
+
+package() {
+	make DESTDIR="$pkgdir" install
+	ln -s flex "$pkgdir/usr/bin/lex"
+	ln -s flex.1 "$pkgdir/usr/share/man/man1/lex.1"
+}

@@ -1,0 +1,1 @@
+(() => { const e = document.getElementById('s1'); e.value = 10; })()

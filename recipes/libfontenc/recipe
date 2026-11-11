@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libfontenc
+version=1.1.8
+release=1
+summary="X font encoding library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libfontenc-1.1.8.tar.xz)
+sha256=(7b02c3d405236e0d86806b1de9d6868fe60c313628b38350b032914aa4fd14c6)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

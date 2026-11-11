@@ -1,0 +1,12 @@
+pkgname=file
+version=5.48
+release=1
+summary="Determines file types"
+url=https://www.darwinsys.com/file/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib bzip2 xz zstd)
+source=(https://astron.com/pub/file/file-$version.tar.gz)
+sha256=(ed14656883b23a364b4057c05595d93252da9bc473d30106519519d0da141283)
+build_style=autotools

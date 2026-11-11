@@ -1,0 +1,32 @@
+#!/bin/bash
+# /etc/rc.d/rc.shutdown 0|6 -- bring the system down after the services
+# have stopped, then power off (0) or reboot (6).
+
+. /etc/rc.conf
+. /etc/rc.d/functions
+
+case $HARDWARECLOCK in
+	localtime) clock=--localtime ;;
+	*) clock=--utc ;;
+esac
+step "Saving the system clock" hwclock --systohc "$clock"
+
+stat_busy "Stopping remaining processes"
+killall5 -15
+sleep 2
+killall5 -9
+stat_done
+
+step "Deactivating swap" swapoff -a
+step "Unmounting file systems" umount -a -r -O no_netdev \
+	-t notmpfs,nosysfs,noproc,nodevtmpfs,nodevpts,nocgroup2
+step "Remounting root read-only" remount_root ro
+sync
+
+if [ "$1" = 6 ]; then
+	echo "Rebooting."
+	reboot -d -f -i
+else
+	echo "Powering off."
+	halt -d -f -i -p
+fi

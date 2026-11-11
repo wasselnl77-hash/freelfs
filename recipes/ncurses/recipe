@@ -1,0 +1,36 @@
+pkgname=ncurses
+version=6.6
+release=1
+summary="Terminal-independent text interfaces"
+url=https://invisible-island.net/ncurses/
+license=(MIT-open-group)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc gcc-libs)
+source=(https://invisible-mirror.net/archives/ncurses/ncurses-$version.tar.gz)
+sha256=(355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11)
+
+build() {
+	./configure --prefix=/usr \
+		--mandir=/usr/share/man \
+		--with-shared \
+		--without-debug \
+		--without-normal \
+		--with-cxx-shared \
+		--enable-pc-files \
+		--with-pkg-config-libdir=/usr/lib/pkgconfig
+	make
+}
+
+package() {
+	local lib
+	make DESTDIR="$pkgdir" install
+	sed -e 's/^#if.*XOPEN.*$/#if 1/' -i "$pkgdir/usr/include/curses.h"
+	for lib in ncurses form panel menu; do
+		ln -sf "lib${lib}w.so" "$pkgdir/usr/lib/lib${lib}.so"
+		ln -sf "${lib}w.pc" "$pkgdir/usr/lib/pkgconfig/${lib}.pc"
+	done
+	ln -sf libncursesw.so "$pkgdir/usr/lib/libcurses.so"
+	install -d "$pkgdir/usr/share/doc"
+	cp -R doc -T "$pkgdir/usr/share/doc/ncurses-$version"
+}

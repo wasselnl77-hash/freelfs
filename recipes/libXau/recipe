@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXau
+version=1.0.12
+release=1
+summary="X11 authorisation library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXau-1.0.12.tar.xz)
+sha256=(74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

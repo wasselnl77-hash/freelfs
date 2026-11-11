@@ -1,0 +1,10 @@
+.btn {
+  transition: 200 snap transform
+  hover  { bend: 5 }                 // bow in 3D
+  active { bend: 16; stretch: 0.94 } // press: bend + squash, volume kept
+}
+
+.flag  { bend-y: -18 }               // sideways bow
+.mini  { hover { bend-up: 14 } }     // rocks back on its bottom edge
+.sheet { hover { fold: 14 } }        // swings up over its top edge
+.pills { bend-around: -22 }          // children ride a smile-shaped arc

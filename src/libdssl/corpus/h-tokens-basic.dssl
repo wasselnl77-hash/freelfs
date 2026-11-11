@@ -1,0 +1,8 @@
+tokens {
+  color { ink: #111; accent: oklch(62% 0.19 35) }
+  space { 1: 4  2: 8  9: 96 }
+  radius { md: 14 }
+  shadow { md: 0 2 4 color.ink/10, 0 4 12 color.ink/8 }
+}
+.a { color: color.ink; padding: space.9; box-shadow: shadow.md }
+

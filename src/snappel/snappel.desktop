@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Snappel
+Comment=Take and annotate screenshots
+Exec=snappel
+Categories=Utility;Graphics;
+X-FreeLFS-Glyph=◎

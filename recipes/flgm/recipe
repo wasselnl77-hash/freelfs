@@ -1,0 +1,24 @@
+# flgm (General Manager, the task manager), from src/flgm in the FreeLFS tree.
+pkgname=flgm
+version=0.1
+release=1
+summary="FreeLFS task manager: processes, performance graphs, startup apps, users, details (Ctrl+Shift+Esc)"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flgm" "$srcdir/flgm"
+	cd "$srcdir/flgm"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flgm"
+	make DESTDIR="$pkgdir" install
+}

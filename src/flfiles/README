@@ -1,0 +1,31 @@
+flfiles -- the FreeLFS file manager
+===================================
+
+    flfiles [FOLDER]
+
+Window: back, forward, up, an editable path field and a new-folder button on
+top; Places (Home and the folders named in ~/.config/user-dirs.dirs, Trash)
+and Drives (System = /sysflfs, everything mounted under /drives) on the left;
+an icon grid; a status bar. The folder is watched with inotify, so changes
+show up on their own. There is no polling: idle means no wakeups.
+
+Hidden files: names with a leading dot, and names listed one per line in the
+folder's own .hidden file. Ctrl-H shows them.
+
+Keys: Enter opens, Backspace or Alt-Up goes up, Alt-Left/Right history,
+Ctrl-L the path field, F2 rename, Del moves to ~/.local/share/Trash (in the
+Trash it deletes for good, after asking), Ctrl-C / Ctrl-X / Ctrl-V copy, cut
+and paste (also between two flfiles windows), Ctrl-Shift-N new folder,
+Ctrl-A select all, F5 refresh, letters jump to a name. Right click opens a
+menu. Ctrl-click and Shift-click select several.
+
+Delete and Move to Trash first ask `flcrash --cant` about the selection: a vital system folder
+(/sysflfs, /boot, ...) brings up the "You can't do that." screen, and "Never mind" leaves everything alone.
+
+Enter on a file starts the default app for its MIME type: the type comes from the shared MIME
+database (/usr/share/mime/globs2), the app from mimeapps.list ([Default Applications], then
+[Added Associations]; ~/.config/mimeapps.list wins over /etc/xdg and the shipped defaults in
+/usr/share/applications/mimeapps.list: images -> Images, PDF/EPUB -> Documents, audio -> Music, video ->
+Videos, text -> fledit, archives -> Archives), else the first .desktop file that lists the type.
+Text files with no known name still open in fledit; a file with no app reports that.
+Copying runs in the window's own loop, so a very large copy holds the window.

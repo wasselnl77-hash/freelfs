@@ -1,0 +1,2 @@
+tokens { k { a: 1 b: "x y: z" c: calc(1 + 2) d: 3 } }
+

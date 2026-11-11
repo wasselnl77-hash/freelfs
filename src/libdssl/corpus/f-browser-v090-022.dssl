@@ -1,0 +1,1 @@
+(async () => { const el = document.querySelector('.cell'); for (let i = 0; i < 200; i++) { el.classList.toggle('x'); await new Promise((r) => setTimeout(r, 4)); } })()

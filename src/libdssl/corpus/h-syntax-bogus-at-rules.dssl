@@ -1,0 +1,7 @@
+@supports (display: grid) { .a { color: red } }
+@media(width>1) { .b { color: red } }
+@container (min-width: 300) { .c { padding: 4 } }
+@keyframes x { from { opacity: 0 } }
+.d { color: red }
+@import url(x.css);
+

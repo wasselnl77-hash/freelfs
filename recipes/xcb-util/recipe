@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xcb-util
+version=0.4.1
+release=1
+summary="XCB utility library (atoms, aux, event)"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libxcb)
+makedepends=(xorgproto xcb-proto)
+source=(https://www.x.org/pub/individual/xcb/xcb-util-0.4.1.tar.xz)
+sha256=(5abe3bbbd8e54f0fa3ec945291b7e8fa8cfd3cccc43718f8758430f94126e512)
+build_style=autotools
+configure_args=(--disable-static --disable-devel-docs --without-doxygen)
+check() { :; }

@@ -1,0 +1,27 @@
+pkgname=libcap
+version=2.78
+release=1
+summary="POSIX 1003.1e capabilities"
+url=https://sites.google.com/site/fullycapable/
+license=(BSD-3-Clause GPL-2.0-only)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-$version.tar.xz)
+sha256=(0d621e562fd932ccf67b9660fb018e468a683d7b827541df27813228c996bb11)
+
+prepare() {
+	sed -i '/install -m.*STA/d' libcap/Makefile
+}
+
+build() {
+	make prefix=/usr lib=lib
+}
+
+check() {
+	make test
+}
+
+package() {
+	make prefix=/usr lib=lib DESTDIR="$pkgdir" install
+}

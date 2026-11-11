@@ -1,0 +1,6 @@
+.a { display: none; column: gap 2 }
+.b { display: flex; row: gap 2 }
+.c { display: block; display: flex; grid: 3 }
+.d { row: gap 1; display: none }
+.e { display: grid; stack: center }
+

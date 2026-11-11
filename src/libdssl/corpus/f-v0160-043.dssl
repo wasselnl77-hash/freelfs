@@ -1,0 +1,1 @@
+.o { position: absolute; left: 180px; top: 180px; width: 40px; height: 40px; background: #222; aura-glow: #f00 70 essential rays 8 spin 0 nohalo intensity 2 }

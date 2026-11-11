@@ -1,0 +1,26 @@
+flsound -- the FreeLFS system sounds
+====================================
+
+  flsound NAME            login, notification, error, tick (volume step), screenshot
+  flsound --force NAME    even with sounds=0 (Settings' Test button)
+  flsound --write NAME FILE.wav    write the sound as 16 bit mono 48 kHz WAV, play nothing
+  flsound --list
+
+The sounds are made here, not recorded: a few sine partials with a soft attack and an exponential
+decay (a rising open chord for login, two soft bell tones for a notification, two low falling notes
+for an error, a dry pop for the volume tick, two bursts of band-limited noise for the shutter),
+computed in memory at 48 kHz and peaking at about -11 dBFS. No audio files ship and nothing is
+sampled, so there is nothing to license. The program plays one PipeWire stream (role Event) and
+exits when it has drained; without a PipeWire server it gives up after about a second, silently.
+
+sounds=0 in ~/.config/freelfs/desktop.conf turns every sound off (Settings > General > System sounds).
+"tick" plays at most about 14 times a second, so a held volume key stays calm.
+
+Who plays what
+  flcomp   login (session start), tick (volume keys), screenshot (saved) and error (not saved): sound.c
+  flpanel  notification (card shown; critical ones play error), tick (the volume slider): sound.h
+  flcrash  error, when "You can't do that." appears
+  flsettings  Test button
+
+make check writes the five sounds and checks length, level, silent ends and clicks (python3, no audio
+hardware). Build: make; make install (PREFIX, DESTDIR). Needs libpipewire-0.3.

@@ -1,0 +1,1 @@
+.card::before { content: "" } .card::after { content: "" } .card { padding: 12 }

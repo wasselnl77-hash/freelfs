@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Downloads</title>
+<link rel="stylesheet" href="freebws://res/ui.css">
+<style>
+.bar { height: 4px; background: var(--bg); margin-top: 6px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.err { color: var(--err); }
+.btns { display: flex; gap: 6px; }
+</style></head>
+<body><div class="page">
+<div class="head"><h1>Downloads</h1><span class="sp"></span><button id="clear" class="small">Clear finished</button><a href="freebws://settings">Settings</a></div>
+<div class="box" id="list" style="margin-top:16px"></div>
+</div>
+<script src="freebws://res/ui.js"></script>
+<script>
+var ST = ['downloading', 'done', 'failed', 'cancelled'];
+function act(c, id) { return function () { fb(c, { id: id }).then(load); }; }
+function render(l) {
+	var box = $('#list');
+	box.textContent = '';
+	if (!l || !l.length) { box.appendChild(el('div', { class: 'empty', text: 'Nothing downloaded yet' })); return; }
+	l.forEach(function (d) {
+		var sub = d.state === 0 ? fmtBytes(d.got) + (d.total ? ' of ' + fmtBytes(d.total) : '') : d.state === 1 ? fmtBytes(d.got) + ', ' + fmtDate(d.started) :
+			ST[d.state] + (d.error ? ': ' + d.error : '');
+		var info = el('div', { class: 'grow' }, [el('div', { text: d.name }), el('div', { class: 'sub' + (d.state >= 2 ? ' err' : ''), text: sub }),
+			el('div', { class: 'sub mono', text: hostOf(d.url) })]);
+		if (d.state === 0) info.appendChild(el('div', { class: 'bar' }, [el('i', { style: 'width:' + (d.total ? Math.min(100, d.got * 100 / d.total) : 5) + '%' })]));
+		var b = el('div', { class: 'btns' });
+		if (d.state === 0) b.appendChild(el('button', { class: 'small danger', text: 'Cancel', onclick: act('dl.cancel', d.id) }));
+		if (d.state === 1) b.appendChild(el('button', { class: 'small', text: 'Open', onclick: act('dl.open', d.id) }));
+		if (d.state >= 2) b.appendChild(el('button', { class: 'small', text: 'Retry', onclick: act('dl.retry', d.id) }));
+		b.appendChild(el('button', { class: 'small', text: 'Show in folder', onclick: act('dl.show', d.id) }));
+		if (d.state !== 0) b.appendChild(el('button', { class: 'small', text: 'Remove', onclick: act('dl.remove', d.id) }));
+		box.appendChild(el('div', { class: 'row' }, [info, b]));
+	});
+}
+function load() { fb('dl.list').then(render); }
+$('#clear').addEventListener('click', function () { fb('dl.clear').then(load); });
+load();
+setInterval(load, 1000);
+</script></body></html>

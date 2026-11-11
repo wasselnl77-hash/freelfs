@@ -1,0 +1,1 @@
+.c { display: inline-block; margin: 14px; background: #223; radius: 6; aura-glow: #ff8800 30 pulse 1200 flicker 0.3 }

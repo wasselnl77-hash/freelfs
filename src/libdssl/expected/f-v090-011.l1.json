@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"slider","value":"fill #f80, thumb 20 #fff"}],"kind":"selector","line":1,"sel":"input[type=range]"}],"kind":"root"}}

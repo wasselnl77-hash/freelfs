@@ -1,0 +1,6 @@
+fonts {
+  Fraunces: 500 700 800                 // Google Fonts, these weights
+  "Hanken Grotesk": 400 700 italic      // with italics
+  Inter: 100..900 display optional      // a variable range; how it swaps in
+  Brand: from "/fonts/brand.woff2" 400  // your own file: @font-face
+}

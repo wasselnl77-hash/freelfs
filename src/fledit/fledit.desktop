@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Text Editor
+Comment=Write and edit plain text
+Exec=fledit %F
+Categories=Office;TextEditor;
+X-FreeLFS-Glyph=¶
+MimeType=text/plain;text/markdown;application/json;application/x-shellscript;

@@ -1,0 +1,39 @@
+fltime -- automatic time and the time zone helper
+================================================
+
+Two small programs for Settings > Date & time. C17, MIT.
+
+fl-sntp (/usr/sbin) is a minimal SNTP client (RFC 4330). The init script
+/etc/rc.d/init.d/ntp (initscripts; `ntp` is in SERVICES in /etc/rc.conf) runs it as a
+daemon: it asks the servers in /etc/fltime.conf (SERVERS="a b", default pool.ntp.org;
+HOST or HOST:PORT), steps the clock when it is 0.2 s or more off, slews it with
+adjtime(3) when it is closer, then asks again after an hour. Until the network
+answers it retries after 10, 20, 40 ... 300 s. State: /run/fltime.status
+(state=synced|waiting, last=, offset_ms=, server=), removed when it stops. The
+hardware clock is saved by rc.shutdown. `fl-sntp -q HOST[:PORT]` only asks and prints the
+offset (no privileges needed), `-1` asks once and sets the clock.
+It answers only to its own question: the reply must echo our transmit time, mode 4,
+stratum 1-15, not "alarm"; of three tries the quickest is used.
+
+fltime-set (/usr/bin) is the one privileged part. It is installed setuid root for the
+group seat (recipe owner= "/usr/bin/fltime-set 0 98 4750", the same pattern as flpower
+and flpkg-seat) and does exactly four things, nothing else:
+
+	fltime-set zone NAME     /etc/localtime -> /usr/share/zoneinfo/NAME, /etc/timezone
+	fltime-set ntp on|off    NTP= in /etc/fltime.conf, then restart/stop the ntp service
+	fltime-set sync          restart the ntp service now (only while ntp is on)
+	fltime-set time EPOCH    set the clock (only while ntp is off), then hwclock --systohc
+
+Checks: NAME has only letters, digits, _ + - . and / with no empty part and no part
+that starts with a dot, at most 48 characters, is not under posix/ or right/, and after
+realpath(3) is a regular file inside the zoneinfo directory that starts with "TZif";
+the links are made with symlink + rename, so /etc/localtime is never missing. EPOCH is
+digits only, between 2023 and 2100, and refused while automatic time is on. The
+environment is discarded, the paths are compiled in (the tests build a copy with
+other paths), the service script runs with a clean environment and no terminal.
+Exit status: 0 done, 2 usage, 3 argument refused, 4 refused (ntp state), 1 failed.
+
+Tests: tests/test.sh builds the helper against a scratch directory and fl-sntp against
+tests/fakentp.py (a stand-in NTP server) and needs no privileges:
+	CC=cc tests/test.sh /usr/share/zoneinfo
+Settings' own end-to-end test is src/flsettings/tests/datetime.py.

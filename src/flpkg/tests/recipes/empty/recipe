@@ -1,0 +1,7 @@
+# Test recipe: a package() that installs nothing must stop the build.
+pkgname=empty
+version=1
+release=1
+summary="flpkg test: empty package"
+arch=(any)
+package() { :; }

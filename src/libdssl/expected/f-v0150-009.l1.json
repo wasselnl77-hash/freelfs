@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0150-009.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"DSSL.play(el, name, { pseudo: \"::after\" \""}],"tree":{"children":[],"kind":"root"}}

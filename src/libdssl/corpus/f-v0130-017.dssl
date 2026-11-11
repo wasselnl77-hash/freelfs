@@ -1,0 +1,14 @@
+// header
+tokens { color { brand: #d1006f } }
+
+.card {
+  background: color.brand
+  color: white
+}
+
+.card:hover {
+  opacity: .5
+}
+@media (width <= 600) {
+  .card { color: red }
+}

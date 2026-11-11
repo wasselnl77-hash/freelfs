@@ -1,0 +1,20 @@
+# Test recipe: programs a build runs must not see $srcdir or $pkgdir.
+pkgname=envcheck
+version=1
+release=1
+summary="flpkg test: build environment"
+arch=(any)
+
+build() {
+	[ -n "$srcdir" ] # the recipe itself does see it
+	if env | grep -q '^\(srcdir\|pkgdir\|startdir\)='; then
+		echo "exported to child processes:"
+		env | grep '^\(srcdir\|pkgdir\|startdir\)='
+		exit 1
+	fi
+}
+
+package() {
+	[ -n "$pkgdir" ]
+	install -Dm644 /dev/null "$pkgdir/usr/share/envcheck/ok"
+}

@@ -1,0 +1,20 @@
+# flpkg system triggers.
+#
+# GLOB COMMAND: after a transaction that installed, upgraded or removed a
+# path matching GLOB (relative to the root, * also matches /), flpkg runs
+# COMMAND once with sh -c inside the root. Commands first check that their
+# tool exists and quietly do nothing if not, so a trigger is harmless before
+# its package is installed.
+
+usr/lib/*.so*                   command -v ldconfig >/dev/null || exit 0; ldconfig
+etc/ld.so.conf*                 command -v ldconfig >/dev/null || exit 0; ldconfig
+usr/lib/modules/*               command -v depmod >/dev/null || exit 0; for d in /usr/lib/modules/*/; do [ -d "$d/kernel" ] && depmod -a "$(basename "$d")"; done; true
+usr/lib/udev/hwdb.d/*           command -v udev-hwdb >/dev/null || exit 0; udev-hwdb update
+etc/udev/hwdb.d/*               command -v udev-hwdb >/dev/null || exit 0; udev-hwdb update
+usr/share/info/*                command -v install-info >/dev/null || exit 0; cd /usr/share/info && rm -f dir && for f in *.info*; do [ -e "$f" ] && install-info "$f" dir 2>/dev/null; done; true
+usr/share/fonts/*               command -v fc-cache >/dev/null || exit 0; fc-cache -s
+usr/share/icons/*               command -v gtk-update-icon-cache >/dev/null || exit 0; for d in /usr/share/icons/*/; do [ -f "$d/index.theme" ] && gtk-update-icon-cache -qf "$d"; done; true
+usr/share/mime/*                command -v update-mime-database >/dev/null || exit 0; update-mime-database /usr/share/mime
+usr/share/glib-2.0/schemas/*    command -v glib-compile-schemas >/dev/null || exit 0; glib-compile-schemas /usr/share/glib-2.0/schemas
+usr/share/applications/*        command -v update-desktop-database >/dev/null || exit 0; update-desktop-database -q
+usr/lib/flboot/*                command -v flboot-install >/dev/null || exit 0; flboot-install --update

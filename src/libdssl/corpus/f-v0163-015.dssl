@@ -1,0 +1,2 @@
+tokens { color { ink2: #111 } }
+.a { color: color.ink2/50 }

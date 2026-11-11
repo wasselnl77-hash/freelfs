@@ -1,0 +1,14 @@
+pkgname=dosfstools
+version=4.2
+release=1
+summary="FAT file system tools (mkfs.fat, fsck.fat), for the EFI system partition"
+url=https://github.com/dosfstools/dosfstools
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com/dosfstools/dosfstools/releases/download/v$version/dosfstools-$version.tar.gz)
+sha256=(64926eebf90092dca21b14259a5301b7b98e7b1943e8a201c7d726084809b527)
+build_style=autotools
+configure_args=(--enable-compat-symlinks --mandir=/usr/share/man
+	--docdir=/usr/share/doc/dosfstools-$version)

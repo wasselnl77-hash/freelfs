@@ -1,0 +1,6 @@
+tokens { color { aurahue: #ff2200 } }
+.btn { position: absolute; left: 300px; top: 300px; width: 100px; height: 40px; background: #222
+  hover { aura-particle: #8cf count 40 life 600 speed 40 dir up from top } }
+#slots { position: absolute; left: 500px; top: 300px; width: 100px; height: 60px; background: #222 }
+.g { aura-glow: #ff8800 24 } .p { aura-particle: #8cf count 20 life 500 speed 30 dir up from top } .noglow { aura-glow: none }
+.tok { aura-glow: color.aurahue 30 }

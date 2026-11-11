@@ -1,0 +1,1 @@
+window.postMessage({ type: 'selection', text: 'aura-glow: #00ff88 55 pulse 1200 flicker 0.2' }, '*')

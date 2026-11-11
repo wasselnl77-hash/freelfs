@@ -1,0 +1,6 @@
+.stage { background: #c8c8c8; color: #222 }
+.plain { color: #d0d0d0 }
+.closed { color: #d0d0d0; opacity: 0 }
+.stroked { color: #fff; text-stroke: 3 #000 }
+.shadowed { color: #fff; text-shadow: 1px 1px 0 #000 }
+.glow { color: #d8d8d8; text-shadow: 0 0 12px #000 }

@@ -1,0 +1,27 @@
+# flpanel, from src/flpanel in the FreeLFS tree.
+pkgname=flpanel
+version=0.1
+release=10
+summary="The FreeLFS desktop panel and start menu"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland dbus)
+owner=("/usr/bin/flpower 0 98 4750")
+makedepends=(flui dbus)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flpanel" "$srcdir/flpanel"
+	# the protocol belongs to flcomp
+	cp "$startdir/../../src/flcomp/protocol/fl-shell.xml" "$srcdir/flpanel/fl-shell.xml"
+	cd "$srcdir/flpanel"
+	make clean
+	make PROTO=fl-shell.xml
+}
+
+package() {
+	cd "$srcdir/flpanel"
+	make PROTO=fl-shell.xml DESTDIR="$pkgdir" install
+}

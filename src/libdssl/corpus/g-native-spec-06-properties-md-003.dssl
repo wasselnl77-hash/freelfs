@@ -1,0 +1,3 @@
+.stripes { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.blend   { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.sheen   { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }

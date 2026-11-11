@@ -1,0 +1,6 @@
+raw {
+  @font-face {
+    font-family: Inter
+    src: url(/fonts/inter.woff2)
+  }
+}

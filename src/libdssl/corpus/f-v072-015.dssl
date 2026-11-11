@@ -1,0 +1,1 @@
+.card { fill: red; stroke: blue; stroke-width: 2; text-wrap: balance; content-visibility: auto }

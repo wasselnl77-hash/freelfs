@@ -1,0 +1,62 @@
+#!/bin/bash
+# /etc/rc.d/init.d/network -- wired networking.
+#
+# With NETWORK empty in /etc/rc.conf, dhcpcd runs DHCP on every interface.
+# Otherwise each entry is "IFACE dhcp" or "IFACE static ADDRESS/PREFIX GW".
+
+. /etc/rc.conf
+. /etc/rc.d/functions
+
+iface_up() {
+	local iface=$1 mode=$2 addr=$3 gw=$4
+	case $mode in
+		dhcp) dhcpcd -q -b "$iface" ;;
+		static)
+			ip link set "$iface" up &&
+				ip addr add "$addr" dev "$iface" &&
+				{ [ -z "$gw" ] || ip route add default via "$gw" dev "$iface"; }
+			;;
+		*) return 1 ;;
+	esac
+}
+
+iface_down() {
+	local iface=$1 mode=$2
+	[ "$mode" = dhcp ] && dhcpcd -q -x "$iface"
+	ip addr flush dev "$iface"
+	ip link set "$iface" down
+}
+
+case $1 in
+	start)
+		if [ ${#NETWORK[@]} -eq 0 ]; then
+			step "Starting DHCP on all interfaces" dhcpcd -q -b
+		else
+			for entry in "${NETWORK[@]}"; do
+				read -r iface mode addr gw <<< "$entry"
+				step "Bringing up $iface ($mode)" iface_up "$iface" "$mode" "$addr" "$gw"
+			done
+		fi
+		;;
+	stop)
+		if [ ${#NETWORK[@]} -eq 0 ]; then
+			step "Stopping DHCP" dhcpcd -q -x
+		else
+			for entry in "${NETWORK[@]}"; do
+				read -r iface mode _ <<< "$entry"
+				step "Bringing down $iface" iface_down "$iface" "$mode"
+			done
+		fi
+		;;
+	restart)
+		"$0" stop
+		"$0" start
+		;;
+	status)
+		ip -brief addr
+		;;
+	*)
+		echo "usage: ${0##*/} {start|stop|restart|status}" >&2
+		exit 2
+		;;
+esac

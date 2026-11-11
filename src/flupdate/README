@@ -1,0 +1,23 @@
+flupdate -- the update notifier
+===============================
+
+flupdate-notify is a small shell daemon the desktop session starts
+(src/flcomp/session). Five minutes after login, then once a day, it runs
+
+    flpkg check-updates                       the FreeLFS package repo (D3)
+    flatpak remote-ls --updates --user        Flathub, the person's own apps
+
+and posts one notification, "N updates available" (body: how many system
+packages and Flatpak apps), through org.freedesktop.Notifications (flnotify;
+the panel is the daemon). The next check replaces the card. Clicking the card
+or its "Open Store" button runs `flstore --updates`. It only tells; it never
+installs or syncs anything system-wide. flpkg downloads the signed index to a
+temporary directory and needs no root. A failed check (offline, no repo) posts
+nothing and is retried after an hour. It refuses to run as root.
+
+Environment: FLUPDATE_FIRST (300 s), FLUPDATE_INTERVAL (86400 s),
+FLUPDATE_RETRY (3600 s); --once checks now and exits. FLUPDATE_FLPKG,
+FLUPDATE_FLATPAK, FLUPDATE_FLNOTIFY, FLUPDATE_STORE name other programs (tests).
+
+Test: `make check` (tests/notify.sh) runs it against made-up flpkg, flatpak,
+flnotify and flstore programs: no network, no bus, no root.

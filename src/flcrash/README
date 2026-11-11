@@ -1,0 +1,60 @@
+flcrash -- the "Something went wrong" screen
+============================================
+
+Shown when the desktop session ends badly: flcomp killed by a signal (crash,
+out of memory) or exiting with a non-zero status. /etc/profile.d/desktop.sh
+(flcomp package) runs it after flcomp and acts on its exit status.
+
+No compositor is left at that point, so flcrash draws on the display itself:
+a KMS dumb buffer (device access through libseat, like flcomp; or the card
+directly when there is no seat daemon), keys through libinput. Fonts, canvas
+and the logo paths come from libflui. Without a usable display it prints the
+same screen as text on the console (truecolor escapes, which the Linux console
+maps to its palette) and reads the keys from the terminal.
+
+The screen: a solid FreeLFS green field, a wide stretched "oh no.", a big ":/",
+the plain headline "Something went wrong", one sentence on what happened, the
+key hints, and the technical lines: Code (FL-SIGSEGV, FL-SIGKILL, FL-START for
+a desktop that could not start in its first 5 seconds, FL-EXITn), Program,
+Status (exit status, signal), how long it ran, the log path. Bottom right: the
+FreeLFS mark with its middle bar knocked out of place. The face and the wide
+line are the EMOTICON, OHNO and WIDE_X defines at the top of flcrash.c.
+
+Keys
+  Enter   exit 0: desktop.sh starts the desktop again
+  R       restart the computer (flpower restart, else /usr/sbin/reboot)
+  S       the end of the session log; Up, Down, Page Up, Page Down, Home, End
+          scroll, Esc or S go back
+  Esc     exit 3: leave to the shell prompt on tty1
+  Ctrl-Alt-F1..F10 switch virtual terminal (when it has a seat)
+
+Usage
+  flcrash --status N [--prog NAME] [--secs N] [--log FILE]
+  flcrash --text                 console version
+  flcrash --demo [--status N] [--view log] [--size WxH]
+                                 made-up data; FLCRASH_PPM=FILE writes the
+                                 picture there and exits (headless previews)
+
+The log is $XDG_RUNTIME_DIR/flcomp.log: desktop.sh sends flcomp's stderr there,
+and with it the panel's and every program the session starts. flcrash keeps a
+copy of its tail in ~/.local/state/freelfs/last-crash.log.
+
+Build: make; make install (PREFIX, DESTDIR). Needs libflui, libseat, libinput, libdrm.
+
+The egg: "You can't do that."
+-----------------------------
+`flcrash --cant PATH...` is asked before someone deletes a vital system folder: /sysflfs and its bin,
+sbin, lib, libexec, share, settings, data, /boot, /, and the classic hidden links (/usr, /usr/bin,
+/etc, /var, /bin, /sbin, /lib, /lib64, /home, /root, /drives, ...). The folder itself, not what is
+inside it; names are folded (. .. // trailing /) and links followed (FLCRASH_PROTECT=/a:/b adds paths
+for tests). The screen is the crash screen's layout and green with the stretched "oh no.", the face
+`>:(` and only "You can't do that.", and two buttons: "Never mind" (default: Enter, Esc, N) and
+"Continue" (C, Tab then Enter, or a click), which lets the caller really delete. Exit status 0: go
+ahead (not a vital path, or Continue), 1: Never mind. On the desktop (WAYLAND_DISPLAY) it is one
+full-screen window and plays the error sound (flsound); on a console the same words in text; with
+neither (no terminal, no desktop) the answer is Never mind. `--text` forces the console version,
+FLCRASH_PPM=FILE (with --cant PATH or --always, --focus continue, --size WxH) writes the picture.
+Callers: flfiles (Delete and Move to Trash, one question for the whole selection) and an
+interactive flsh before the external `rm` with -r, -R or --recursive (scripts and `flsh -c` are never
+asked, coreutils' rm is not modified). tests/egg.py checks the paths, the console keys, flsh and,
+with a compositor, the window (needs python3; see its header for the environment).

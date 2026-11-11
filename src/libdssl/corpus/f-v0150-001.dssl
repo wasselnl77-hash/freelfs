@@ -1,0 +1,1 @@
+#orb { position: absolute; left: 150px; top: 120px; width: 50px; height: 50px; background: #222; aura-particle: #f80 -> transparent count 40 life 300 size 6 dir up from top essential; aura-glow: #f00 40 essential }

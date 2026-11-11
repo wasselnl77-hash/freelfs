@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[],"css":"\n  @supports (display: grid) {\n    .a { display: grid }\n  }\n","kind":"raw","line":1},{"children":[{"kind":"decl","line":6,"prop":"color","value":"red"}],"kind":"selector","line":6,"sel":".b"}],"kind":"root"}}

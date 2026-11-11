@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FreeLFS install
+Comment=Install FreeLFS on this computer
+Exec=flinstall
+# only the live system has this directory: the icon is not shown on an installed system
+TryExec=/run/live
+Categories=System;
+X-FreeLFS-Glyph=↓

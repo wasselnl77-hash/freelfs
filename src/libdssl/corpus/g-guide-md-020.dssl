@@ -1,0 +1,3 @@
+.wall  { texture: bricks scale 64 color2 #7a3a2a }
+.floor { texture: herringbone scale 30 color2 #8a5a33 }
+.sky   { background: #070a1c; texture: starfield density 1.6 }

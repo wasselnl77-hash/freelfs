@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Software Store
+Comment=Find, install and update apps and packages
+Exec=flstore
+Categories=System;PackageManager;
+X-FreeLFS-Glyph=▣

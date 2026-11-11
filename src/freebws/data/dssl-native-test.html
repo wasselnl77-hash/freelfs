@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>FreeBWS DSSL native test</title>
+<!-- No CSS anywhere on this page, and nothing in it that CSS cannot express (no
+     texture, aura, @signal, ...): FreeBWS lowers the DSSL below to CSS with libdssl
+     and never loads the JavaScript engine. The pill says which path styled the
+     page (the browser sets <html data-dssl-mode="native"> or "engine"). Without
+     DSSL this is plain black text on white. -->
+<link rel="stylesheet" type="text/dssl" href="freebws-dssl://engine/examples/hello.dssl">
+<style type="text/dssl">
+tokens {
+  color {
+    fl-bg: #1d2125
+    fl-panel: #272c33
+    fl-line: #3a4148
+    fl-text: #e6e9ec
+    fl-dim: #8b949e
+    fl-green: #3f9b63
+  }
+  radius { box: 8 }
+  shadow { lift: 0 8 22 #000/45 }
+}
+
+body {
+  background: color.fl-bg
+  color: color.fl-text
+  font-family: "IBM Plex Sans", sans-serif
+  padding: 28 36
+}
+h1 { font-size: fluid 24 38; margin: 0 0 6; color: color.fl-text }
+h1 span { color: color.fl-green }
+p { color: color.fl-dim; margin: 0 0 18 }
+code { font-family: "IBM Plex Mono", monospace; color: color.fl-text }
+
+.bar { row: gap 12 between center; margin: 0 0 18 }
+.pill {
+  background: color.fl-green
+  color: #fff
+  radius: full
+  padding: 4 14
+  font-size: 13
+}
+.pill.wait { background: color.fl-line }
+
+.grid { grid: 3 gap 16 }
+.card {
+  background: color.fl-panel
+  border: 1 solid color.fl-line
+  color: color.fl-text
+  radius: box
+  padding: 18
+  transition: 160
+  hover { background: #313840; box-shadow: shadow.lift; border-color: color.fl-green }
+}
+.card b { color: color.fl-green }
+.warm {
+  background: gradient(135deg, #3b2f22, #1f2a22)
+  border-color: #6b5a3a
+}
+.dot {
+  display: inline-block
+  size: 9
+  radius: full
+  background: color.fl-green
+  margin-right: 8
+  animate: pulse 1400 infinite
+}
+
+motion pulse {
+  0 { opacity: 1 }
+  50 { opacity: .35 }
+  100 { opacity: 1 }
+}
+
+button {
+  background: color.fl-green
+  color: #fff
+  radius: 6
+  padding: 8 16
+  border: 0
+  margin-top: 10
+  hover { background: #4cb374 }
+}
+
+@media (max-width: 720px) {
+  .grid { grid: 1 gap 12 }
+}
+</style></head>
+<body>
+<div class="bar">
+<div><h1>FreeBWS <span>+ DSSL</span></h1>
+<p>Tokens, layout words, states, a gradient and a motion, written in a style language, not CSS. Lowered natively.</p></div>
+<div class="pill wait" id="status">waiting for DSSL</div>
+</div>
+<div class="grid">
+<div class="card"><b>row / grid</b><br>This grid is <code>grid: 3 gap 16</code>; the bar above is <code>row: gap 12 between center</code>.</div>
+<div class="card"><b>hover</b><br>A nested <code>hover { }</code> block lifts the card and tints its border.<br><button>Button</button></div>
+<div class="card warm"><b><span class="dot"></span>gradient and motion</b><br><code>gradient(135deg, ...)</code> and <code>animate: pulse</code>, both plain CSS once lowered.</div>
+</div>
+<p id="how" style="margin-top:22px"></p>
+<script>
+addEventListener('dssl-ready', function (e) {
+  var s = document.getElementById('status'), m = document.documentElement.getAttribute('data-dssl-mode');
+  s.textContent = 'DSSL ' + e.detail.version + ' ready (' + m + ')';
+  s.className = 'pill';
+  document.getElementById('how').textContent = m === 'native'
+    ? 'Styled by libdssl in the browser process. The JavaScript engine was not loaded (window.DSSL is ' + typeof window.DSSL + ').'
+    : 'Styled by the JavaScript engine (window.DSSL is ' + typeof window.DSSL + ').';
+});
+</script>
+</body></html>

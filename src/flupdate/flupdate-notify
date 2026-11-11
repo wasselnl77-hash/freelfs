@@ -1,0 +1,113 @@
+#!/bin/sh
+# flupdate-notify -- the update notifier: tells you that updates exist, never
+# installs anything. Started by the desktop session (src/flcomp/session).
+# SPDX-License-Identifier: MIT
+#
+# First check FLUPDATE_FIRST seconds after start (default 300: five minutes
+# after login), then every FLUPDATE_INTERVAL seconds (default 86400: daily).
+# A check runs
+#     flpkg check-updates                          (the FreeLFS repo)
+#     flatpak remote-ls --updates --user           (Flathub, this person's apps)
+# and, if either has something, posts ONE notification through
+# org.freedesktop.Notifications (flnotify), "N updates available", that
+# replaces the one from the last check. Clicking it, or its "Open Store"
+# button, runs `flstore --updates`. A failed check (offline, no repo
+# configured) posts nothing and is retried after FLUPDATE_RETRY seconds
+# (default 3600).
+#
+# Runs as the user: flpkg reads its database and downloads the signed repo
+# index to a temporary directory (it needs no root and writes nothing to the
+# system). Refuses to run as root.
+#
+# Options: --once   check once now, without waiting, and exit.
+# Test hooks (environment): FLUPDATE_FLPKG, FLUPDATE_FLATPAK, FLUPDATE_FLNOTIFY,
+# FLUPDATE_STORE name other programs; FLUPDATE_STATE is the directory for the
+# notification id (default $XDG_RUNTIME_DIR).
+
+flpkg=${FLUPDATE_FLPKG:-flpkg}
+flatpak=${FLUPDATE_FLATPAK:-flatpak}
+flnotify=${FLUPDATE_FLNOTIFY:-flnotify}
+store=${FLUPDATE_STORE:-flstore}
+first=${FLUPDATE_FIRST:-300}
+interval=${FLUPDATE_INTERVAL:-86400}
+retry=${FLUPDATE_RETRY:-3600}
+state=${FLUPDATE_STATE:-${XDG_RUNTIME_DIR:-/tmp}}
+idfile=$state/flupdate-notify.id
+
+[ "$(id -u)" -ne 0 ] || { echo "flupdate-notify: not as root" >&2; exit 1; }
+export TMPDIR=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+
+# sleep that a TERM from the session interrupts at once
+nap() {
+	sleep "$1" &
+	wait $!
+}
+trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT HUP
+
+# Print "NPKG NFLATPAK"; fail if neither source could be checked.
+check() {
+	pk= fp= got=0
+	if command -v "$flpkg" >/dev/null 2>&1; then
+		if out=$(nice timeout 180 "$flpkg" check-updates 2>/dev/null); then
+			got=1
+			pk=$(printf '%s\n' "$out" | grep -c .)
+		fi
+	fi
+	if command -v "$flatpak" >/dev/null 2>&1; then
+		if out=$(nice timeout 240 "$flatpak" remote-ls --updates --user --columns=application 2>/dev/null); then
+			got=1
+			fp=$(printf '%s\n' "$out" | grep -c .)
+		fi
+	fi
+	[ "$got" -eq 1 ] || return 1
+	echo "${pk:-0} ${fp:-0}"
+}
+
+store_open() {
+	command -v "$store" >/dev/null 2>&1 && "$store" --updates >/dev/null 2>&1 &
+}
+
+notify() { # notify NPKG NFLATPAK
+	total=$(($1 + $2))
+	[ "$total" -gt 0 ] || return 0
+	if [ "$total" -eq 1 ]; then summary="1 update available"; else summary="$total updates available"; fi
+	body=
+	[ "$1" -gt 0 ] && body="$1 system package$([ "$1" -eq 1 ] || echo s)"
+	if [ "$2" -gt 0 ]; then
+		body="${body:+$body, }$2 Flatpak app$([ "$2" -eq 1 ] || echo s)"
+	fi
+	rid=0
+	[ -r "$idfile" ] && rid=$(cat "$idfile" 2>/dev/null)
+	case $rid in '' | *[!0-9]*) rid=0 ;; esac
+	# the answer (action or closing) comes back on flnotify's output
+	(
+		"$flnotify" -a "Updates" -i flstore -r "$rid" -A "default=Open Store" -A "open=Open Store" \
+			-w "$summary" "$body" 2>/dev/null | while read -r a b; do
+			case $a in
+			[0-9]*) echo "$a" >"$idfile" ;;
+			action) store_open ;;
+			closed) break ;;
+			esac
+		done
+	) &
+	bg="$bg $!"
+}
+
+bg=
+once=
+[ "$1" = --once ] && once=1
+[ -n "$once" ] || nap "$first"
+while :; do
+	if r=$(check); then
+		# shellcheck disable=SC2086
+		notify $r
+		delay=$interval
+	else
+		delay=$retry
+	fi
+	if [ -n "$once" ]; then
+		wait $bg
+		exit 0
+	fi
+	nap "$delay"
+done

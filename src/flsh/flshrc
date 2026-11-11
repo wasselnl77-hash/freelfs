@@ -1,0 +1,13 @@
+# /etc/flshrc -- read by every interactive flsh, before ~/.config/flsh/flshrc.
+# The file is shell commands, like ~/.profile; type help in flsh for the
+# builtins and keys.
+
+alias ls='ls --color=auto'
+alias ll='ls -lh'
+alias la='ls -A'
+alias grep='grep --color=auto'
+alias diff='diff --color=auto'
+alias ..='cd ..'
+
+# Your own prompt: define a function named flsh_prompt that prints it, e.g.
+#   flsh_prompt() { printf '%s> ' "${PWD##*/}"; }

@@ -1,0 +1,31 @@
+pkgname=tar
+version=1.35
+release=1
+summary="GNU tar"
+url=https://www.gnu.org/software/tar/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc acl attr)
+source=(https://ftpmirror.gnu.org/tar/tar-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/tar-$version-acl_fix-1.patch)
+sha256=(4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16
+        51cadccfcb2f29cfdb4ec18015360100aa167179a72ece040a6a8612aeec5081)
+
+prepare() {
+	patch -Np1 -i "$srcdir/tar-$version-acl_fix-1.patch"
+}
+
+build() {
+	FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr
+	make
+}
+
+check() {
+	make check
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	make -C doc DESTDIR="$pkgdir" install-html docdir=/usr/share/doc/tar-$version
+}

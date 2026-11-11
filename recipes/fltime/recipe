@@ -1,0 +1,27 @@
+# fltime, from src/fltime in the FreeLFS tree: fl-sntp (the ntp service's daemon)
+# and fltime-set (the setuid helper Settings uses for the time zone, automatic
+# time and a hand-set clock).
+pkgname=fltime
+version=0.1
+release=1
+summary="Automatic time (SNTP client) and the time zone helper for Settings"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc util-linux tzdata initscripts)
+# the helper runs as root for the group seat, like flpower in flpanel
+owner=("/usr/bin/fltime-set 0 98 4750")
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/fltime" "$srcdir/fltime"
+	cd "$srcdir/fltime"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/fltime"
+	make DESTDIR="$pkgdir" install
+}

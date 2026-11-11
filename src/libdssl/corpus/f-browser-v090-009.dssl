@@ -1,0 +1,1 @@
+.src { position: absolute; left: 300px; top: 250px; width: 80px; height: 40px; background: #345; color: #22dd44; aura-glow: currentColor 40, ; }

@@ -1,0 +1,9 @@
+.a { shadow: md }
+.b { shadow: none }
+.c { shadow: pop }
+.d { shadow: 0 2 4 red }
+tokens { shadow { pop: 0 1 1 black } radius { pill: 99 } }
+.e { radius: pill md 4 }
+.f { radius: xl }
+.g { radius: sm lg full }
+

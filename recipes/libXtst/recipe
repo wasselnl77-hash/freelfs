@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXtst
+version=1.2.5
+release=1
+summary="XTest and RECORD extension library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11 libXext libXi)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXtst-1.2.5.tar.xz)
+sha256=(b50d4c25b97009a744706c1039c598f4d8e64910c9fde381994e1cae235d9242)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

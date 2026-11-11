@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v073-008.dssl","hint":"the whole block is skipped - for verbatim CSS like @font-face / @keyframes / @supports, wrap it in raw { }","line":1,"message":"unknown at-rule \"@font-face\""}],"tree":{"children":[{"children":[],"kind":"bogus","line":1}],"kind":"root"}}

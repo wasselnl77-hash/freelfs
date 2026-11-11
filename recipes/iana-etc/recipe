@@ -1,0 +1,14 @@
+pkgname=iana-etc
+version=20260805
+release=1
+summary="/etc/services and /etc/protocols from IANA"
+url=https://www.iana.org/protocols
+license=(MIT)
+arch=(any)
+groups=(base)
+source=(https://github.com/Mic92/iana-etc/releases/download/$version/iana-etc-$version.tar.gz)
+sha256=(29270860664e324107537f32ea476a333ca52d71b59c74bc06ecc3b0fa9cf490)
+
+package() {
+	install -Dm644 services protocols -t "$pkgdir/etc"
+}

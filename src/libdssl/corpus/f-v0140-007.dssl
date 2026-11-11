@@ -1,0 +1,2 @@
+motion w { from { opacity: 0 } to { opacity: 1 } }
+.y { animate: w 400; animation-delay: 200ms }

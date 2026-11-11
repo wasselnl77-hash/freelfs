@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0163-060.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"is unchanged\""}],"tree":{"children":[{"children":[{"children":[],"kind":"selector","line":1,"sel":".b"}],"kind":"selector","line":1,"sel":"plain .a"}],"kind":"root"}}

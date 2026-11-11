@@ -1,0 +1,9 @@
+.card { background: #c9a66b; texture: wood }              // 30 presets, or build your own
+
+behavior fire {                                            // aura has no presets: you write them
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up from top gravity -40 shape flame glowing behind
+}
+.torch { use fire }
+
+input[type=range] { slider: track 6 #445566 radius full, fill #ff7a00, thumb 22 #fff }

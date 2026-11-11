@@ -1,0 +1,4 @@
+.toolbar { row: gap 8 between center }
+.board   { grid: 3 gap 12 }
+.pane    { stack: center }
+.hero    { center: both }

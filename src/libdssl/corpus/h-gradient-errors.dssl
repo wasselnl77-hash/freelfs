@@ -1,0 +1,25 @@
+.a { gradient: sideways 1, red -> blue }
+.b { gradient: linear 90, red }
+.c { gradient: linear foo, red -> blue }
+.d { gradient: radial wat, red -> blue }
+.e { gradient: conic around, red, blue }
+.f { gradient: linear 90, 30% -> red -> blue }
+.g { gradient: linear 90, red -> 30% }
+.h { gradient: linear 90, redd -> blue }
+.i { gradient: mesh red }
+.j { gradient: mesh red, blue }
+.k { gradient: mesh #fff, red at 1 }
+.l { gradient: linear 90, 20 -> blue }
+.m { gradient: linear 90, red 10 -> blue 20 }
+.n { gradient: linear 135 }
+.o { gradient: }
+.p { gradient: linear 90, red, blue; background-image: url(x.png) }
+.q { gradient: linear 90, red, blue; background: url(x.png) }
+.r { gradient: linear 90, red, blue; background-image: none }
+.s { gradient: radial circle farthest-side at 10px 10px, red, blue }
+.t { gradient: conic at 50% 50%, red, blue }
+.u { gradient: conic from 10deg at center, red, blue }
+.v { gradient: linear -45deg, red, blue }
+.w { gradient: linear 90 in hsl longer hue, red, blue }
+.x { gradient: linear in srgb, red, blue }
+

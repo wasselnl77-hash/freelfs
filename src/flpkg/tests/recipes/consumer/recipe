@@ -1,0 +1,8 @@
+# Test package depending on a provided name.
+pkgname=consumer
+version=1.0
+release=1
+summary="flpkg test consumer"
+arch=(any)
+depends=("libfoo.so>=1")
+package() { mkdir -p "$pkgdir/usr/share/consumer" && echo c > "$pkgdir/usr/share/consumer/c"; }

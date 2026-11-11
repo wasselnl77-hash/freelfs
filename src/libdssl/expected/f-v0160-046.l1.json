@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"aura-particle","value":"#f00 #0f0 #00f count 20 from outline palette spin 90 wind 20 orbit 45 around diamond"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

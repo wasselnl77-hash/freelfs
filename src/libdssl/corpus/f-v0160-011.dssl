@@ -1,0 +1,1 @@
+tokens { color { ok: #111 bad: nonsense } }

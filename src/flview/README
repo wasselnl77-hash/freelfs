@@ -1,0 +1,42 @@
+flview -- the FreeLFS image viewer ("Images")
+=============================================
+
+    flview [--rotate N] [--zoom PERCENT] [--no-strip] [FILE|FOLDER]
+
+Opens a picture and keeps its whole folder at hand (PNG, JPEG, WebP; an
+animated WebP shows its first frame). Without an argument it opens ~/Pictures,
+else the current folder.
+
+Keys
+  Right, Page Down      next picture          Left, Page Up, Backspace  previous
+  Home, End             first, last           + / - / wheel             zoom (wheel: at the pointer)
+  0 or F                fit to the window     1                         100 %
+  Up, Down              pan, or zoom when the whole picture is visible
+  R / Shift+R, [ ]      rotate clockwise / counter-clockwise
+  Delete                move the file to the Trash (~/.local/share/Trash, as flfiles does)
+  W                     use it as the desktop wallpaper
+  T                     show or hide the thumbnail strip
+  Q, Escape             quit
+Mouse: drag pans, double click toggles fit and 100 %, click a thumbnail to go
+there, wheel over the strip steps through the folder. The toolbar has the same
+actions as buttons (narrow windows drop the least used ones).
+
+Wallpaper: the picture is copied to ~/.local/share/freelfs/wallpapers/NAME and
+desktop.conf gets "wallpaper=THAT PATH" (fl_conf_set, the call the Settings app
+uses for its keys); the copy means deleting the original is safe. The previous
+copy is removed.
+
+Decoding: libpng, libjpeg(-turbo) and libwebp directly (no gdk-pixbuf). JPEGs
+are decoded at 1/2, 1/4 or 1/8 size when that is enough (thumbnails, and photos
+over 24 megapixels), EXIF orientation is applied. Memory: the picture as ARGB
+(4 bytes a pixel), one shrunken copy while zoomed out, up to 600 thumbnails of
+at most 76 x 58 px; thumbnails are made one per timer tick, nearest the current
+picture first, so the window never waits for them.
+
+Rendering: bilinear (2x2 supersampled when shrinking a lot), nearest above
+250 %; the finished view is cached, so moving the pointer does not redraw the
+picture. Transparent pixels show a checkerboard.
+
+Test: make check (python3; runs the viewer without a compositor). FLVIEW_KEYS=
+"Right,w,Delete" feeds key presses into the first frame, for tests and
+screenshots; FLUI_PPM=FILE writes the frame to a PPM (see libflui).

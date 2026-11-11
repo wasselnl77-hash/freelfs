@@ -1,0 +1,29 @@
+# Firmware the kernel's drivers load from /lib/firmware. Not all of
+# linux-firmware (over 1 GB): GPUs (AMD, Intel), Wi-Fi and Bluetooth
+# (Realtek, Intel), Realtek Ethernet. More families get added as hardware
+# needs them.
+pkgname=linux-firmware
+version=20261019
+release=1
+summary="Firmware for GPUs, Wi-Fi, Bluetooth and Ethernet chips"
+url=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+license=(custom)
+arch=(any)
+groups=(desktop)
+options=(!strip)
+source=(https://cdn.kernel.org/pub/linux/kernel/firmware/linux-firmware-$version.tar.xz)
+sha256=(a10d1ab5baf2c74ba92e8c7cf313e691696c26bddfa6df00db795e48d70cd4ca)
+
+package() {
+	local fw=$pkgdir/usr/lib/firmware d
+	install -d "$fw"
+	for d in amdgpu radeon i915 xe rtw88 rtw89 rtl_nic rtl_bt intel; do
+		[ -d "$d" ] && cp -a "$d" "$fw/"
+	done
+	# Intel Wi-Fi is in intel/iwlwifi now; older releases had it at the top
+	for d in iwlwifi-*; do
+		[ -e "$d" ] && cp -a "$d" "$fw/"
+	done
+	install -Dm644 WHENCE "$pkgdir/usr/share/licenses/linux-firmware/WHENCE"
+	cp -a LICENCE.* LICENSE.* "$pkgdir/usr/share/licenses/linux-firmware/" 2> /dev/null || true
+}

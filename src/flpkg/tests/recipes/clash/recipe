@@ -1,0 +1,10 @@
+# Test package that claims a file demo owns.
+pkgname=clash
+version=1.0
+release=1
+summary="flpkg test package with a file conflict"
+arch=(any)
+package() {
+	mkdir -p "$pkgdir/usr/share/demo"
+	echo mine > "$pkgdir/usr/share/demo/a.txt"
+}

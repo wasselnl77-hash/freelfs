@@ -1,0 +1,5 @@
+.a { place-items: center }
+.b { display: grid; place-items: center }
+.c { row: center }
+.d:hover { justify-content: center }
+@media (width < 600) { .e { align-items: center } }

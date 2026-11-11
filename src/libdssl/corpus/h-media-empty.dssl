@@ -1,0 +1,4 @@
+.a { @media { color: red } }
+@media  { .b { color: red } }
+.c { @container { color: red } @container (min-width: 300) { color: blue } @container card (width > 20) { color: green } }
+

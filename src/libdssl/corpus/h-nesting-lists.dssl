@@ -1,0 +1,5 @@
+.a, .b { .c { color: red } hover { color: blue } ::before { content: "" } }
+.a { .c, .d { color: red } }
+.a, .b { &.x, .y & { color: red } }
+:is(.x, .y) { .z { color: red } }
+

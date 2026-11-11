@@ -1,0 +1,15 @@
+pkgname=libass
+version=0.17.5
+release=1
+summary="Portable subtitle renderer for the ASS/SSA format"
+url=https://github.com/libass/libass
+license=(ISC)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc freetype harfbuzz fontconfig fribidi)
+makedepends=(nasm pkgconf)
+source=(https://github.com/libass/libass/releases/download/$version/libass-$version.tar.xz)
+sha256=(2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc)
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

@@ -1,0 +1,26 @@
+# snappel, from src/snappel in the FreeLFS tree.
+pkgname=snappel
+version=0.1
+release=1
+summary="FreeLFS screenshot tool: full screen, window, region, timer, annotate, clipboard"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland libpng flcomp)
+makedepends=(flui libpng)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/snappel" "$srcdir/snappel"
+	# the protocol belongs to flcomp
+	cp "$startdir/../../src/flcomp/protocol/fl-screencopy.xml" "$srcdir/snappel/fl-screencopy.xml"
+	cd "$srcdir/snappel"
+	make clean
+	make PROTO=fl-screencopy.xml
+}
+
+package() {
+	cd "$srcdir/snappel"
+	make PROTO=fl-screencopy.xml DESTDIR="$pkgdir" install
+}

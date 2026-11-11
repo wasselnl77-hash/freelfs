@@ -1,0 +1,24 @@
+# The freedesktop.org MIME database: file name and content patterns to MIME
+# types. GIO (g_content_type_guess), and so WPE WebKit, flatpak and
+# AppStream, take a file's type from /usr/share/mime/mime.cache; without it
+# everything unknown is text/plain (FreeBWS showed start.html as source).
+# update-mime-database runs at install time on the package directory, so
+# the package ships the generated cache; flpkg's trigger for usr/share/mime/*
+# regenerates it when another package adds types. No man page spec (xmlto),
+# no tests.
+pkgname=shared-mime-info
+version=2.5.1
+release=1
+summary="freedesktop.org shared MIME database and update-mime-database"
+url=https://gitlab.freedesktop.org/xdg/shared-mime-info
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib libxml2)
+makedepends=(meson ninja gettext)
+source=(https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/$version/shared-mime-info-$version.tar.gz)
+sha256=(ea248ea157b7fa0165f4fe282c84919fa84c3f175553642f229c8f1ab7539128)
+build_style=meson
+configure_args=(--wrap-mode=nodownload -D update-mimedb=true -D build-tests=false -D build-spec=false)
+
+check() { :; } # tests are not built

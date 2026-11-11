@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXcomposite
+version=0.4.6
+release=1
+summary="XComposite extension library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11 libXfixes)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXcomposite-0.4.6.tar.xz)
+sha256=(fe40bcf0ae1a09070eba24088a5eb9810efe57453779ec1e20a55080c6dc2c87)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

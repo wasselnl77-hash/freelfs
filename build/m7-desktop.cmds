@@ -1,0 +1,5 @@
+# Commands for build/vm-run.py: make an account without a password and restart
+# the login screen so it lists it. Use with build/m7-desktop.tty:
+#   FLFS_VM_MEM=1G FLFS_VM_TTY=build/m7-desktop.tty ./build/gentle.sh ./build/vm-run.py build/m7-desktop.cmds
+{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null && echo made
+sleep 3; pkill -x flcomp; sleep 6; pgrep -x flgreet-ui >/dev/null && echo greeter-again

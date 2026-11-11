@@ -1,0 +1,12 @@
+pkgname=markupsafe
+version=3.0.3
+release=1
+summary="Escapes characters for HTML and XML"
+url=https://markupsafe.palletsprojects.com/
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(python)
+source=(https://pypi.org/packages/source/M/MarkupSafe/markupsafe-$version.tar.gz)
+sha256=(722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698)
+build_style=python

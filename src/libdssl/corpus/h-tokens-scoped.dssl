@@ -1,0 +1,2 @@
+.danger { --color.accent: color.err; --brand: red; --x: 1 2 3 }
+

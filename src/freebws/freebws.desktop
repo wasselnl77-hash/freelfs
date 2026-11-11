@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Web Browser
+Comment=Browse the web
+Exec=freebws %u
+Categories=Network;WebBrowser;
+X-FreeLFS-Glyph=W

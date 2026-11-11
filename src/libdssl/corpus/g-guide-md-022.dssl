@@ -1,0 +1,6 @@
+.stripes { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.blend   { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.mid     { gradient: linear 90, #f00 -> 30% -> #00f }
+.band    { gradient: linear 90, #f00 0 30%, #00f 30% 100% }
+.aurora  { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+.sheen   { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }

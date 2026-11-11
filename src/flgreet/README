@@ -1,0 +1,30 @@
+flgreet -- the FreeLFS login screen
+===================================
+
+inittab runs /usr/sbin/flgreet on tty1 instead of agetty.
+
+  flgreet     (root) takes tty1 as its controlling terminal and runs
+              `flcomp --firstboot` with FLCOMP_SETUP=/usr/libexec/flgreet-ui,
+              XDG_RUNTIME_DIR=/run/flgreet and a clean environment. It reads
+              one line, the user name, from a pipe. It accepts the name only
+              if it is in /etc/passwd with a uid from 1000 to 59999, creates
+              /run/user/UID (0700, owned by the user), and becomes
+              `login -f NAME`. When login ends, init starts flgreet again.
+              If flcomp cannot start, or crashes, it execs /sbin/agetty on
+              tty1, so a broken desktop never locks you out of the console.
+              Ctrl-Alt-F2 .. F6 still give plain console logins.
+  flgreet-ui  (root, inside that compositor) the screen: accounts, password
+              field, Log in, Shut down (a second click within 4 s confirms).
+              The password is checked with crypt_r against /etc/shadow: an
+              empty hash logs in without one, a hash starting with ! or *
+              is locked, a wrong password waits one second. The password is
+              never printed or logged, and its buffer is wiped after use.
+
+Look: the card of flsetup, theme from /etc/freelfs/desktop.conf when that
+file exists (theme=dark|light), else dark. The title is the boot screen's
+"FreeLFS" wordmark at rest: right after flsplash handed over (/run/flsplash.released)
+the first frames draw it where and how flsplash left it and ease it into the card
+(640 ms, the card fades in); see docs/M7-DESIGN.md "Login screen take-over".
+FLGREET_ANIM_T=MS (tests) shows that animation frozen at MS ms.
+
+Build: make (flgreet needs no libraries; flgreet-ui needs flui and libcrypt).

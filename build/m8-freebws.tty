@@ -1,0 +1,202 @@
+# Steps for FLFS_VM_TTY: login, FreeBWS from the start menu, then the pages.
+# @MEM@ is replaced by build/m8-freebws.sh. Screenshots are PPM files in /tmp.
+# The account has the US layout (m8-freebws.cmds), so ":" and "/" type as is.
+# m8mem (made by m8-freebws.cmds) prints rss and pss of the browser's processes.
+# Part 1: one tab through several origins (memory must stay flat), back.
+wait 3
+key ret
+wait 12
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+shot /tmp/flfs-m8-start-@MEM@.ppm
+run m8mem START
+# the start page is freebws://start (not file:///usr/share/freebws/start.html); the first-start ad blocker build finished
+run echo start-page-loaded=$(grep -c 'loaded freebws://start' /tmp/freebws.err) file-start=$(grep -c 'start.html' /tmp/freebws.err) adblock-chunks=$(grep -c 'filter chunk(s) loaded' /tmp/freebws.err) oom=$(dmesg | grep -ci 'out of memory\|oom-kill')
+# DSSL page with texture: wood: the engine is needed (fallback)
+# the address bar is focused and empty at start; Ctrl-L must select all, so the new text replaces the old
+key ctrl-l
+wait 1
+type file:///usr/share/freebws/dssl-test.html\n
+wait 25
+shot /tmp/flfs-m8-dssl-@MEM@.ppm
+run m8mem DSSLPAGE
+key ctrl-l
+wait 1
+type file:///usr/share/freebws/test.html\n
+wait 25
+shot /tmp/flfs-m8-test-@MEM@.ppm
+run m8mem TESTPAGE
+# a real https page: TLS and the CA bundle (needs QEMU's user networking)
+run ip -4 addr show | grep -c "inet 10\." ; cat /etc/resolv.conf | head -2
+key ctrl-l
+wait 1
+type https://example.com\n
+wait 30
+shot /tmp/flfs-m8-https-@MEM@.ppm
+run m8mem HTTPS
+# a bare host name gets https://; text typed over a selected address; Escape restores
+key ctrl-l
+wait 1
+type example.org\n
+wait 25
+shot /tmp/flfs-m8-bare-@MEM@.ppm
+run m8mem ORG
+key ctrl-l
+wait 1
+type some text that is not an address
+key esc
+wait 2
+shot /tmp/flfs-m8-escape-@MEM@.ppm
+wait 10
+run m8mem END
+run m8cpu
+# back/forward still work (the cache model reloads the page)
+key esc
+key alt-left
+wait 15
+shot /tmp/flfs-m8-back-@MEM@.ppm
+run m8mem BACK
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA"
+# Part 2: tabs. Start page, example.com and the DSSL test page, then a fourth with the native DSSL page
+run pkill -x freebws.real
+run : > /tmp/freebws.err
+wait 5
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+run m8mem TABS-1
+key ctrl-t
+wait 2
+type https://example.com\n
+wait 30
+run m8mem TABS-2
+key ctrl-t
+wait 2
+type file:///usr/share/freebws/dssl-test.html\n
+wait 30
+shot /tmp/flfs-m8-tabs3-@MEM@.ppm
+run m8mem TABS-3
+wait 30
+run m8mem TABS-3-IDLE
+run m8cpu
+key ctrl-shift-tab
+wait 6
+shot /tmp/flfs-m8-tabs-prev-@MEM@.ppm
+key ctrl-tab
+wait 3
+key ctrl-t
+wait 2
+type file:///usr/share/freebws/dssl-native-test.html\n
+wait 25
+shot /tmp/flfs-m8-tabs4-@MEM@.ppm
+run m8mem TABS-4
+key ctrl-w
+wait 4
+shot /tmp/flfs-m8-tabs-closed-@MEM@.ppm
+run m8mem TABS-CLOSED
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | tail -12
+# Part 3: links. Tab and Enter on a target=_blank link, Ctrl-Enter on a plain link (background tab), a window.open() button
+run pkill -x freebws.real
+run : > /tmp/freebws.err
+wait 5
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+key ctrl-l
+wait 1
+type file:///usr/share/freebws/tabs-test.html\n
+wait 15
+key tab
+wait 1
+key ret
+wait 20
+shot /tmp/flfs-m8-link-blank-@MEM@.ppm
+key ctrl-shift-tab
+wait 3
+key tab
+wait 1
+key ctrl-ret
+wait 20
+shot /tmp/flfs-m8-link-bg-@MEM@.ppm
+key tab
+key tab
+wait 1
+key ret
+wait 20
+shot /tmp/flfs-m8-link-open-@MEM@.ppm
+run m8mem LINKS
+key ctrl-w
+wait 3
+key ctrl-w
+wait 3
+shot /tmp/flfs-m8-link-closed-@MEM@.ppm
+key ctrl-shift-t
+wait 20
+shot /tmp/flfs-m8-link-reopen-@MEM@.ppm
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | tail -8
+# Part 4: discarding. Three tabs, idle 45 s (freebws-env), then back to a discarded one
+run pkill -x freebws.real
+run : > /tmp/freebws.err
+run printf 'export FREEBWS_DISCARD_IDLE=45\n' > /tmp/freebws-env
+wait 5
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+key ctrl-t
+wait 2
+type https://example.com\n
+wait 30
+key ctrl-t
+wait 2
+type file:///usr/share/freebws/dssl-test.html\n
+wait 30
+run m8mem DISCARD-BEFORE
+wait 75
+shot /tmp/flfs-m8-discard-@MEM@.ppm
+run m8mem DISCARD-AFTER
+run m8cpu
+key ctrl-shift-tab
+wait 30
+shot /tmp/flfs-m8-discard-back-@MEM@.ppm
+run m8mem DISCARD-REACTIVATED
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | tail -8
+run rm -f /tmp/freebws-env
+# Part 5: native DSSL page against the engine's: one tab each, a fresh browser each
+run pkill -x freebws.real
+run : > /tmp/freebws.err
+wait 5
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+key ctrl-l
+wait 1
+type file:///usr/share/freebws/dssl-native-test.html\n
+wait 25
+shot /tmp/flfs-m8-native-@MEM@.ppm
+run m8mem NATIVE-PAGE
+run grep "freebws: dssl" /tmp/freebws.err; echo "JS engine loaded: $(grep -c 'JS engine loaded' /tmp/freebws.err) time(s)"
+run pkill -x freebws.real
+run : > /tmp/freebws.err
+wait 5
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+key ctrl-l
+wait 1
+type file:///usr/share/freebws/dssl-test.html\n
+wait 25
+run m8mem ENGINE-PAGE
+run grep "freebws: dssl" /tmp/freebws.err; echo "JS engine loaded: $(grep -c 'JS engine loaded' /tmp/freebws.err) time(s)"

@@ -1,0 +1,3 @@
+# Tab completion for kill: signal names after -s, jobs and processes otherwise
+complete kill -s -s -w 'HUP INT QUIT KILL USR1 USR2 TERM CONT STOP TSTP'
+complete kill -c "jobs -p 2>/dev/null; ps -eo pid= 2>/dev/null"

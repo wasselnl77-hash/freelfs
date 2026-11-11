@@ -1,0 +1,21 @@
+.a { gradient: linear 135, color.accent -> color.ok }
+.b { gradient: radial circle at 30% 20%, color.card -> color.ink }
+.c { gradient: conic from 45, color.accent, color.line, color.card, color.accent }
+.d { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.e { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.f { gradient: linear 90, #ff7a1a 0 30%, #3949ab 30% 100% }
+.g { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+.h { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }
+.i { gradient: linear to bottom right, red, blue }
+.j { gradient: linear #f00 -> #00f }
+.k { gradient: linear 90, a -> 30% -> b }
+.l { gradient: linear 180, red -> blue tile 24 12 offset 4 4 no-repeat }
+.m { gradient: radial-gradient(circle, red, blue) + url(a.png) repeat-x }
+.n { gradient-text: linear to right, color.accent, color.ink }
+.o { gradient-flow: 7s alternate }
+.p { gradient-flow: none }
+.q { gradient-flow: fast }
+.r { gradient-flow: 3000 snap alternate-reverse }
+.s { gradient-flow: 3s wat }
+.t { gradient-flow: }
+

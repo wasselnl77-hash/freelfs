@@ -1,0 +1,6 @@
+
+    .card {
+      ::after { content: "→" }
+      hover { color: color.accent }
+    }
+  

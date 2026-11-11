@@ -1,0 +1,8 @@
+fonts { /* c */ X: 400 /* d */
+  Y: 500 // tail
+  Z: 600 ; }
+raw { /* x */ .a { color: red } /* y */
+  /* multi
+     line */ .b { color: blue }
+}
+

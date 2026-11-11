@@ -1,0 +1,15 @@
+pkgname=libfyaml
+version=0.9.6
+release=1
+summary="Fully feature complete YAML parser and emitter (AppStream's YAML reader)"
+url=https://github.com/pantoniou/libfyaml
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://github.com/pantoniou/libfyaml/releases/download/v$version/libfyaml-$version.tar.gz)
+sha256=(a59cc3331e2eb903ec36933ad52a45888041cac31e44f553a00511131242c483)
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

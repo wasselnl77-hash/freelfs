@@ -1,0 +1,48 @@
+# The PDF engine behind flpdf. Static libraries only (flpdf links it in, so no
+# libmupdf.so sits in memory twice), plus the mutool command line tool. Built
+# without the X11/GL viewers, libcurl and OpenSSL. CJK fonts are left out
+# (the "tofu" options): they are most of the library's size and PDFs embed the
+# fonts they need anyway. freetype, harfbuzz, libjpeg, zlib and brotli are the
+# system ones (flpdf loads libflui, which uses the same freetype and harfbuzz:
+# a second copy inside the executable would interpose on them); lcms2 (the
+# thread-safe lcms2mt), gumbo, openjpeg, jbig2dec, mujs, cmark and extract come
+# from mupdf's own thirdparty directory.
+pkgname=mupdf
+version=1.28.3
+release=1
+summary="Lightweight PDF, XPS and EPUB rendering library and mutool"
+url=https://mupdf.com/
+license=(AGPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc freetype harfbuzz libjpeg-turbo zlib brotli)
+makedepends=(pkgconf binutils)
+source=(https://mupdf.com/downloads/archive/mupdf-$version-source.tar.gz)
+sha256=(37c3209dc0e06fa4f3781ed44839ad933a9e6143eb4731f99e069204715bcef2)
+worksrc=mupdf-$version-source
+
+_opts=(build=release shared=no HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no HAVE_LIBCRYPTO=no
+	USE_SYSTEM_FREETYPE=yes USE_SYSTEM_HARFBUZZ=yes USE_SYSTEM_LIBJPEG=yes USE_SYSTEM_ZLIB=yes
+	USE_SYSTEM_BROTLI=yes tofu_cjk=yes tofu_cjk_ext=yes tofu_cjk_lang=yes)
+
+build() {
+	make "${_opts[@]}" libs tools
+}
+
+check() { :; }
+
+package() {
+	make "${_opts[@]}" prefix=/usr DESTDIR="$pkgdir" install-libs install-tools
+	install -Dm644 /dev/stdin "$pkgdir/usr/lib/pkgconfig/mupdf.pc" <<-EOF2
+		prefix=/usr
+		libdir=\${prefix}/lib
+		includedir=\${prefix}/include
+
+		Name: mupdf
+		Description: Lightweight PDF and XPS viewer library
+		Version: $version
+		Libs: -L\${libdir} -lmupdf -lmupdf-third -lharfbuzz -lfreetype -ljpeg -lbrotlidec -lbrotlienc -lz -lm
+		Cflags: -I\${includedir}
+	EOF2
+	install -Dm644 COPYING "$pkgdir/usr/share/licenses/mupdf/COPYING"
+}

@@ -1,0 +1,23 @@
+pkgname=lz4
+version=1.10.0
+release=1
+summary="Very fast lossless compression"
+url=https://lz4.org/
+license=(BSD-2-Clause GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com/lz4/lz4/releases/download/v$version/lz4-$version.tar.gz)
+sha256=(537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b)
+
+build() {
+	make BUILD_STATIC=no PREFIX=/usr
+}
+
+check() {
+	make -j1 check
+}
+
+package() {
+	make BUILD_STATIC=no PREFIX=/usr DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,12 @@
+pkgname=libpipeline
+version=1.5.8
+release=1
+summary="Library for running pipelines of subprocesses"
+url=https://libpipeline.nongnu.org/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://download.savannah.gnu.org/releases/libpipeline/libpipeline-$version.tar.gz)
+sha256=(1b1203ca152ccd63983c3f2112f7fe6fa5afd453218ede5153d1b31e11bb8405)
+build_style=autotools

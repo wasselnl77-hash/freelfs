@@ -1,0 +1,48 @@
+# The FreeLFS package manager, from src/flpkg in the FreeLFS tree.
+pkgname=flpkg
+version=0.1
+release=2
+summary="The FreeLFS package manager"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc sqlite zstd openssl bash tar)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flpkg" "$srcdir/flpkg"
+	cd "$srcdir/flpkg"
+	make clean
+	make
+}
+
+check() {
+	cd "$srcdir/flpkg"
+	make check
+}
+
+package() {
+	cd "$srcdir/flpkg"
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir/etc/flpkg/keys"
+	# the public key(s) of the online repo, made by build/70-repo.sh (public half only)
+	for k in "$startdir/../../config/flpkg/keys/"*.pub; do
+		[ -f "$k" ] && install -m644 "$k" "$pkgdir/etc/flpkg/keys/"
+	done
+	repourl=
+	[ -f "$startdir/../../config/flpkg/repo-url" ] && repourl=$(head -n1 "$startdir/../../config/flpkg/repo-url")
+	cat > "$pkgdir/etc/flpkg.conf" <<-EOF
+		# /etc/flpkg.conf -- settings for flpkg (see flpkg help)
+
+		# Repos, searched in this order: repo NAME URL (a path, file:// or https://)
+		${repourl:+repo freelfs $repourl}
+		#repo core file:///srv/flpkg/core
+
+		keys = /etc/flpkg/keys          # trusted *.pub signing keys
+		signatures = required           # required, optional or never
+		backup_config = no              # yes: keep a changed /etc file as FILE.flpkg-save
+		snapshots = 1                   # 0: no btrfs snapshot before a transaction (the flsnap
+		                                # pre-transaction hook); how many are kept: /etc/flsnap.conf
+	EOF
+}

@@ -1,0 +1,23 @@
+.a { glass: 12 saturate 1.8 tint white/10 }
+.b { glass: none }
+.c { glass: }
+.d { glass: bright 1.1 tint none }
+.e { glass: wat }
+.f { glass: -3 }
+.g { glass: tint }
+.h { glass: saturate }
+.i { glass: color.ink/20 }
+.j { glass: #fff }
+.k { glass: white }
+.l { glass: 8 tint nonsense }
+.m { tilt: 10 }
+.n { tilt: none }
+.o { tilt: }
+.p { tilt: 12 lift 1.05 perspective 700 speed 0.2 invert glare }
+.q { tilt: 99 }
+.r { tilt: lift 0 }
+.s { tilt: perspective 50 }
+.t { tilt: speed 5 }
+.u { tilt: wat }
+.v { tilt: lift }
+

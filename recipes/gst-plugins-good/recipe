@@ -1,0 +1,24 @@
+pkgname=gst-plugins-good
+version=1.28.6
+release=1
+summary="GStreamer good plugins (containers, audio and video codecs)"
+url=https://gstreamer.freedesktop.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gstreamer gst-plugins-base orc zlib libpng libjpeg-turbo)
+makedepends=(meson ninja python)
+source=(https://gstreamer.freedesktop.org/src/gst-plugins-good/gst-plugins-good-$version.tar.xz)
+sha256=(b0c620a4b18b6ee931b4c43bbf1760d308666dc37f730a7e7f1ad327e59ce2df)
+build_style=meson
+configure_args=(-D auto_features=disabled -D doc=disabled -D tests=disabled
+	-D examples=disabled -D nls=disabled -D orc=enabled
+	-D matroska=enabled -D isomp4=enabled -D audioparsers=enabled -D autodetect=enabled
+	-D avi=enabled -D id3demux=enabled -D icydemux=enabled -D wavparse=enabled
+	-D wavenc=enabled -D flac=disabled -D multifile=enabled 
+	-D videofilter=enabled -D videocrop=enabled -D deinterlace=enabled
+	-D equalizer=enabled -D apetag=enabled -D audiofx=enabled -D law=enabled
+	-D png=enabled -D jpeg=enabled -D rtp=enabled -D rtpmanager=enabled -D rtsp=enabled
+	-D udp=enabled -D soup=disabled -D pulse=disabled  -D xingmux=enabled
+	-D flv=enabled  -D gtk3=disabled -D v4l2=disabled -D ximagesrc=disabled)
+check() { :; }

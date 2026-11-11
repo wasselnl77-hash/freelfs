@@ -1,0 +1,66 @@
+# udev on its own from the systemd source, as LFS 12.4 (sysv) builds it:
+# only udevadm, the hwdb tool, libudev, the rules and the helpers. The
+# hardware database is compiled by flpkg's udev-hwdb trigger.
+pkgname=udev
+version=261.2
+release=1
+summary="Device manager for the Linux kernel (from systemd)"
+url=https://systemd.io/
+license=(GPL-2.0-or-later LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc acl libcap kmod util-linux libxcrypt)
+worksrc=systemd-$version
+source=(https://github.com/systemd/systemd/archive/v$version/systemd-$version.tar.gz
+        https://anduin.linuxfromscratch.org/LFS/udev-lfs-20230818.tar.xz)
+sha256=(ed1059ff964f5df35b6056434cc17cc83f86dc913f10489948a0b19b6081c5ec
+        104cdde52a898c648ce346a9ed1fbe9297514656534636a6584132cf2d7428d9)
+
+prepare() {
+	sed -i '/systemd-sysctl/s/^/#/' rules.d/99-systemd.rules.in
+	sed -e '/NETWORK_DIRS/s/systemd/udev/' -i src/libsystemd/sd-network/network-util.h
+}
+
+helpers() {
+	grep "'name' :" ../src/udev/meson.build | awk '{print $3}' | tr -d ",'" | grep -v 'udevadm'
+}
+
+build() {
+	mkdir -p build
+	cd build
+	meson setup .. \
+		--prefix=/usr \
+		--buildtype=release \
+		-D mode=release \
+		-D dev-kvm-mode=0660 \
+		-D link-udev-shared=false \
+		-D logind=false \
+		-D vconsole=false
+	# shellcheck disable=SC2046
+	ninja udevadm systemd-hwdb \
+		$(ninja -n | grep -Eo '(src/(lib)?udev|rules.d|hwdb.d)/[^ ]*') \
+		$(realpath libudev.so --relative-to .) \
+		$(helpers)
+}
+
+package() {
+	cd build
+	local d=$pkgdir
+	install -m755 -d "$d"/{usr/lib,etc}/udev/{hwdb.d,rules.d,network} \
+		"$d"/usr/{lib,share}/pkgconfig "$d"/usr/{bin,sbin,include}
+	install -m755 udevadm "$d/usr/bin/"
+	install -m755 systemd-hwdb "$d/usr/bin/udev-hwdb"
+	ln -sfn ../bin/udevadm "$d/usr/sbin/udevd"
+	cp -a libudev.so{,*[0-9]} "$d/usr/lib/"
+	install -m644 ../src/libudev/libudev.h "$d/usr/include/"
+	install -m644 src/libudev/*.pc "$d/usr/lib/pkgconfig/"
+	install -m644 src/udev/*.pc "$d/usr/share/pkgconfig/"
+	install -m644 ../src/udev/udev.conf "$d/etc/udev/"
+	install -m644 rules.d/* ../rules.d/README "$d/usr/lib/udev/rules.d/"
+	install -m644 $(find ../rules.d/*.rules -not -name '*power-switch*') "$d/usr/lib/udev/rules.d/"
+	install -m644 hwdb.d/* ../hwdb.d/{*.hwdb,README} "$d/usr/lib/udev/hwdb.d/"
+	install -m755 $(helpers) "$d/usr/lib/udev"
+	install -m644 ../network/99-default.link "$d/usr/lib/udev/network"
+	# LFS's extra rules and helpers (cdrom symlinks, persistent net names)
+	make -C "$srcdir" -f udev-lfs-20230818/Makefile.lfs DESTDIR="$d" install
+}

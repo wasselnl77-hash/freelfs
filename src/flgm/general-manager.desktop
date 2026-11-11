@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=General Manager
+Comment=Processes, performance, startup apps and users
+Exec=general-manager
+Categories=System;Monitor;
+X-FreeLFS-Glyph=▥

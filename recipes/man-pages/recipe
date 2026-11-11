@@ -1,0 +1,15 @@
+pkgname=man-pages
+version=6.18
+release=1
+summary="Linux man pages: system calls, library functions, file formats"
+url=https://www.kernel.org/doc/man-pages/
+license=(GPL-2.0-or-later)
+arch=(any)
+groups=(base)
+source=(https://www.kernel.org/pub/linux/docs/man-pages/man-pages-$version.tar.xz)
+sha256=(c934fadc8b59748c68227a34f6581d2ddf8282b73cdcd52546c8cd88b74b24d1)
+
+package() {
+	rm -f man3/crypt* # libxcrypt has better ones
+	make -R GIT=false prefix=/usr DESTDIR="$pkgdir" install
+}

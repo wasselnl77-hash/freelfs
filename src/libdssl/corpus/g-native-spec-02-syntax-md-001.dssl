@@ -1,0 +1,4 @@
+// a line comment
+.card {
+  padding: 16   /* a block comment, even in the middle of a line */
+}

@@ -1,0 +1,34 @@
+# /etc/inittab -- FreeLFS
+#
+# Runlevels: 0 halt, 1 single user, 3 multi user (console), 5 graphical
+# (later), 6 reboot. Boot work is in /etc/rc.d/rc.sysinit, services are
+# listed in /etc/rc.conf.
+
+id:3:initdefault:
+
+si::sysinit:/etc/rc.d/rc.sysinit
+
+l0:0:wait:/etc/rc.d/rc 0
+l1:S1:wait:/etc/rc.d/rc 1
+l2:2:wait:/etc/rc.d/rc 2
+l3:3:wait:/etc/rc.d/rc 3
+l4:4:wait:/etc/rc.d/rc 4
+l5:5:wait:/etc/rc.d/rc 5
+l6:6:wait:/etc/rc.d/rc 6
+
+ca:12345:ctrlaltdel:/sbin/shutdown -t1 -a -r now
+
+su:S06:once:/sbin/sulogin
+s1:1:respawn:/sbin/sulogin
+
+# tty1: the graphical login (flgreet falls back to agetty by itself; without the
+# desktop packages there is no flgreet, so a plain agetty runs)
+1:2345:respawn:/bin/sh -c '[ -x /usr/sbin/flgreet ] && exec /usr/sbin/flgreet; /usr/sbin/flsplash --text 2>/dev/null; exec /sbin/agetty --noclear tty1 38400 linux'
+2:2345:respawn:/sbin/agetty tty2 38400 linux
+3:2345:respawn:/sbin/agetty tty3 38400 linux
+4:2345:respawn:/sbin/agetty tty4 38400 linux
+5:2345:respawn:/sbin/agetty tty5 38400 linux
+6:2345:respawn:/sbin/agetty tty6 38400 linux
+
+# Serial console (QEMU, servers)
+S0:2345:respawn:/sbin/agetty --keep-baud 115200,38400,9600 ttyS0 vt220

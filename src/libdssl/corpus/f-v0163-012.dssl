@@ -1,0 +1,2 @@
+.a { background: url(http://x.com/a.png)
+  color: nonsense }

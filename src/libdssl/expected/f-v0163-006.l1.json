@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[],"css":" .a { background: url(http://x.com/a.png) } ","kind":"raw","line":1},{"children":[{"kind":"decl","line":2,"prop":"color","value":"red"}],"kind":"selector","line":2,"sel":".b"}],"kind":"root"}}

@@ -1,0 +1,16 @@
+# the snapshot's desktop: login, the notice "You are in an earlier state of the system"
+wait 3
+shot @S@/snap-login.ppm
+key ret
+wait 25
+shot @S@/snap-desktop.ppm
+run pgrep -a flsnap-notice; pgrep -a flnotify; cat /run/user/$(id -u tester)/session.log | grep -v -E "^[WNE] |mod.rt|^\[W\]"
+run m10sh 'flnotify --count'
+key ctrl-shift-esc
+wait 5
+shot @S@/snap-gm.ppm
+run pkill -x general-manager; echo
+# make the earlier state the current one, as the notice's button does
+run flsnap rollback; echo rollback-rc=$?
+run btrfs subvolume get-default /; btrfs subvolume list / | cat; flsnap list | head -6
+run sync

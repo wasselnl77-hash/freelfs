@@ -1,0 +1,15 @@
+pkgname=lcms2
+version=2.19.1
+release=1
+summary="Little CMS color management library"
+url=https://www.littlecms.com/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja)
+source=(https://github.com/mm2/Little-CMS/releases/download/lcms$version/lcms2-$version.tar.gz)
+sha256=(bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8)
+build_style=meson
+configure_args=(-D utils=false -D tests=disabled -D jpeg=disabled -D tiff=disabled)
+check() { :; }

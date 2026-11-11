@@ -1,0 +1,2 @@
+.a { grid-template-columns: repeat(3, 1fr) repeat(auto-fit, 40) repeat(2.5, 4) }
+

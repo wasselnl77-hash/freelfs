@@ -1,0 +1,22 @@
+motion rise-in { from { opacity: 0 } to { opacity: 1 } }
+motion bob { from { top: 0 } to { top: 4 } }
+.a { animate: rise-in }
+.b { animate: rise-in 600 snap delay 100 }
+.c { animate: bob 1200 infinite alternate delay 100 jitter 600 essential }
+.d { animate: bob 300 iterations 3 forwards, rise-in 200 2s }
+.e { animate: none }
+.f { animate: nothere 400 }
+.g { animate: rise-in wat }
+.h { animate: rise-in delay }
+.i { animate: rise-in 1s 2s reverse backwards }
+.j { animate: bob 5s smoth }
+.k { animate: rise-in 2.5s }
+.l { animate: rise-in iterations x }
+.m { animation: rise-in 400 }
+.n { animation: nothing 400 }
+.o { animation-name: spin }
+.p { animation-delay: 100; animation-duration: 3 }
+.q { animation: rise-in 1s; animation-delay: 100 }
+.r { animate: rise-in 3; animation-iteration-count: 2 }
+.s { ::before { animate: rise-in 400 } }
+

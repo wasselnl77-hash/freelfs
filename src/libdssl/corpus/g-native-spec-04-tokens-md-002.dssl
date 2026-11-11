@@ -1,0 +1,3 @@
+tokens { color { bg: white } }
+@media dark { tokens { color { bg: black } } }
+.a { background: color.bg }

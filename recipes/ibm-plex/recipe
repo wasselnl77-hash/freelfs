@@ -1,0 +1,33 @@
+# IBM Plex Sans (UI) and Plex Mono (terminal) for the FreeLFS desktop.
+pkgname=ibm-plex
+version=1.1.0
+release=1
+summary="IBM Plex Sans and IBM Plex Mono fonts"
+url=https://github.com/IBM/plex
+license=(OFL-1.1)
+arch=(any)
+groups=(desktop)
+depends=(fontconfig)
+makedepends=(python)
+# Sans 1.1.0 and Mono 2.5.0 are separate upstream releases; flpkg only
+# links the zips into $srcdir, so they are unpacked here.
+source=(https://github.com/IBM/plex/releases/download/%40ibm%2Fplex-sans%401.1.0/ibm-plex-sans.zip
+        https://github.com/IBM/plex/releases/download/%40ibm%2Fplex-mono%402.5.0/ibm-plex-mono.zip)
+sha256=(fb365d910566e6d199cc2c15579a7dd9a267128e18431a394ed81f1970c69200
+        6d23f01257663d8cc49a0d64c22ced630b79e0e2a0ac08a0da86e9a38bbc481c)
+
+build() {
+	local z
+	for z in ibm-plex-sans ibm-plex-mono; do
+		python3 -I -m zipfile -e "$srcdir/$z.zip" "$srcdir"
+	done
+}
+
+package() {
+	install -d "$pkgdir/usr/share/fonts/ibm-plex"
+	install -m644 "$srcdir"/ibm-plex-sans/fonts/complete/ttf/*.ttf \
+		"$srcdir"/ibm-plex-mono/fonts/complete/ttf/*.ttf \
+		"$pkgdir/usr/share/fonts/ibm-plex/"
+	install -Dm644 "$srcdir/ibm-plex-sans/LICENSE.txt" \
+		"$pkgdir/usr/share/licenses/ibm-plex/LICENSE.txt"
+}

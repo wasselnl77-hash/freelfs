@@ -1,0 +1,9 @@
+.card {
+  background: #26201a
+  shadow: sm
+  hover { background: #3a2f26; shadow: lg }   // beats the base now, by order
+
+  @media dark { background: #181310 }         // condition is kept, sorts after base
+
+  @layer utilities { margin-top: 0 }
+}

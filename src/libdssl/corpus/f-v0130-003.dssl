@@ -1,0 +1,3 @@
+.code { radius: 14 }
+.code-head + .code { radius: 0 0 14 14 }
+.code-plain { radius: 14 }

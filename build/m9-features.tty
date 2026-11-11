@@ -1,0 +1,72 @@
+# Steps for FLFS_VM_TTY (build/m9-features.sh): login, notification card, lock screen, Settings Date & time,
+# time zone change and the panel clock, FreeBWS ad blocker first start and an error page. @MEM@ is replaced.
+wait 3
+key ret
+wait 12
+shot /tmp/flfs-m9-desktop-@MEM@.ppm
+run ps -eo user,rss,args | grep -E "flpanel|flcomp|dbus-daemon --session" | grep -v grep
+# --- notification (A2): session bus of the tester
+run su -s /bin/sh tester -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus flnotify "Test" "Hello"; echo rc=$?'
+wait 2
+shot /tmp/flfs-m9-notify-@MEM@.ppm
+run su -s /bin/sh tester -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus flnotify --count'
+# --- lock screen (A1): password is set now, for the test only
+run echo tester:flfstest1 | chpasswd && echo password-set
+run su -s /bin/sh tester -c 'printf "wrongpw\n" | /usr/libexec/fllock-check; echo wrong-rc=$?; printf "flfstest1\n" | /usr/libexec/fllock-check; echo right-rc=$?'
+key meta_l-l
+wait 4
+shot /tmp/flfs-m9-lock-@MEM@.ppm
+run pgrep -a fllock
+type wrongpass\n
+wait 4
+shot /tmp/flfs-m9-lock-wrong-@MEM@.ppm
+type flfstest1
+wait 1
+shot /tmp/flfs-m9-lock-typed-@MEM@.ppm
+key ret
+wait 5
+shot /tmp/flfs-m9-unlocked-@MEM@.ppm
+run echo fllock-after-unlock=$(pgrep -cx fllock)
+# --- Settings > Date & time (A10) and the time zone
+run su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; flsettings --page datetime >/tmp/flsettings.out 2>&1 &' ; sleep 5; cat /tmp/flsettings.out; pgrep -a flsettings
+wait 4
+shot /tmp/flfs-m9-datetime-@MEM@.ppm
+# click on Tokyo on the map (a usb-tablet is the pointer): the page runs fltime-set zone
+click 865 210
+wait 3
+shot /tmp/flfs-m9-datetime-click-@MEM@.ppm
+run readlink /etc/localtime; cat /etc/timezone; date; grep tz_changed /usr/tester/.config/freelfs/desktop.conf
+wait 70
+shot /tmp/flfs-m9-datetime-tokyo-@MEM@.ppm
+run ps -eo rss,comm | grep -E "flsettings|flpanel|flcomp"; free -m | sed -n 2p
+run su -s /bin/sh tester -c 'fltime-set zone Europe/Berlin; echo rc=$?'; readlink /etc/localtime; date
+# --- FreeBWS: first start, ad blocker build
+run pkill -x flsettings
+run (setsid m9sample > /tmp/memlog 2>/dev/null &) ; sleep 2; free -m | sed -n 2p
+run pgrep -c WPEWebProcess; ls /usr/tester/.cache/freebws 2>&1 | head -3
+key meta_l
+wait 1
+type web
+key ret
+wait 5
+run m8mem BROWSER-START-5S
+wait 20
+shot /tmp/flfs-m9-fb-start-@MEM@.ppm
+run m8mem BROWSER-START-25S
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | head -20
+run m9peak; free -m | sed -n 2p; dmesg | grep -ci "out of memory\|oom-kill"; pgrep -a "freebws|adblock" | head
+wait 15
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | head -20; ls -la /usr/tester/.cache/freebws/filters 2>&1 | head
+key ctrl-l
+wait 1
+type http://nonexistent.invalid\n
+wait 30
+shot /tmp/flfs-m9-fb-error-@MEM@.ppm
+run m8mem BROWSER-ERROR
+key ctrl-l
+wait 1
+type freebws://settings\n
+wait 15
+shot /tmp/flfs-m9-fb-settings-@MEM@.ppm
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | tail -12
+run dmesg | grep -ci "out of memory\|oom-kill"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Images
+Comment=View pictures and browse a folder of them
+Exec=flview %f
+Categories=Graphics;Viewer;
+MimeType=image/png;image/jpeg;image/webp;
+X-FreeLFS-Glyph=◫

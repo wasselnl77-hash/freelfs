@@ -1,0 +1,12 @@
+.doc-card {
+  transition: 200
+
+  hover {
+    translate: 0 -4
+    shadow: lg
+  }
+
+  focus-visible { outline: 2 solid color.accent }
+
+  active { translate: 0 -1 }
+}

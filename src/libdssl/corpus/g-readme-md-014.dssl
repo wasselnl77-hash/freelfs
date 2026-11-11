@@ -1,0 +1,26 @@
+motion pulse {
+  from { transform: scale(1) }
+  to   { transform: scale(1.06) }
+}
+
+.pe-dot {
+  animate: pulse 1200 infinite alternate   // loops forever, eases both ways
+  transition: 200
+}
+
+.pt-grid {
+  stagger: 70          // children's animations cascade in, 70ms apart
+}
+
+.pt-card {
+  seen {
+    animate: rise 600 ease-out   // the motion below owns the from-state
+  }
+}
+
+motion rise {
+  from {
+    opacity: 0
+    translate: 0 18
+  }
+}

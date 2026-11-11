@@ -1,0 +1,20 @@
+tokens {
+  color {
+    ink: #16161d
+    accent: oklch(62% 0.19 35)
+  }
+  space {
+    1: 4
+    2: 8
+    4: 16
+  }   // numeric keys are legal
+  radius { md: 14 }
+  shadow { md: 0 2 4 color.ink/10, 0 4 12 color.ink/8 }
+}
+
+.card {
+  background: color.ink
+  padding: space.4
+  radius: md
+  shadow: md
+}

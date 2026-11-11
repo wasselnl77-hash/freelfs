@@ -1,0 +1,21 @@
+behavior focus-ring {
+  outline: 2 solid color.accent
+  outline-offset: 2
+}
+behavior card-base {
+  use focus-ring
+  radius: md
+  hover { background: color.paper }
+}
+.btn { use focus-ring }
+.card { use card-base; color: red }
+.x { use nothere }
+.y { use nothre }
+behavior focus-ring { color: red }
+behavior a { use b }
+behavior b { use a }
+.z { use a }
+.late { use defined-later }
+behavior defined-later { padding: 3 }
+.q { .nested { behavior inner { color: red } } }
+

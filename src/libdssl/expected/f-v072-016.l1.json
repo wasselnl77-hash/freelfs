@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"background","value":"red"}],"kind":"selector","line":1,"sel":"my-card::part(header)"}],"kind":"root"}}

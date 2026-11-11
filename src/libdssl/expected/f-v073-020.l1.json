@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v073-020.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"as the answer\""}],"tree":{"children":[{"children":[],"kind":"selector","line":1,"sel":"5b-2. the error names pin"}],"kind":"root"}}

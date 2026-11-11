@@ -1,0 +1,8 @@
+.a { yield: padding-top padding-bottom }
+.b { yield: padding, margin }
+.c { yield: none }
+.d { yield: }
+.e { yield: padding-tpo }
+.f { yield: row }
+.g { yield: colour }
+

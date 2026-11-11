@@ -1,0 +1,24 @@
+# flterm, from src/flterm in the FreeLFS tree.
+pkgname=flterm
+version=0.1
+release=2
+summary="The FreeLFS terminal (runs flsh)"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland flsh)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flterm" "$srcdir/flterm"
+	cd "$srcdir/flterm"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flterm"
+	make DESTDIR="$pkgdir" install
+}

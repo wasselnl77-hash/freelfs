@@ -1,0 +1,53 @@
+#!/bin/sh
+# flboot-install -- put flboot on the EFI system partition.
+#
+#   flboot-install [--esp DIR] [--update]
+#
+# Copies /usr/lib/flboot/flboot.efi to DIR/EFI/BOOT/BOOT<arch>.EFI (the path
+# firmware boots by default, so no boot variables are needed) and writes
+# DIR/flboot/flboot.conf if there is none, with the running root file system
+# as root=. DIR defaults to /boot, where FreeLFS mounts the ESP. With
+# --update (as flpkg's trigger runs it), a system without an ESP is left
+# alone.
+# SPDX-License-Identifier: MIT
+set -eu
+
+# the console in the FreeLFS colours (the boot menu's palette)
+VT_COLORS="vt.default_red=29,224,63,216,111,198,86,216,122,239,95,232,143,215,127,240 vt.default_grn=33,108,155,181,168,120,182,220,129,128,191,201,192,160,208,242 vt.default_blu=37,108,99,106,220,221,194,224,137,128,131,138,236,232,218,244"
+
+esp=/boot update=no
+while [ $# -gt 0 ]; do
+	case $1 in
+		--esp) esp=$2; shift ;;
+		--update) update=yes ;;
+		*) echo "usage: flboot-install [--esp DIR] [--update]" >&2; exit 2 ;;
+	esac
+	shift
+done
+
+if [ "$update" = yes ] && [ ! -d "$esp/EFI" ]; then
+	exit 0
+fi
+case $(uname -m) in
+	x86_64) name=BOOTX64.EFI ;;
+	aarch64) name=BOOTAA64.EFI ;;
+	*) echo "flboot-install: unsupported architecture $(uname -m)" >&2; exit 1 ;;
+esac
+
+mkdir -p "$esp/EFI/BOOT" "$esp/flboot"
+cp /usr/lib/flboot/flboot.efi "$esp/EFI/BOOT/$name.new"
+mv -f "$esp/EFI/BOOT/$name.new" "$esp/EFI/BOOT/$name"
+
+conf=$esp/flboot/flboot.conf
+if [ ! -e "$conf" ]; then
+	src=$(findmnt -no SOURCE / | sed 's/\[.*//')
+	partuuid=$(blkid -s PARTUUID -o value "$src" 2> /dev/null || true)
+	[ -n "$partuuid" ] || { echo "flboot-install: cannot find the PARTUUID of $src" >&2; exit 1; }
+	cat > "$conf" <<-CONF
+		# flboot.conf -- see /usr/share/doc/flboot/README
+		timeout 5
+		cmdline root=PARTUUID=$partuuid rootwait ro quiet panic=30 console=tty0 $VT_COLORS
+	CONF
+	echo "flboot-install: wrote $conf"
+fi
+echo "flboot-install: flboot is $esp/EFI/BOOT/$name"

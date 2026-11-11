@@ -1,0 +1,45 @@
+flarchive -- Archives
+=====================
+
+    flarchive [ARCHIVE]                    browse an archive
+    flarchive --extract-here ARCHIVE...    extract next to the archive, show progress, close when done
+    flarchive --compress PATH...           the new-archive page with these files and folders in it
+    flarchive --new                        the same, empty
+
+Reads zip, tar (with gzip, bzip2, xz, zstd, lz4, lzma or compress), 7z, rar (RAR 3 to 5),
+cab, cpio, deb, rpm, iso and more, whatever libarchive knows; a single compressed file
+(name.txt.gz) is an archive with one file in it. Creates zip and tar.zst.
+
+Window (title "Archives"): the toolbar has Open, New, and Extract selected / Extract all
+on the right. Below it the path inside the archive with an Up button, then the files
+(folders first), with size and date. Double click or Enter opens a folder; Backspace or
+Alt-Up goes up; Enter or a double click on a file offers to extract just that. Ctrl-E extracts
+everything, Ctrl-Shift-E the selected row, Ctrl-O opens, Ctrl-N makes a new archive,
+Ctrl-Q quits. Extracting asks for a folder (Tab completes the name).
+
+Extraction never overwrites anything. It goes into a hidden folder first (.flarchive-XXXXXX in
+the destination) and is then moved to a free name: an archive with one top-level item puts that
+item in the destination as it is (project.zip -> project/), an archive with several puts them in
+a folder named after the archive (loose.zip -> loose/); a second extraction gets "project 2".
+Entries with .. in the path are skipped, absolute paths are made relative, symbolic links are
+not followed when writing, setuid bits are dropped; archives that need a password are refused
+with a message. If the work is cancelled or fails the hidden folder is removed.
+
+New archive page: the list of files and folders (Add file or folder takes a path; Tab completes
+it), Format (Zip, or Tar + Zstd), Name and Save in. The name is made unique (Archive.zip,
+Archive 2.zip), the archive is written as a hidden .part file and renamed when complete, and
+nothing is put into itself. Symbolic links are stored as links; sockets and devices are left out;
+unreadable files are skipped (the status line says how many).
+
+Listing, extracting and creating run in a child process that reports over a pipe, so the window
+stays responsive, shows the progress (extraction: the share of the archive read) and Cancel
+works. Idle the program is small (it holds one entry per file of the open archive).
+
+From Files (flfiles): right click on an archive: Extract here; on any selection: Compress;
+Enter on an archive opens it here. They run "flarchive --extract-here" and "--compress".
+
+Not done: passwords, adding to or deleting from an existing archive, drag and drop, other
+formats to create (7z and rar are read only), a progress percentage for listing.
+
+make check (needs python3, and 7z and zstd for those samples; FLCOMP, FLARCHIVE as in the
+header of tests/flarchive_test.py) runs the real program under a headless flcomp.

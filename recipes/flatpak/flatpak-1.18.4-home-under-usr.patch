@@ -1,0 +1,105 @@
+--- a/common/flatpak-exports.c
++++ b/common/flatpak-exports.c
+@@ -73,6 +73,45 @@
+   NULL
+ };
+ 
++/* FreeLFS keeps home directories in /usr (/usr/NAME), which Flatpak reserves: nothing under /usr is
++ * exported, because /usr in the sandbox is the read-only runtime and bwrap cannot make mount points
++ * in it. That is why --filesystem=home and ~/.var/app/APP did not reach the sandbox.
++ *
++ * The user's own $HOME (and what is below it) is allowed when its mount point is ready:
++ * flatpak_exports_prepare_home_under_usr() makes the (empty) directory in the runtime's files, which
++ * belongs to the user in a per-user install, before bwrap gets the runtime as /usr. The rest of
++ * /usr stays reserved. In the sandbox $HOME is a tmpfs unless it is exported itself, so that the
++ * directories below it can be created. If the directory cannot be made nothing changes from before.
++ * own_home_under_usr is the canonical $HOME, set only when it is inside /usr and ready. */
++static char *own_home_under_usr = NULL;
++
++void
++flatpak_exports_prepare_home_under_usr (int runtime_fd)
++{
++  g_autofree char *home = flatpak_canonicalize_filename (g_get_home_dir ());
++  g_autoptr(GError) local_error = NULL;
++
++  g_clear_pointer (&own_home_under_usr, g_free);
++
++  if (!g_str_has_prefix (home, "/usr/") || home[strlen ("/usr/")] == 0)
++    return;
++
++  if (!glnx_shutil_mkdir_p_at (runtime_fd, home + strlen ("/usr/"), 0755, NULL, &local_error))
++    {
++      g_info ("No mount point for %s in the runtime, the home directory stays out of the sandbox: %s",
++              home, local_error->message);
++      return;
++    }
++
++  own_home_under_usr = g_steal_pointer (&home);
++}
++
++static gboolean
++is_own_home_under_usr (const char *path)
++{
++  return own_home_under_usr != NULL && flatpak_has_path_prefix (path, own_home_under_usr);
++}
++
+ static char *
+ make_relative (const char *base, const char *path)
+ {
+@@ -493,7 +532,10 @@
+              is a pre-existing dir we can mount the path on. */
+           if (path_is_dir (exports, path))
+             {
+-              if (!path_parent_is_mapped (keys, n_keys, exports->hash, path))
++              if (own_home_under_usr != NULL && strcmp (path, own_home_under_usr) == 0)
++                /* the mount point in the runtime's /usr: a tmpfs, not a plain directory (see above) */
++                flatpak_bwrap_add_args (bwrap, "--tmpfs", path, NULL);
++              else if (!path_parent_is_mapped (keys, n_keys, exports->hash, path))
+                 /* If the parent is not mapped, it will be a tmpfs, no need to mount another one */
+                 {
+                   g_debug ("Parent of \"%s\" is not mapped, creating empty directory", path);
+@@ -517,7 +559,10 @@
+           if (path_is_dir (exports, path))
+             {
+               g_debug ("Ensuring \"%s\" is created as a directory", path);
+-              flatpak_bwrap_add_args (bwrap, "--dir", path, NULL);
++              if (own_home_under_usr != NULL && strcmp (path, own_home_under_usr) == 0)
++                flatpak_bwrap_add_args (bwrap, "--tmpfs", path, NULL);	/* see above */
++              else
++                flatpak_bwrap_add_args (bwrap, "--dir", path, NULL);
+             }
+           else
+             {
+@@ -990,7 +1035,8 @@
+       /* Don't expose files in non-mounted dirs like /app or /usr, as
+          they are not the same as on the host, and we generally can't
+          create the parents for them anyway */
+-      if (flatpak_has_path_prefix (path, dont_export_in[i]))
++      if (flatpak_has_path_prefix (path, dont_export_in[i]) &&
++          !(strcmp (dont_export_in[i], "/usr") == 0 && is_own_home_under_usr (path)))
+         {
+           g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_MOUNTABLE_FILE,
+                        _("Path \"%s\" is reserved by Flatpak"),
+--- a/common/flatpak-exports-private.h
++++ b/common/flatpak-exports-private.h
+@@ -60,6 +60,8 @@
+                                        const char      *path,
+                                        GError         **error);
+ 
++void flatpak_exports_prepare_home_under_usr (int runtime_fd);
++
+ gboolean flatpak_exports_path_is_visible (FlatpakExports *exports,
+                                           const char     *path);
+ FlatpakFilesystemMode flatpak_exports_path_get_mode (FlatpakExports *exports,
+--- a/common/flatpak-run.c
++++ b/common/flatpak-run.c
+@@ -3634,6 +3634,9 @@
+       flatpak_bwrap_set_env (bwrap, "FLATPAK_SANDBOX_DIR", flatpak_file_get_path_cached (sandbox_dir), TRUE);
+     }
+ 
++  /* a home directory under /usr (FreeLFS): the runtime needs its mount point before it becomes /usr */
++  flatpak_exports_prepare_home_under_usr (runtime_fd);
++
+   if (!flatpak_bwrap_add_args_data_fd_dup (bwrap,
+                                            "--ro-bind-fd", runtime_fd, "/usr",
+                                            error))

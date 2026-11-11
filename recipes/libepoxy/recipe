@@ -1,0 +1,15 @@
+pkgname=libepoxy
+version=1.5.10
+release=1
+summary="OpenGL function pointer management (EGL, GLES)"
+url=https://github.com/anholt/libepoxy
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc mesa)
+makedepends=(meson ninja)
+source=(https://download.gnome.org/sources/libepoxy/1.5/libepoxy-$version.tar.xz)
+sha256=(072cda4b59dd098bba8c2363a6247299db1fa89411dc221c8b81b8ee8192e623)
+build_style=meson
+configure_args=(-D glx=no -D x11=false -D egl=yes -D tests=false -D docs=false)
+check() { :; }

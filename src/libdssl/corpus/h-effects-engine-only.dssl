@@ -1,0 +1,5 @@
+.a { texture: paper }
+.b { aura: glow red 10 }
+.c { aura-glow: none }
+.d { slider: track 6 }
+

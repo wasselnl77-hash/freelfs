@@ -1,0 +1,47 @@
+flboot -- the FreeLFS UEFI boot loader
+=====================================
+
+flboot lives on the EFI system partition (ESP), which FreeLFS mounts at
+/boot, as EFI/BOOT/BOOTX64.EFI (BOOTAA64.EFI on aarch64): the file UEFI
+firmware starts by default, so no boot variables are needed. `flboot-install`
+puts it there; flpkg runs that again whenever the flboot package changes.
+
+The menu lists:
+  - every kernel on the ESP (/boot/vmlinuz-*), newest first;
+  - the entries in flboot/flboot.conf;
+  - "Start an earlier state" (only when there are snapshots): a second screen
+    with the btrfs snapshots listed in flboot/snapshots, which flsnap writes
+    after every change (src/flsnap; flpkg takes one before each transaction).
+    Choosing one shows a notice (read-only, nothing is kept, how to keep it),
+    then starts the newest kernel with rootflags=subvol=@snapshots/N.
+Up/Down (or j/k) choose, Enter starts, Esc goes back from the second screen; any
+key stops the countdown.
+
+flboot/flboot.conf, one setting per line, '#' starts a comment:
+
+  timeout SECONDS            countdown; 0 starts the default at once, -1 waits
+  cmdline OPTIONS...         kernel command line for the kernels found
+  default TEXT               kernel version or entry title to preselect
+  entry TITLE|PATH|OPTIONS   an extra entry; PATH on the ESP, \ separated
+
+flboot starts a kernel through its EFI stub (CONFIG_EFI_STUB), passing the
+command line as load options. The installed system has no initramfs, so root=
+must name the root partition directly, e.g. root=PARTUUID=.... The live ISO
+(build/53-iso.sh) does use one: its cmdline has initrd=\initrd.img, which the
+kernel's EFI stub loads from the same volume (flboot sets the kernel's device
+handle to the volume it read the kernel from), and no root=; src/flinitrd
+then finds the ISO. If the firmware shows no file system on the device flboot
+was loaded from (some virtual disks), flboot uses the first volume that has
+flboot/flboot.conf.
+
+To undo a broken update: start the snapshot from before it ("Start an earlier
+state"), check that all is well, then choose "Make this the current state" in
+the notice on the desktop, in Settings > Snapshots, or run `flsnap rollback`
+(as root or a member of group seat). That swaps @ for a copy of the snapshot
+(the state left becomes a snapshot itself) and sets it as the default
+subvolume; restart to use it. A snapshot is read-only, so the system started
+from it cannot change /; /tmp, /run and the home folders (@home) still work.
+
+Tests: tests/menu-test.sh runs the real menu code (conf.c, menu.c, gfx.c) on a
+stand-in firmware (tests/hostmenu.c) with scripted keys and writes screenshots:
+  FONT=.../Lat2-Terminus16.psfu.gz tests/menu-test.sh [SHOTDIR]

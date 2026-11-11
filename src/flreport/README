@@ -1,0 +1,32 @@
+flreport -- collect a report of this computer for bug hunting
+==============================================================
+
+  flreport [-o DIR] [-q]
+
+Makes ~/freelfs-report-YYYYMMDD-HHMMSS.tar.gz (DIR instead of ~ with -o; /tmp when that is
+not writable) and prints the path. Settings > About > "Save a report" runs it. About ten seconds.
+On the live system the home folder is in RAM: copy the file to a USB stick with Files before
+shutting down.
+
+What is in it (all read with ordinary user rights; what needs more is left out):
+  summary.txt     release, kernel and command line, machine (DMI), CPU, memory, clock
+  logs/           flcomp.log (the desktop, the panel and every program started from it) and the
+                  one of the run before, session.log, the program logs under
+                  ~/.local/state/freelfs/log, /var/log/*, dmesg
+  hw/             PCI and USB devices (ids and drivers, what lspci/lsusb would list), input
+                  devices, sound cards, graphics (connectors, modes, drivers), backlight,
+                  battery, rfkill, loaded modules, firmware the kernel could not load
+  net.txt         links, addresses, routes, /etc/resolv.conf and iwd's DNS, Wi-Fi state (iwctl),
+                  a name lookup, a TLS request to example.com with timings, the server's clock
+  config/         desktop.conf, FreeBWS settings, keyboard, rc.conf, fstab, flpkg.conf, iwd
+  mounts.txt, processes.txt, packages.txt (flpkg, Flatpak), audio.txt, crashes.txt
+
+Not in it: passwords, Wi-Fi keys, browser history, bookmarks, file contents outside config/.
+It does hold network names, device ids and MAC addresses; look before you pass it on.
+
+Programs write their messages to log files so there is something to read: flcomp.log in
+$XDG_RUNTIME_DIR (the whole session; the previous one as flcomp.log.1), and one file per program
+started from the panel or start menu in ~/.local/state/freelfs/log/NAME.log (kept at about 1 MB,
+one older copy as NAME.log.1).
+
+make check   tests/report.sh: the archive, its sections, a planted log, the /tmp fallback.

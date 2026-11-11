@@ -1,0 +1,53 @@
+flstore -- the Software Store
+=============================
+
+One window: Explore (home with featured apps, recently updated apps, eight
+categories, search, FreeLFS packages), Installed and Updates. It replaces the
+Packages app (src/flpackages), which stays only as the provider of
+flpkg-seat and is hidden from the menu.
+
+Sources
+  Flathub     per user through `flatpak --user` (no root, no polkit): install,
+              update, remove, open, "Remove unused runtimes" (also run after
+              every removal), update check with `flatpak remote-ls --updates`.
+  FreeLFS     the flpkg database. Reads run `flpkg list` and `flpkg search ""`
+              as the person; changes go through `flpkg-seat install|remove`.
+              Updates are the repo packages flpkg marks "[installed: older]".
+              "Check now" also runs `flpkg sync`; if flpkg refuses (it is a
+              root command today) the index is simply read again.
+
+The Flathub catalog
+  Flathub's appstream collection (11 MB gzip) is downloaded with curl into
+  $XDG_CACHE_HOME/flstore/appstream.xml.gz (only when Flathub has something
+  newer, at most once a day) and turned into index.tsv (about 0.6 MB, English
+  strings only, 3300 apps) and details.bin by `flstore --build-index`, a child
+  process that streams the XML (libxml2 reader): 1 second, a few MB of memory.
+  The window loads index.tsv; descriptions, screenshot links and licences of
+  one app are read from details.bin only when its page opens.
+  Icons (64 and 128 px) and screenshots (752 px thumbnails) are downloaded
+  one app at a time, only for what is on screen, cached under the same
+  directory and decoded to the size they are shown at (at most 10 MB of
+  decoded pictures in memory, the screenshot cache is kept under 120 MB).
+  Lists are paged (24 cards) and cards outside the window are not drawn, so
+  no icon is fetched for them.
+  Download and installed sizes come from `flatpak remote-info` when an app
+  page opens.
+
+Progress: flatpak's plain output gives "Installing 2/4" steps (a bar that fills
+with them, the log under "Show log"); flpkg gives no progress, so that bar
+runs as a moving segment. Changes queue; Cancel stops a flatpak change.
+
+Tests
+  make check            tests/index.sh: the indexer on a small appstream file
+                        (no network, no display).
+  tests/store.py        headless flcomp, real Flathub data and pictures,
+                        stand-ins for flatpak, flpkg and flpkg-seat: first
+                        start, offline, home, category, search, app page with
+                        screenshots, install with progress, Installed,
+                        Updates, Update all, FreeLFS packages. Screenshots
+                        docs/m7/store-*.png. STORE_APPSTREAM=FILE avoids the
+                        11 MB download.
+Test hooks: FLSTORE_FLPKG, FLSTORE_SEAT, FLSTORE_CONF, FLSTORE_FLATPAK,
+FLSTORE_CURL, FLSTORE_SELF, FLSTORE_APPSTREAM_URL, FLSTORE_ICON_URL,
+FLSTORE_PAGE=home|cat:N|pkgs|search:TEXT|app:ID|installed|updates. `flstore --updates` opens the Updates tab (flupdate-notify uses it).
+FreeLFS package updates come from `flpkg check-updates` (no root needed, it fetches the indexes itself).

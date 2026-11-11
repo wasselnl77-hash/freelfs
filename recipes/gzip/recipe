@@ -1,0 +1,12 @@
+pkgname=gzip
+version=1.14
+release=1
+summary="GNU compression utility"
+url=https://www.gnu.org/software/gzip/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc bash)
+source=(https://ftpmirror.gnu.org/gzip/gzip-$version.tar.xz)
+sha256=(01a7b881bd220bfdf615f97b8718f80bdfd3f6add385b993dcf6efd14e8c0ac6)
+build_style=autotools

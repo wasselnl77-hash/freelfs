@@ -1,0 +1,24 @@
+# Gaming support (roadmap E2): udev rules that open game controllers, hidraw,
+# /dev/uinput, /dev/uhid and /dev/ntsync to the group seat (no logind, so no
+# uaccess), the sysctl Proton games need (vm.max_map_count), and flgaming, which
+# checks the machine and prepares the per-user Flatpak install for Steam.
+# The kernel side is config/kernel/freelfs.config (linux release 6). Steam
+# itself is never part of the image: it comes from Flathub, per user.
+# See docs/E2-GAMING.md.
+pkgname=gaming-config
+version=0.1
+release=1
+summary="Game controller udev rules, Proton sysctl and the flgaming helper"
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(udev procps-ng)
+source=()
+sha256=()
+
+package() {
+	local here=$startdir
+	install -Dm644 "$here/71-freelfs-gaming.rules" "$pkgdir/usr/lib/udev/rules.d/71-freelfs-gaming.rules"
+	install -Dm644 "$here/70-freelfs-gaming.conf" "$pkgdir/usr/lib/sysctl.d/70-freelfs-gaming.conf"
+	install -Dm755 "$here/flgaming" "$pkgdir/usr/bin/flgaming"
+}

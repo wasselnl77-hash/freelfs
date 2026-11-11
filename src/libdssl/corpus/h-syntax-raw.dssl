@@ -1,0 +1,10 @@
+raw {
+  @font-face {
+    font-family: X
+    src: url(x.woff2)
+  }
+  .x { color: red; }
+}
+@css { .y { color: blue } }
+.a { raw { .b { } } }
+

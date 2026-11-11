@@ -1,0 +1,13 @@
+pkgname=spirv-headers
+version=1.4.357.0
+release=1
+worksrc=SPIRV-Headers-vulkan-sdk-$version
+summary="Headers for the SPIR-V shader format"
+url=https://github.com/KhronosGroup/SPIRV-Headers
+license=(MIT)
+arch=(any)
+groups=(desktop)
+makedepends=(cmake ninja)
+source=(https://github.com/KhronosGroup/SPIRV-Headers/archive/vulkan-sdk-$version/SPIRV-Headers-vulkan-sdk-$version.tar.gz)
+sha256=(4d703067a7e06331ccb37bdfed3f9b7879cc61969a2689ae95c95db34a47ff07)
+build_style=cmake

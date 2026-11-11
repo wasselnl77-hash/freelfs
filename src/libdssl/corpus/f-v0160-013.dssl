@@ -1,0 +1,1 @@
+.a { padding: env(safe-area-inset-top, 20) env(safe-area-inset-right, 0) max(env(safe-area-inset-bottom), 12) 0 }

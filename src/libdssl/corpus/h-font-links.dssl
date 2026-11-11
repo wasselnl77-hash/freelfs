@@ -1,0 +1,17 @@
+fonts {
+  Fraunces: 500 700 800
+  Inter: 100..900 display optional
+  "Hanken Grotesk": 400 700 italic
+  Fraunces: 900
+  Roboto
+  Zeta: 1100
+  Eta: 400..300
+  Theta: display wat
+  Iota: from
+  Kappa: from "a.ttf" 400 700
+  Lambda: from "l.otf?x=1" 600 italic display block
+  Mu: from "m.woff" 100..900
+  Nu: 400 // comment
+  Xi: 400 /* c */ ;
+}
+

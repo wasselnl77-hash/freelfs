@@ -1,0 +1,35 @@
+pkgname=readline
+version=8.3
+release=1
+summary="Line editing and history library"
+url=https://tiswww.case.edu/php/chet/readline/rltop.html
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses)
+source=(https://ftpmirror.gnu.org/readline/readline-$version.tar.gz)
+sha256=(fe5383204467828cd495ee8d1d3c037a7eba1389c22bc6a041f627976f9061cc)
+
+prepare() {
+	sed -i '/MV.*old/d' Makefile.in
+	sed -i '/{OLDSUFF}/c:' support/shlib-install
+	sed -i 's/-Wl,-rpath,[^ ]*//' support/shobj-conf
+	sed -e '270a\
+     else\
+       chars_avail = 1;' \
+		-e '288i\   result = -1;' \
+		-i.orig input.c
+}
+
+build() {
+	./configure --prefix=/usr \
+		--disable-static \
+		--with-curses \
+		--docdir=/usr/share/doc/readline-$version
+	make SHLIB_LIBS="-lncursesw"
+}
+
+package() {
+	make SHLIB_LIBS="-lncursesw" DESTDIR="$pkgdir" install
+	install -m644 doc/*.{ps,pdf,html,dvi} "$pkgdir/usr/share/doc/readline-$version"
+}

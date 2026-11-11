@@ -1,0 +1,25 @@
+pkgname=dhcpcd
+version=10.5.2
+release=2
+summary="DHCP and IPv6 router discovery client"
+url=https://roy.marples.name/projects/dhcpcd
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc udev)
+sysgroups=("dhcpcd 52")
+sysusers=("dhcpcd 52 52 /var/lib/dhcpcd /usr/bin/false 'dhcpcd PrivSep'")
+owner=("/var/lib/dhcpcd 52 52 0700")
+source=(https://github.com/NetworkConfiguration/dhcpcd/releases/download/v$version/dhcpcd-$version.tar.xz)
+sha256=(3e476657fdb6eeb38b277da3a48d0ac0113ecce5858ebdcddff2b629faed52b4)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --libexecdir=/usr/lib/dhcpcd --dbdir=/var/lib/dhcpcd
+	--runstatedir=/run --privsepuser=dhcpcd)
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -d -m700 "$pkgdir/var/lib/dhcpcd"
+	# Wi-Fi interfaces are iwd's (EnableNetworkConfiguration in /etc/iwd/main.conf):
+	# two DHCP clients on one interface fight over its address and routes.
+	printf '\n# Wi-Fi interfaces get their address from iwd\ndenyinterfaces wl*\n' >> "$pkgdir/etc/dhcpcd.conf"
+}

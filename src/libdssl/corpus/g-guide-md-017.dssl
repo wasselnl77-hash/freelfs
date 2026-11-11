@@ -1,0 +1,1 @@
+.app { padding: 16; yield: padding-top padding-bottom }      // DSSL keeps the sides, your CSS decides the top and bottom

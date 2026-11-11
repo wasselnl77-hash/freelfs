@@ -1,0 +1,20 @@
+pkgname=libpng
+version=1.6.58
+release=1
+summary="Library for reading and writing PNG images"
+url=http://www.libpng.org/pub/png/libpng.html
+license=(libpng-2.0)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib)
+source=(https://downloads.sourceforge.net/libpng/libpng-$version.tar.xz)
+sha256=(28eb403f51f0f7405249132cecfe82ea5c0ef97f1b32c5a65828814ae0d34775)
+build_style=autotools
+# BLFS's optional APNG patch (needed only by Firefox & co. using the system
+# libpng) is not applied.
+configure_args=(--disable-static)
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -vDm644 README libpng-manual.txt -t "$pkgdir/usr/share/doc/libpng-$version"
+}

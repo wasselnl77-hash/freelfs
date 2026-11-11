@@ -1,0 +1,1 @@
+.a:is(.x, .y) { hover { color: red } }

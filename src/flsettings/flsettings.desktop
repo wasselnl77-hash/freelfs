@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Comment=Display, Wi-Fi, sound, keyboard
+Exec=flsettings
+Categories=Settings;
+X-FreeLFS-Glyph=≡

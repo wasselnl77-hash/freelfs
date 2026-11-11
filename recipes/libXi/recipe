@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=libXi
+version=1.8.2
+release=1
+summary="XInput 2 extension library"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libX11 libXext libXfixes)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/libXi-1.8.2.tar.xz)
+sha256=(d0e0555e53d6e2114eabfa44226ba162d2708501a25e18d99cfb35c094c6c104)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

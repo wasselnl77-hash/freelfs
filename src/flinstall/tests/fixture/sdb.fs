@@ -1,0 +1,1 @@
+/dev/sdb1	iso9660	FREELFS_LIVE

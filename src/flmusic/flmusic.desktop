@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Music
+Comment=Play your music library
+Exec=flmusic %F
+Categories=Audio;Music;Player;AudioVideo;
+MimeType=audio/mpeg;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/opus;audio/mp4;audio/x-wav;audio/aac;
+X-FreeLFS-Glyph=♪

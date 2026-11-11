@@ -1,0 +1,13 @@
+pkgname=kmod
+version=34.2
+release=1
+summary="Kernel module tools: modprobe, insmod, depmod, ..."
+url=https://git.kernel.org/pub/scm/utils/kernel/kmod/kmod.git
+license=(LGPL-2.1-or-later GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib xz zstd openssl)
+source=(https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-$version.tar.xz)
+sha256=(5a5d5073070cc7e0c7a7a3c6ec2a0e1780850c8b47b3e3892226b93ffcb9cb54)
+build_style=meson
+configure_args=(-D manpages=false)

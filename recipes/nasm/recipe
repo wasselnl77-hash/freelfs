@@ -1,0 +1,14 @@
+pkgname=nasm
+version=3.02
+release=1
+summary="The Netwide Assembler (for libjpeg-turbo and FFmpeg)"
+url=https://www.nasm.us/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://www.nasm.us/pub/nasm/releasebuilds/$version/nasm-$version.tar.xz)
+sha256=(87336eba53b4acfe917424ab5d500d2b0054d9f5148d35c2273ccf2cfb712f0d)
+build_style=autotools
+check() { :; }

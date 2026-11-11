@@ -1,0 +1,100 @@
+flsettings -- FreeLFS settings
+==============================
+
+Six pages behind a sidebar: General (theme, panel labels), Display, Mouse &
+touchpad, Keyboard (pages.c), Date & time (datetime.c) and Wi-Fi. `flsettings --page
+general|display|mouse|keyboard|datetime|wifi` opens on that page; if Settings
+is already running the page is passed to it (a socket in $XDG_RUNTIME_DIR) and
+the new process exits.
+
+General: settings are written to ~/.config/freelfs/desktop.conf ($FLUI_CONF
+overrides the path):
+
+	theme=dark|light
+	panel_labels=0|1
+	keyboard=de|us|uk|fr
+	pointer_speed=-100..100  pointer_accel=adaptive|flat  left_handed=0|1
+	mouse_natural=0|1  touchpad_natural=0|1  tap_click=0|1  typing_disable=0|1
+	key_repeat_delay=ms  key_repeat_rate=per second  numlock=0|1
+	night_light=0|1  night_warmth=0..100  brightness=percent
+	mode=1920x1080@60  scale=100|125|150|200
+
+The panel, flterm and flsettings pick changes up at once (inotify). A
+keyboard choice is switched live through fl_shell (set_keyboard_layout) and
+written to /etc/keyboard.conf (LAYOUT=de; $FL_KEYBOARD_CONF overrides) when
+the user may write it; otherwise only keyboard= in desktop.conf is saved and
+the window says so.
+
+Display: the resolutions and refresh rates of the screen (fl_shell output_mode),
+scale 100, 125, 150 or 200 % (only as far as the desktop stays at least 640 x 400),
+brightness and night light. Apply sends fl_shell set_output; flcomp switches at
+once and goes back after 15 seconds unless Keep is pressed (the banner at the top
+counts down). Only a kept mode and scale are written to desktop.conf (mode=,
+scale=). Brightness is the backlight's sysfs file (FLSETTINGS_BACKLIGHT=DIR for
+tests); it needs write access: the udev rule 90-flsettings-backlight.rules gives
+group seat that. Without a backlight (desktop monitors) the page says so.
+Mouse & touchpad: speed, acceleration profile, left-handed, natural scrolling for
+mouse and touchpad separately, tap to click, disable while typing; flcomp applies
+them through libinput. Keyboard: the four layouts (also written to
+/etc/keyboard.conf when writable), repeat delay and rate, Num Lock at start, a
+field to try it, and a read-only list of the keyboard shortcuts (flcomp's: Super, Alt-Tab,
+Super+arrows, Print, ...; keep it in step with src/flcomp/seat.c and docs/M7-DESIGN.md).
+Pages that do not fit the window scroll (wheel or bar).
+
+Wi-Fi: iwd's D-Bus API (net.connman.iwd on the system bus, libdbus;
+$DBUS_SYSTEM_BUS_ADDRESS overrides the bus). Lists networks with signal bars
+and a lock, scan, connect, disconnect, forget, the Wi-Fi switch, a Wired status
+line. iwd asks for passwords through net.connman.iwd.Agent, exported by this
+program; the typed password is wiped after it is sent and never logged. The
+user needs access to iwd on the bus: group seat (iwd-seat.conf), wheel or
+netdev. Without D-Bus, iwd, permission or hardware the page says so.
+
+Build: make; make install (PREFIX, DESTDIR). Needs libflui, libdbus and
+flcomp's protocol/fl-shell.xml (PROTO=...). Test without a compositor:
+FLUI_PPM=out.ppm flsettings. Headless test with a stand-in iwd: tests/fakeiwd.c
+and `apps.py flsettings` in src/flcomp/tests.
+
+Date & time (datetime.c): a world map (libflui's fl_worldmap, Natural Earth projection)
+with a dot for every place in tzdata's zone.tab. Click anywhere: the zone whose place is
+nearest is chosen; a hover shows the nearest place with its local time and UTC offset,
+and outlines its region (land nearer to that place than to any other). The chosen zone
+has a pin and a card, its own region is tinted strongly and every region that shows the
+same time right now softly. The search field above the map takes a city, country or zone
+name ("berlin", "new york", "japan"), Up/Down and Enter or a click choose. Below: the
+big local time, city, country, abbreviation, offset and zone name.
+Choosing runs the helper fltime-set (src/fltime): /etc/localtime and /etc/timezone are
+written, tz_changed= in desktop.conf is set so the panel redraws its clock at once (it
+also calls tzset() each time). Clock: 24-hour or 12-hour (clock_24h=1|0 in desktop.conf,
+used by the panel). Date and time: "Set time automatically" is the ntp service
+(fltime-set ntp on|off; the line under it says when it last synchronised, from
+/run/fltime.status; "Sync now" asks again). With it off, a date (YYYY-MM-DD) and time
+(HH:MM) field and "Set" set the clock in the chosen zone (fltime-set time). When the
+helper may not be run (the account is not in the group seat) or is missing, the page
+says so in red and nothing changes.
+Test hooks: FLTIME_SET, FLTIME_CONF, FLTIME_STATUS, FL_TZ_ETC, FL_ZONEINFO, FL_NOW (a fixed
+time); for FLUI_PPM screenshots FLSETTINGS_TEST_MOUSE=x,y, FLSETTINGS_TEST_SEARCH=text,
+FLSETTINGS_SIZE=WxH. tests/datetime.py drives the page in a headless flcomp.
+
+Snapshots (snapshots.c): the btrfs snapshots flsnap keeps (src/flsnap): date, reason, package count; "Take a
+snapshot", "Go back to this" (asks first; the current system is kept as a snapshot, restart to use it) and "Delete".
+When the system runs from a snapshot a banner offers "Make this the current state". All of it runs /usr/bin/flsnap
+(setuid root for group seat); $FLSNAP names another program for tests (the real flsnap with FLSNAP_MOCK=DIR).
+`flsettings --page snapshots`.
+
+Accent colour, wallpaper and sounds (2026-11, roadmap A4, A5, A7).
+General > Appearance: six swatches (green, teal, blue, amber, orange, rose), written as accent= to
+desktop.conf; libflui derives the theme from it (accent, text on it, selection fill) and every app
+that watches the file, the panel and Settings itself included, redraws at once. flcomp reads the same
+key for the volume indicator, the Alt-Tab frame and the lock screen. The crash screen keeps its own
+green. General > Sounds: "System sounds" (sounds=0|1, default on) and a Test button (runs
+`flsound --force notification`).
+Display > Wallpaper (wallpaper.c): wallpaper=accent (default: the 3D F in the accent colour), a colour
+name (one of the six built-in variants /usr/share/flcomp/wallpaper[-NAME].flw from flsplash's genart)
+or user:NAME (an imported picture). "Match the accent colour" is the switch for the first. Import: type
+or paste the path of a PNG or JPEG and "Use picture": it is decoded once (libpng, libjpeg; alpha is
+mixed with the desktop colour, no CMYK, up to 64 megapixels), scaled down to fit 2560 x 1440 (never
+enlarged) and saved as $XDG_DATA_HOME/freelfs/wallpapers/NAME.flw, the format flcomp loads
+("FLWALL01", x, y, w, h, 3, size, deflate of the R, G, B planes, rows delta coded). flcomp watches
+desktop.conf and swaps the wallpaper without a restart. "Remove" deletes an imported picture.
+`flsettings --set-wallpaper FILE` does the import and sets it without a window (for the image viewer
+and scripts). FLCOMP_SHARE moves the built-in directory (tests, screenshots).

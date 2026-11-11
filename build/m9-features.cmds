@@ -1,0 +1,28 @@
+# Commands for build/vm-run.py (see build/m9-features.sh): the account "tester" without a password
+# (the login screen logs it in with Enter; the test sets a known password only after the login,
+# for the lock screen), US keyboard layout (the test types with QEMU's US key names), and the checks
+# that need no desktop: the setuid helpers, fl-sntp, fltime-set. Throwaway image copy (-snapshot).
+{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null && echo made && id tester
+mkdir -p /home/tester/.config/freelfs && printf 'keyboard=us\n' > /home/tester/.config/freelfs/desktop.conf && chown -R tester: /home/tester/.config
+printf 'LAYOUT=us\n' > /etc/keyboard.conf
+echo "== setuid helpers (owner:group:mode)"; stat -c '%n %U:%G:%a' /usr/bin/flpower /usr/bin/fltime-set /usr/libexec/fllock-check /usr/bin/fusermount3 /usr/bin/flpkg-seat
+echo "== network (QEMU user networking)"; for i in $(seq 40); do ip -4 -o addr show | grep -q "inet 10\." && break; sleep 1; done; ip -4 -o addr show | grep -v " lo "; getent hosts pool.ntp.org | head -2
+echo "== ntp service"; grep ^SERVICES /etc/rc.conf; ls -l /etc/rc.d/init.d/ntp; pgrep -a fl-sntp; sleep 5; cat /run/fltime.status
+echo "== fl-sntp -q (UDP 123 through slirp)"; timeout 30 fl-sntp -q pool.ntp.org; echo "rc=$?"; timeout 20 fl-sntp -q 162.159.200.1; echo "rc=$?"
+echo "== the daemon after a while"; sleep 20; cat /run/fltime.status
+echo "== before"; readlink /etc/localtime; date
+echo "== fltime-set refusals (as root they still work through the seat check; as tester too)"; su -s /bin/sh tester -c 'fltime-set zone ../../etc/passwd; echo rc=$?; fltime-set zone posix/UTC; echo rc=$?; fltime-set time 1000000000; echo rc=$?'
+echo "== automatic time: refused while on, off, set by hand, on again (fl-sntp must step the clock back)"
+su -s /bin/sh tester -c 'fltime-set time $(( $(date +%s) - 7200 )); echo time-while-on-rc=$?; fltime-set ntp off; echo off-rc=$?'; sleep 1; echo "sntp processes: $(pgrep -c fl-sntp)"; grep NTP /etc/fltime.conf; cat /run/fltime.status 2>&1
+su -s /bin/sh tester -c 'fltime-set time $(( $(date +%s) - 7200 )); echo set-rc=$?'; date
+su -s /bin/sh tester -c 'fltime-set ntp on; echo on-rc=$?'; sleep 12; pgrep -a fl-sntp; cat /run/fltime.status; date
+echo "== fusermount3 / seat"; su -s /bin/sh tester -c 'fusermount3 -V; echo rc=$?'
+# m8mem LABEL: resident (rss) and proportional (pss) size of every process of the browser, their sums, free -m
+printf '%s\n' '#!/bin/sh' 'echo "== $1"; trs=0; tps=0' 'for p in $(pgrep "freebws|flcomp|WPEWebProcess|WPENetworkProce"); do' ' c=$(cat /proc/$p/comm); r=$(grep ^VmRSS /proc/$p/status | tr -s " " | cut -d" " -f2); q=$(grep ^Pss: /proc/$p/smaps_rollup | tr -s " " | cut -d" " -f2)' ' echo "  $p $c rss=$r pss=$q"; trs=$((trs + r)); tps=$((tps + ${q:-0}))' 'done' 'echo "total_kb $1 rss=$trs pss=$tps"; free -m | sed -n 2p' > /usr/bin/m8mem && chmod 755 /usr/bin/m8mem && echo m8mem
+# freebws-env: whatever is in this file is exported when freebws starts (the test sets the discard time with it)
+mv /usr/bin/freebws /usr/bin/freebws.real && printf '%s\n' '#!/bin/sh' '[ -f /tmp/freebws-env ] && . /tmp/freebws-env' 'exec /usr/bin/freebws.real "$@" 2>>/tmp/freebws.err' > /usr/bin/freebws && chmod 755 /usr/bin/freebws && echo wrapper
+# memory sampler: every 0.5 s MemAvailable (kB) and the biggest rss (kB) of "freebws" processes, to /tmp/memlog; "m9peak" prints the minimum and maximum
+printf '%s\n' '#!/bin/sh' 'while :; do a=$(grep ^MemAvailable /proc/meminfo | tr -s " " | cut -d" " -f2); r=0; for p in $(pgrep -x freebws.real); do v=$(grep ^VmRSS /proc/$p/status | tr -s " " | cut -d" " -f2); [ "${v:-0}" -gt "$r" ] && r=$v; done; echo "$a $r"; sleep 0.5; done' > /usr/bin/m9sample && chmod 755 /usr/bin/m9sample
+printf '%s\n' '#!/bin/sh' 'sort -n /tmp/memlog | head -1 | sed "s/^/min MemAvailable kB: /"; sort -k2 -n /tmp/memlog | tail -1 | sed "s/^/max single freebws rss kB (adblock child): /"; wc -l < /tmp/memlog | sed "s/^/samples: /"' > /usr/bin/m9peak && chmod 755 /usr/bin/m9peak && echo sampler
+sleep 3; pkill -x flcomp; sleep 6; pgrep -x flgreet-ui >/dev/null && echo greeter-again
+free -m | head -2

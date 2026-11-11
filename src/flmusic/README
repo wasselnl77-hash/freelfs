@@ -1,0 +1,47 @@
+flmusic -- the FreeLFS music player ("Music")
+=============================================
+
+    flmusic [--tab albums|artists|songs] [--search TEXT] [FOLDER | FILE...]
+    flmusic --ctl play|pause|play-pause|stop|next|previous|status
+
+The library is ~/music (else ~/Music; FLMUSIC_DIR or a FOLDER argument replaces it),
+read by tags: Albums (grouped by album artist and album, tracks by disc and number),
+Artists, and Songs. FILE arguments are queued and played at once. The search box filters
+all three views (title, artist, album).
+
+Playing: double click or Enter on a song plays it with the rest of the list as the queue;
+"Play" plays the whole list; "Add to queue" appends it (key A adds the selected song). The
+queue panel on the right shows "Up next"; click an entry to jump to it. Shuffle, repeat
+(off, one, all), a seek bar and a volume slider are in the bottom bar.
+
+Keys: Space play/pause, Left/Right seek 5 s (Alt+Left/Right previous/next), N and P next and
+previous, M mute, S shuffle, R repeat, A add to queue, Q show/hide the queue, 1 2 3 the
+three views, Ctrl+F or / search, Ctrl+Q quit. "Previous" restarts a track that is more
+than 3 s in.
+
+MPRIS: the player owns org.mpris.MediaPlayer2.flmusic on the session bus with
+MediaPlayer2 and MediaPlayer2.Player (Play, Pause, PlayPause, Stop, Next, Previous, Seek,
+SetPosition, OpenUri; PlaybackStatus, Metadata, Position, Volume, Shuffle, LoopStatus,
+CanGoNext ..., PropertiesChanged and Seeked signals). Any panel or key daemon that speaks
+MPRIS works. For the compositor's media keys there is `flmusic --ctl play-pause` (also
+play, pause, stop, next, previous, status): it calls the first MPRIS player on the bus, so
+XF86AudioPlay/Next/Prev can simply run it. A second flmusic window has no MPRIS (the bus
+name is taken).
+
+Formats: whatever GStreamer has (playbin): MP3, FLAC, AAC/M4A, WAV, Ogg Vorbis, Opus
+(gst-plugins-base with ogg, vorbis, opus; gst-plugins-good; gst-libav). Output goes to
+pipewiresink if the plugin exists, else autoaudiosink; FLMUSIC_SINK=fakesink plays into
+nothing (tests).
+
+Tags come from GstDiscoverer, one file per timer tick (the window stays usable), and are
+cached in ~/.cache/flmusic/library.tsv with the file's size and mtime, so a restart shows
+the library at once and reads only new or changed files. Missing tags fall back to the file
+name (title), the folder (album) and "Unknown artist". Album tiles are flat colours with the
+album's first letter; embedded cover art is not read yet.
+
+Memory: about 60 MB RSS while scanning and playing (GStreamer and its decoders are most of
+it; the interface itself is a few MB).
+
+Test: make check needs dbus-daemon, python3 and the GStreamer plugins: it synthesises a
+library (tests/mkaudio.py, tests/tagenc.c), starts a private session bus and drives flmusic
+through MPRIS (play, pause, next, previous, position advancing, stop) with a fakesink.

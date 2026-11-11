@@ -1,0 +1,5 @@
+raw {
+  @supports (display: grid) {
+    .box { display: grid; }
+  }
+}

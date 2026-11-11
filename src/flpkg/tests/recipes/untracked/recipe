@@ -1,0 +1,10 @@
+# Test package installing a file that already exists, untracked, on disk.
+pkgname=untracked
+version=1.0
+release=1
+summary="flpkg test package for --overwrite"
+arch=(any)
+package() {
+	mkdir -p "$pkgdir/usr/bin"
+	echo packaged > "$pkgdir/usr/bin/untracked"
+}

@@ -1,0 +1,31 @@
+pkgname=ninja
+version=1.13.2
+release=1
+summary="Small build system with a focus on speed"
+url=https://ninja-build.org/
+license=(Apache-2.0)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc gcc-libs)
+source=(https://github.com/ninja-build/ninja/archive/v$version/ninja-$version.tar.gz)
+sha256=(974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17)
+
+prepare() {
+	# honour NINJAJOBS, which flpkg sets
+	sed -i '/int Guess/a \
+  int   j = 0;\
+  char* jobs = getenv( "NINJAJOBS" );\
+  if ( jobs != NULL ) j = atoi( jobs );\
+  if ( j > 0 ) return j;\
+' src/ninja.cc
+}
+
+build() {
+	python3 configure.py --bootstrap --verbose
+}
+
+package() {
+	install -Dm755 ninja "$pkgdir/usr/bin/ninja"
+	install -Dm644 misc/bash-completion "$pkgdir/usr/share/bash-completion/completions/ninja"
+	install -Dm644 misc/zsh-completion "$pkgdir/usr/share/zsh/site-functions/_ninja"
+}

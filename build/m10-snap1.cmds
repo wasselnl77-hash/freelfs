@@ -1,0 +1,16 @@
+# Boot 1 of build/m10-snapshots.sh (a writable copy of the image): a login for the snapshot's desktop, a marker
+# file, a snapshot, then a change after it.
+{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null && echo made
+mkdir -p /usr/tester/.config/freelfs && printf 'keyboard=us\n' > /usr/tester/.config/freelfs/desktop.conf && chown -R tester: /usr/tester/.config
+printf 'LAYOUT=us\n' > /etc/keyboard.conf
+echo "== before: status, hook, flboot list"; flsnap status; ls /usr/libexec/flpkg/pre-transaction.d/; ls /boot/flboot/; cat /etc/flsnap.conf | grep -v '^#' | grep .
+printf '%s\n' '#!/bin/sh' 'u=$(id -u tester)' 'exec su -s /bin/sh tester -c "export XDG_RUNTIME_DIR=/run/user/$u WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$u/bus; $*"' > /usr/bin/m10sh && chmod 755 /usr/bin/m10sh && echo m10sh
+echo before > /root/m10-marker; sync
+echo "== create"; flsnap create --reason "m10 first snapshot"; echo rc=$?
+echo "== list"; flsnap list; flsnap list --machine; ls -l /.snapshots; btrfs subvolume list / | cat
+echo "== flboot list"; cat /boot/flboot/snapshots
+echo "== change after the snapshot"; echo changed > /root/m10-marker; touch /root/m10-after; sync; cat /root/m10-marker; ls /root
+echo "== flsnap show 1"; flsnap show 1 | head -12
+echo "== a second one (prune keeps 8)"; flsnap create --reason "m10 second snapshot"; flsnap list
+btrfs subvolume get-default /; btrfs subvolume show /.snapshots/1 | grep -i -E "flags|readonly|name:"
+sync

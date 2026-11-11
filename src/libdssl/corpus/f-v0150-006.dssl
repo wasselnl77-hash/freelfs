@@ -1,0 +1,7 @@
+div, p { color: #000 }
+@signal toasting { #t1 { color: #f00 }
+ #t1::before { content: "T" } }
+@signal screen == menu { .item { color: #00f } }
+@signal screen == shop { .item { color: #008000 } }
+@signal screen == shop { .item::before { content: "shop" } }
+@signal screen == menu { .item::before { content: "menu" } }

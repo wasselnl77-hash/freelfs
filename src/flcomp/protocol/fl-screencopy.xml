@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="fl_screencopy">
+  <copyright>SPDX-License-Identifier: MIT</copyright>
+
+  <interface name="fl_screencopy_manager" version="1">
+    <description summary="screenshots for the FreeLFS desktop (Snappel)">
+      Copies the desktop, a part of it or one window into a wl_shm buffer of the
+      client. It is meant for screenshot tools: the picture is exactly what the
+      compositor draws (at the desktop's logical size, see wl_output.mode), but
+      without the pointer, the Alt-Tab row, the on-screen indicator, and without
+      the windows of the program that asks (so a screenshot tool does not
+      photograph itself). While the screen is locked every capture fails.
+
+      A capture is a frame object: the compositor answers the capture request
+      with buffer (what to allocate), the client makes a wl_shm buffer of that
+      size and sends copy, and the compositor answers with ready (the pixels
+      are in the buffer) or failed. The picture is taken when copy arrives.
+    </description>
+
+    <request name="destroy" type="destructor"/>
+
+    <request name="capture_output">
+      <description summary="the whole desktop"/>
+      <arg name="frame" type="new_id" interface="fl_screencopy_frame"/>
+    </request>
+
+    <request name="capture_region">
+      <description summary="a rectangle of the desktop">
+        Logical pixels, from the top left of the desktop. The part outside the desktop
+        is cut off; nothing left means failed.
+      </description>
+      <arg name="frame" type="new_id" interface="fl_screencopy_frame"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+
+    <request name="capture_window">
+      <description summary="one window, even when others cover it">
+        id is the number fl_shell window_added gave (or window below). The picture is the
+        window's window geometry (its title bar included, the programs draw their own),
+        with its popups, transparent where the window is. An unknown id means failed.
+      </description>
+      <arg name="frame" type="new_id" interface="fl_screencopy_frame"/>
+      <arg name="id" type="uint"/>
+    </request>
+
+    <request name="list_windows">
+      <description summary="the windows in view, topmost first">
+        Answered by one window event for every window that is on the screen right now
+        (on the workspace in view, not minimized, not one of the asking program's), then
+        windows_done. For a "click a window" picker.
+      </description>
+    </request>
+
+    <event name="window">
+      <arg name="id" type="uint"/>
+      <arg name="x" type="int" summary="window geometry on the desktop"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="app_id" type="string"/>
+      <arg name="title" type="string"/>
+    </event>
+
+    <event name="windows_done"/>
+  </interface>
+
+  <interface name="fl_screencopy_frame" version="1">
+    <enum name="error">
+      <entry name="already_used" value="0" summary="copy was sent twice"/>
+      <entry name="invalid_buffer" value="1" summary="the buffer does not fit what buffer announced"/>
+    </enum>
+
+    <request name="copy">
+      <description summary="take the picture into this buffer">
+        The buffer must be a wl_shm buffer of the size and stride from the buffer event and
+        in the format from it or the other 32 bit one (argb8888 and xrgb8888 are accepted
+        for every capture; xrgb8888 gets alpha 255). One copy per frame.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+    </request>
+
+    <request name="destroy" type="destructor"/>
+
+    <event name="buffer">
+      <description summary="what to allocate; sent right after the capture request">
+        format is a wl_shm format: xrgb8888 for the desktop and regions, argb8888 for windows.
+      </description>
+      <arg name="format" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="stride" type="uint"/>
+    </event>
+
+    <event name="ready" summary="the pixels are in the buffer"/>
+    <event name="failed" summary="no picture (locked, window gone, nothing to capture); the frame is dead"/>
+  </interface>
+</protocol>

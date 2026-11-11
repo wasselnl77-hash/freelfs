@@ -1,0 +1,36 @@
+pkgname=bzip2
+version=1.0.8
+release=1
+summary="Block-sorting file compressor"
+url=https://sourceware.org/bzip2/
+license=(bzip2-1.0.6)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://www.sourceware.org/pub/bzip2/bzip2-$version.tar.gz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/bzip2-$version-install_docs-1.patch)
+sha256=(ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+        35e3bbd9642af51fef2a8a83afba040d272da42d7e3a251d8e43255a7b496702)
+
+prepare() {
+	patch -Np1 -i "$srcdir/bzip2-$version-install_docs-1.patch"
+	sed -i 's@\(ln -s -f \)$(PREFIX)/bin/@\1@' Makefile
+	sed -i "s@(PREFIX)/man@(PREFIX)/share/man@g" Makefile
+}
+
+build() {
+	make -f Makefile-libbz2_so
+	make clean
+	make
+}
+
+package() {
+	make PREFIX="$pkgdir/usr" install
+	cp -a libbz2.so.* "$pkgdir/usr/lib"
+	ln -sf "libbz2.so.$version" "$pkgdir/usr/lib/libbz2.so"
+	ln -sf "libbz2.so.$version" "$pkgdir/usr/lib/libbz2.so.1"
+	cp bzip2-shared "$pkgdir/usr/bin/bzip2"
+	ln -sf bzip2 "$pkgdir/usr/bin/bzcat"
+	ln -sf bzip2 "$pkgdir/usr/bin/bunzip2"
+	rm -f "$pkgdir/usr/lib/libbz2.a"
+}

@@ -1,0 +1,25 @@
+# The Mozilla root certificates, as one PEM bundle, for every TLS client (curl,
+# libsoup through glib-networking, OpenSSL's default). The bundle is the one
+# the certifi project cuts from Mozilla's list (its sdist carries it
+# unchanged), so there is a versioned, hash-checked source; no make-ca with
+# p11-kit and a certdata.txt parser is needed.
+pkgname=ca-certificates
+version=2026.10.23
+release=1
+summary="Mozilla root certificate bundle (via certifi)"
+url=https://certifiio.readthedocs.io/
+license=(MPL-2.0)
+arch=(any)
+groups=(desktop)
+depends=()
+worksrc=certifi-$version
+source=(https://files.pythonhosted.org/packages/source/c/certifi/certifi-$version.tar.gz)
+sha256=(a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd)
+
+package() {
+	install -Dm644 certifi/cacert.pem "$pkgdir/etc/ssl/certs/ca-certificates.crt"
+	# the names programs look for: OpenSSL's default file, and the Red Hat style path
+	ln -s certs/ca-certificates.crt "$pkgdir/etc/ssl/cert.pem"
+	install -d "$pkgdir/etc/pki/tls/certs"
+	ln -s ../../../ssl/certs/ca-certificates.crt "$pkgdir/etc/pki/tls/certs/ca-bundle.crt"
+}

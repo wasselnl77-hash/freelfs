@@ -1,0 +1,46 @@
+pkgname=perl
+version=5.44.0
+release=1
+summary="Practical Extraction and Report Language"
+url=https://www.perl.org/
+license=(GPL-1.0-or-later Artistic-1.0-Perl)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc gdbm libxcrypt zlib bzip2)
+source=(https://www.cpan.org/src/5.0/perl-$version.tar.xz)
+sha256=(505cf43912e9480495c344c70260452e32aa2a73c546a026b3f100053b23ce91)
+
+build() {
+	local v=${version%.*}
+	export BUILD_ZLIB=False BUILD_BZIP2=0
+	sh Configure -des \
+		-D prefix=/usr \
+		-D vendorprefix=/usr \
+		-D privlib=/usr/lib/perl5/$v/core_perl \
+		-D archlib=/usr/lib/perl5/$v/core_perl \
+		-D sitelib=/usr/lib/perl5/$v/site_perl \
+		-D sitearch=/usr/lib/perl5/$v/site_perl \
+		-D vendorlib=/usr/lib/perl5/$v/vendor_perl \
+		-D vendorarch=/usr/lib/perl5/$v/vendor_perl \
+		-D man1dir=/usr/share/man/man1 \
+		-D man3dir=/usr/share/man/man3 \
+		-D pager="/usr/bin/less -isR" \
+		-D useshrplib \
+		-D usethreads
+	# Reproducible: record SOURCE_DATE_EPOCH as the configure time, then
+	# regenerate config.h and friends from config.sh.
+	local when
+	when=$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH")
+	sed -i -e "s/^cf_time=.*/cf_time='$when'/" \
+		-e "s/^# Configuration time: .*/# Configuration time: $when/" config.sh
+	sh Configure -S
+	make
+}
+
+check() {
+	TEST_JOBS=$(nproc) make test_harness
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}

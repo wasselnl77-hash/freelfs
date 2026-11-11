@@ -1,0 +1,16 @@
+# Filters a sandboxed app's D-Bus connection; Flatpak starts it for every app.
+pkgname=xdg-dbus-proxy
+version=0.1.9
+release=1
+summary="Filtering proxy for D-Bus connections (used by Flatpak)"
+url=https://github.com/flatpak/xdg-dbus-proxy
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib)
+makedepends=(meson ninja)
+source=(https://github.com/flatpak/xdg-dbus-proxy/releases/download/$version/xdg-dbus-proxy-$version.tar.xz)
+sha256=(5450dda586ec3bb3ca709d311e845487883faa3b09cf562608d7e84f4311dced)
+build_style=meson
+configure_args=(-D man=disabled -D tests=false)
+check() { :; }

@@ -1,0 +1,24 @@
+# fledit, from src/fledit in the FreeLFS tree.
+pkgname=fledit
+version=0.1
+release=2
+summary="FreeLFS text editor: tabs, syntax colours, find and replace, remembered files"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland)
+makedepends=(flui)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/fledit" "$srcdir/fledit"
+	cd "$srcdir/fledit"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/fledit"
+	make DESTDIR="$pkgdir" install
+}

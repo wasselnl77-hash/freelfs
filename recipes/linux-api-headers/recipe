@@ -1,0 +1,23 @@
+# The kernel's user-space API headers, which glibc is built against.
+pkgname=linux-api-headers
+version=6.18.59
+release=1
+summary="Linux kernel headers for user space"
+url=https://www.kernel.org/
+license=(GPL-2.0-only)
+arch=(x86_64 aarch64)
+groups=(base)
+worksrc=linux-$version
+source=(https://www.kernel.org/pub/linux/kernel/v6.x/linux-$version.tar.xz)
+sha256=(53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963)
+
+build() {
+	make mrproper
+	make headers
+	find usr/include -type f ! -name '*.h' -delete
+}
+
+package() {
+	install -d "$pkgdir/usr"
+	cp -r usr/include "$pkgdir/usr"
+}

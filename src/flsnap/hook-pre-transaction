@@ -1,0 +1,11 @@
+#!/bin/sh
+# flpkg pre-transaction hook: a btrfs snapshot of / before the packages change.
+# Environment from flpkg: FLPKG_ROOT, FLPKG_SUMMARY, FLPKG_PACKAGES (a file of
+# "name version" lines, what is installed now), FLPKG_SNAPSHOTS (0: the person
+# turned snapshots off in flpkg.conf).
+# SPDX-License-Identifier: MIT
+[ "${FLPKG_ROOT:-/}" = / ] || exit 0
+[ "${FLPKG_SNAPSHOTS:-1}" != 0 ] || exit 0
+set -- --auto --reason "flpkg: ${FLPKG_SUMMARY:-transaction}"
+[ -z "${FLPKG_PACKAGES:-}" ] || set -- "$@" --packages "$FLPKG_PACKAGES"
+exec /usr/bin/flsnap create "$@" > /dev/null

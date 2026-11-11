@@ -1,0 +1,25 @@
+# flsettings, from src/flsettings in the FreeLFS tree.
+pkgname=flsettings
+version=0.1
+release=7
+summary="FreeLFS settings: theme, accent colour, wallpaper, sounds, panel labels, display, mouse and touchpad, keyboard, date and time, Wi-Fi"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland dbus fltime libpng libjpeg-turbo zlib)
+makedepends=(flui dbus libpng libjpeg-turbo zlib)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsettings" "$srcdir/flsettings"
+	cp "$startdir/../../src/flcomp/protocol/fl-shell.xml" "$srcdir/flsettings/fl-shell.xml"
+	cd "$srcdir/flsettings"
+	make clean
+	make PROTO=fl-shell.xml
+}
+
+package() {
+	cd "$srcdir/flsettings"
+	make PROTO=fl-shell.xml DESTDIR="$pkgdir" install
+}

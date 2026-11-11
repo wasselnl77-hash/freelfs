@@ -1,0 +1,47 @@
+# FreeLFS gaming: controllers and the virtual input devices of Steam Input.
+# SPDX-License-Identifier: MIT
+#
+# FreeLFS has no logind, so there are no per-seat ACLs (uaccess): the people at
+# the machine are the group seat (seatd's group; the groups a new user gets are
+# seat, audio, video and render, not input). Games run inside Flatpak and talk
+# to the device nodes themselves, so these nodes go to group seat, mode 0660:
+#   - every game controller's event node and js node
+#   - hidraw nodes of the controller makers (Steam, Sony, Nintendo, Microsoft, 8BitDo, ...)
+#   - /dev/uinput and /dev/uhid: Steam Input makes virtual controllers with them
+#   - /dev/ntsync: Wine/Proton NT synchronisation (kernel CONFIG_NTSYNC)
+# The rules run after 50-udev-default.rules (which sets group input), 60-input-id
+# (which sets ID_INPUT_JOYSTICK) and 70-joystick (hwdb).
+
+ACTION=="remove", GOTO="fl_gaming_end"
+
+# ---- controllers (event and js nodes) ------------------------------------------------------
+SUBSYSTEM=="input", ENV{ID_INPUT_JOYSTICK}=="1", KERNEL=="event[0-9]*|js[0-9]*", GROUP="seat", MODE="0660"
+# motion sensors of DualShock 4, DualSense, Switch pads and the Deck (SDL reads them for gyro aiming)
+SUBSYSTEM=="input", ENV{ID_INPUT_ACCELEROMETER}=="1", KERNEL=="event[0-9]*", GROUP="seat", MODE="0660"
+
+# The touchpad of a PlayStation pad is a separate input device; libinput would treat
+# it as a laptop touchpad and move the desktop's pointer with it. Games read it
+# through SDL or Steam Input, which open the event node by themselves.
+SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*Wireless Controller Touchpad", ENV{LIBINPUT_IGNORE_DEVICE}="1", GROUP="seat", MODE="0660"
+SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*DualSense*Touchpad", ENV{LIBINPUT_IGNORE_DEVICE}="1", GROUP="seat", MODE="0660"
+
+# ---- hidraw: Steam Input and SDL's HIDAPI drivers --------------------------------------------
+# The HID bus ids are 0003 (USB) and 0005 (Bluetooth); the device's name is BUS:VENDOR:PRODUCT.INDEX.
+# 28DE Valve (Steam Controller, Steam Deck, dongle)   054C Sony   057E Nintendo
+# 045E Microsoft (Xbox pads)   2DC8 8BitDo   0079 DragonRise   0E6F PDP   0F0D HORI
+# 1532 Razer   1BAD Harmonix   20D6 PowerA   24C6 PowerA/ThrustMaster   2563 ShanWan
+SUBSYSTEM=="hidraw", KERNELS=="0003:28DE:*|0005:28DE:*|0003:054C:*|0005:054C:*|0003:057E:*|0005:057E:*|0003:045E:*|0005:045E:*|0003:2DC8:*|0005:2DC8:*|0003:0079:*|0003:0E6F:*|0003:0F0D:*|0003:1532:*|0003:1BAD:*|0003:20D6:*|0003:24C6:*|0003:2563:*", GROUP="seat", MODE="0660"
+
+# Raw USB access (libusb) for Steam's own drivers: the wireless dongle of the Steam
+# Controller needs it, as do a few pads in their native modes.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="28de", GROUP="seat", MODE="0660"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="05c4|09cc|0ba0|0ce6|0df2", GROUP="seat", MODE="0660"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="057e", ATTRS{idProduct}=="2009|200e|2017|2066|2067", GROUP="seat", MODE="0660"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="045e", ATTRS{idProduct}=="028e|02d1|02dd|02e3|02ea|02fd|0b00|0b12|0b13", GROUP="seat", MODE="0660"
+
+# ---- misc devices (built into the kernel: they exist from boot) ----------------------------------
+KERNEL=="uinput", SUBSYSTEM=="misc", GROUP="seat", MODE="0660", OPTIONS+="static_node=uinput"
+KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="seat", MODE="0660"
+KERNEL=="ntsync", SUBSYSTEM=="misc", GROUP="seat", MODE="0660"
+
+LABEL="fl_gaming_end"

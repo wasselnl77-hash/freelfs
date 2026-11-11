@@ -1,0 +1,25 @@
+# flsplash, from src/flsplash in the FreeLFS tree.
+pkgname=flsplash
+version=0.2
+release=3
+summary="FreeLFS boot screen: a glossy 3D logo on the KMS framebuffer, no compositor"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib)
+# genart renders the logo and the word (IBM Plex Sans) at build time
+makedepends=(freetype zlib ibm-plex)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsplash" "$srcdir/flsplash"
+	cd "$srcdir/flsplash"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flsplash"
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,38 @@
+#!/bin/bash
+# /etc/rc.d/rc RUNLEVEL -- enter a runlevel, run by init.
+#
+#   0, 6     stop the services in reverse order, then halt or reboot
+#   1        stop the services (single user mode)
+#   2 to 5   start the services in /etc/rc.conf, in order
+
+. /etc/rc.conf
+. /etc/rc.d/functions
+
+stop_services() {
+	local s
+	for s in $(enabled_services | tac); do
+		[ -x "/etc/rc.d/init.d/$s" ] && "/etc/rc.d/init.d/$s" stop
+	done
+}
+
+case $1 in
+	0 | 6)
+		stop_services
+		exec /etc/rc.d/rc.shutdown "$1"
+		;;
+	1 | S)
+		stop_services
+		;;
+	*)
+		for s in $(enabled_services); do
+			if [ -x "/etc/rc.d/init.d/$s" ]; then
+				"/etc/rc.d/init.d/$s" start
+			else
+				stat_busy "Starting $s"
+				stat_fail
+			fi
+		done
+		[ -x /etc/rc.local ] && /etc/rc.local
+		;;
+esac
+exit 0

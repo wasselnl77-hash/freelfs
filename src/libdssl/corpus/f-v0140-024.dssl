@@ -1,0 +1,2 @@
+i { color: red }
+.hot i { color: green }

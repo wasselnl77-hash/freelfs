@@ -1,0 +1,135 @@
+#!/bin/sh
+# The services a desktop session needs, started by flcomp after the panel.
+# SPDX-License-Identifier: MIT
+#
+# Runs as the user, with the environment flcomp gives its clients:
+# XDG_RUNTIME_DIR (/run/user/UID, made by flgreet) and DBUS_SESSION_BUS_ADDRESS
+# (unix:path=$XDG_RUNTIME_DIR/bus, a fixed address, so every program started
+# later finds the bus). flcomp stops this script with SIGTERM when the session
+# ends; it stops the daemons it started.
+#
+# Sound: pipewire, then wireplumber (policy) and pipewire-pulse (for apps that
+# speak PulseAudio). Each is optional: a missing one is skipped. Then Flathub
+# for Flatpak (see flathub_setup below).
+
+[ -n "$XDG_RUNTIME_DIR" ] && [ -d "$XDG_RUNTIME_DIR" ] || exit 0
+exec >>"$XDG_RUNTIME_DIR/session.log" 2>&1
+echo "session: start $(date +%T) as $(id -un)"
+
+pids=
+start() {
+	command -v "$1" >/dev/null 2>&1 || return 0
+	"$@" &
+	pids="$pids $!"
+}
+trap 'kill $pids 2>/dev/null; exit 0' TERM INT HUP
+
+# The desktop's name, for xdg-desktop-portal (it picks freelfs-portals.conf, i.e. flportal, by it) and
+# for Flatpak (which passes it on into sandboxes). Exported before the bus starts, so that every
+# D-Bus activated service has it too.
+XDG_CURRENT_DESKTOP=FreeLFS
+export XDG_CURRENT_DESKTOP
+
+# the session bus
+case $DBUS_SESSION_BUS_ADDRESS in
+"unix:path=$XDG_RUNTIME_DIR/bus")
+	rm -f "$XDG_RUNTIME_DIR/bus"
+	start dbus-daemon --session --address="$DBUS_SESSION_BUS_ADDRESS" --nofork --nopidfile
+	;;
+esac
+
+# PipeWire needs its socket before the others can connect
+if [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; then
+	start pipewire
+	i=0
+	while [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ] && [ "$i" -lt 30 ]; do
+		sleep 0.1
+		i=$((i + 1))
+	done
+fi
+start wireplumber
+start pipewire-pulse
+
+# the update notifier: checks five minutes after login, then daily, and only
+# posts a notification (flupdate-notify never installs anything)
+start flupdate-notify
+
+# When the desktop runs an earlier state (booted from a snapshot, flboot "Start an
+# earlier state"), flsnap-notice says so and offers to make it the current state;
+# on a normal boot it exits at once. A few seconds' delay: the panel has to answer on the bus.
+( sleep 5; exec flsnap-notice ) >/dev/null 2>&1 &
+pids="$pids $!"
+
+# Autostart (the XDG way): every .desktop file in ~/.config/autostart and in
+# /etc/xdg/autostart (XDG_CONFIG_DIRS); a file of the same name in the user's folder
+# wins over the system's. Hidden=true, X-GNOME-Autostart-enabled=false, OnlyShowIn/
+# NotShowIn without/with FreeLFS, a missing TryExec and the override files General
+# Manager writes (X-FreeLFS-Override=true) switch an entry off. General Manager's
+# "Startup apps" tab edits these files.
+autostart() {
+	dirs="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+	for d in $(echo "${XDG_CONFIG_DIRS:-/etc/xdg}" | tr : ' '); do
+		dirs="$dirs $d/autostart"
+	done
+	seen=:
+	for d in $dirs; do
+		for f in "$d"/*.desktop; do
+			[ -f "$f" ] || continue
+			n=${f##*/}
+			case $seen in *":$n:"*) continue ;; esac
+			seen="$seen$n:"
+			line=$(awk '
+				/^\[/ { ent = ($0 == "[Desktop Entry]"); next }
+				!ent { next }
+				/^Hidden=true/ || /^X-GNOME-Autostart-enabled=false/ || /^X-FreeLFS-Override=true/ { skip = 1 }
+				/^OnlyShowIn=/ { if ($0 !~ /[=;]FreeLFS(;|$)/) skip = 1 }
+				/^NotShowIn=/ { if ($0 ~ /[=;]FreeLFS(;|$)/) skip = 1 }
+				/^Type=/ { type = substr($0, 6) }
+				/^TryExec=/ { try = substr($0, 9) }
+				/^Exec=/ && ex == "" { ex = substr($0, 6) }
+				END {
+					if (skip || ex == "" || (type != "" && type != "Application")) exit
+					gsub(/ ?%[a-zA-Z]/, "", ex)
+					print try "\t" ex
+				}' "$f" 2>/dev/null)
+			[ -n "$line" ] || continue
+			try=${line%%	*}
+			cmd=${line#*	}
+			[ -z "$try" ] || command -v "$try" >/dev/null 2>&1 || continue
+			echo "session: autostart $n: $cmd"
+			( sh -c "exec $cmd" >/dev/null 2>&1 & )
+		done
+	done
+}
+( sleep 3; autostart ) &
+pids="$pids $!"
+
+# Flathub, the Flatpak app catalog, for this person: added once, quietly, on the
+# first session that reaches the network (retried with growing pauses while
+# offline), for the person's own apps only (flatpak --user: no root). The
+# stamp file records that it was done, so a remote removed on purpose stays
+# removed. The catalog's appstream data is fetched right after, so that the
+# Packages app opens the Flathub tab with names and descriptions.
+flathub_setup() {
+	command -v flatpak >/dev/null 2>&1 || return 0
+	stamp=${XDG_DATA_HOME:-$HOME/.local/share}/freelfs/flathub-added
+	[ -e "$stamp" ] && return 0
+	if flatpak remotes --user --columns=name 2>/dev/null | grep -qx flathub; then
+		mkdir -p "${stamp%/*}" && : >"$stamp"
+		return 0
+	fi
+	pause=20
+	until timeout 120 flatpak remote-add --user --if-not-exists flathub \
+		https://dl.flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1; do
+		sleep "$pause"
+		pause=$((pause * 2))
+		[ "$pause" -le 900 ] || pause=900
+	done
+	mkdir -p "${stamp%/*}" && : >"$stamp"
+	echo "session: flathub added $(date +%T)"
+	timeout 600 nice flatpak update --user --appstream --noninteractive flathub >/dev/null 2>&1
+}
+flathub_setup &
+pids="$pids $!"
+
+wait

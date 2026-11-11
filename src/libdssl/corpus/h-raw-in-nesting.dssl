@@ -1,0 +1,5 @@
+.a { raw { .b { color: red } } }
+@media dark { raw { .c { color: red } } }
+fonts { X: 400 }
+.d { fonts { Y: 400 } }
+

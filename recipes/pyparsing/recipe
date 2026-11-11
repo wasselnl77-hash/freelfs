@@ -1,0 +1,15 @@
+# Flatpak's build runs a code generator (variant-schema-compiler) written
+# with it.
+pkgname=pyparsing
+version=3.3.3
+release=1
+summary="Python parsing module"
+url=https://github.com/pyparsing/pyparsing
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(python)
+makedepends=(flit-core)
+source=(https://files.pythonhosted.org/packages/source/p/pyparsing/pyparsing-$version.tar.gz)
+sha256=(928ae7e20211f3b6f3915a72f06a0cfd29ab9d24279dd6346b6b1a7146397d36)
+build_style=python

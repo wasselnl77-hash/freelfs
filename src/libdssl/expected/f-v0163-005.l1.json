@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0163-005.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"the closing brace is kept\""}],"tree":{"children":[{"children":[],"kind":"selector","line":1,"sel":"inside raw"}],"kind":"root"}}

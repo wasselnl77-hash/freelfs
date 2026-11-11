@@ -1,0 +1,4 @@
+@media 600 { .a { color: red } tokens { color { x: red } } }
+@container (min-width: 100) { .b { color: red } }
+@media dark { @media 800 { .c { color: red } } }
+

@@ -1,0 +1,5 @@
+// a second sheet: a changed token, a new one, a dark override, and a motion
+tokens { color { extra: red } }
+@media dark { tokens { color { brand: #fff } } }
+motion fade { from { opacity: 0 } to { opacity: 1 } }
+.b { color: color.brand; background: color.extra }

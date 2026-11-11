@@ -1,0 +1,11 @@
+tokens { color { x: red } }
+.a {
+  color: color.x
+  background: url(
+    "a.png"
+  )
+}
+raw {
+  .b { color: blue; }
+}
+

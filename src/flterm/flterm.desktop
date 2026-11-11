@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Comment=Type commands in flsh
+Exec=flterm
+Categories=System;TerminalEmulator;
+X-FreeLFS-Glyph=›

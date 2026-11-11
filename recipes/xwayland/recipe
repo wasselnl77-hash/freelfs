@@ -1,0 +1,51 @@
+# Xwayland: the X server for X11 programs (Steam, old apps) on the Wayland compositor flcomp.
+# Standalone release of the Xwayland tree (xorg-server built with only -Dxwayland, split out
+# by upstream), version 24.1 branch (xwayland_shell_v1 for the window manager, glamor + DRI3
+# for GPU clients). flcomp starts it on demand (src/flcomp/xwm.c), `Xwayland -rootless
+# -listenfd ... -wm FD`: it never runs while no X client is connected.
+# Options off: XDMCP, secure RPC, libei (input emulation portal), libdecor (rootful mode
+# decorations), xvfb, IPv6 listen, systemd notify.
+pkgname=xwayland
+version=24.1.15
+release=1
+summary="X11 server on Wayland (rootless, started by flcomp on the first X connection)"
+url=https://www.x.org/wiki/Xwayland/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc wayland libdrm libepoxy libxshmfence libxcvt libXfont2 libxkbfile pixman openssl xkbcomp xkeyboard-config mesa libXau libXdmcp)
+makedepends=(meson ninja pkgconf xorgproto xtrans libX11 wayland-protocols mesa)
+source=(https://www.x.org/pub/individual/xserver/xwayland-$version.tar.xz)
+sha256=(7311b4bcda22cfc19cb99680eb1c35cfc1ea885981310639f0429fe2948c122e)
+build_style=meson
+configure_args=(
+	-D glamor=true
+	-D glx=true
+	-D dri3=true
+	-D xwayland_ei=false
+	-D libdecor=false
+	-D xdmcp=false
+	-D xdm-auth-1=false
+	-D secure-rpc=false
+	-D xvfb=false
+	-D ipv6=false
+	-D systemd_notify=false
+	-D docs=false
+	-D devel-docs=false
+	-D docs-pdf=false
+	-D sha1=libcrypto
+	-D xkb_dir=/usr/share/X11/xkb
+	-D xkb_bin_dir=/usr/bin
+	-D default_font_path=built-ins,/usr/share/fonts/X11/misc,/usr/share/fonts/X11/Type1
+	-D serverconfigdir=/usr/lib/xorg
+	-D vendor_name=FreeLFS
+	-D vendor_name_short=FreeLFS
+)
+
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	# Xwayland starts xkbcomp from /usr/bin and wants no setuid or Xorg-only pieces
+	rm -rf "$pkgdir/usr/share/man"
+}

@@ -1,0 +1,5 @@
+
+    .a { gradient-flow: 6s }
+    .b { gradient-flow: 900 bounce alternate }
+    .c { gradient-flow: none }
+  

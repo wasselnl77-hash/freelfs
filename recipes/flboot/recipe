@@ -1,0 +1,23 @@
+# FreeLFS's own UEFI boot loader, from src/flboot in the FreeLFS tree.
+pkgname=flboot
+version=0.1
+release=5
+summary="The FreeLFS UEFI boot loader"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(util-linux)
+makedepends=(kbd python)
+options=(!strip) # a PE image, not ELF
+
+build() {
+	cp -r "$startdir/../../src/flboot" "$srcdir/flboot"
+	cd "$srcdir/flboot"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flboot"
+	make DESTDIR="$pkgdir" install
+}

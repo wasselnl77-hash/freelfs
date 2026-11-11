@@ -1,0 +1,1 @@
+.card { transition-delay: 200; animation-duration: 0.5 }

@@ -1,0 +1,20 @@
+#!/bin/sh
+# flsnap-notice -- when the desktop runs an earlier state (booted from a snapshot),
+# say so, with a button to make it the current state. Run once per session
+# (the session script or an autostart entry); does nothing on a normal boot.
+# SPDX-License-Identifier: MIT
+grep -q '^[0-9]* [0-9]* [0-9:]* /@snapshots/[0-9]* / ' /proc/self/mountinfo || exit 0
+n=$(flsnap status 2> /dev/null | sed -n 's/^booted=//p')
+[ "${n:-0}" -gt 0 ] || exit 0
+act=$(flnotify -a Snapshots -u critical -t 0 -w \
+	-A "keep=Make this the current state" \
+	"You are in an earlier state of the system" \
+	"This is snapshot #$n, read-only: nothing you change here is kept. Restart to go back to normal, or make this the current state." |
+	sed -n 's/^action //p')
+if [ "$act" = keep ]; then
+	if out=$(flsnap rollback 2>&1); then
+		flnotify -a Snapshots "Restart to finish" "$out"
+	else
+		flnotify -a Snapshots -u critical "Could not make it the current state" "$out"
+	fi
+fi

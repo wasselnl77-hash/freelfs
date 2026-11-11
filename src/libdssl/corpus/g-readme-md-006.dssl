@@ -1,0 +1,17 @@
+tokens {
+  color {
+    ink: #16161d
+    accent: oklch(62% 0.19 35)
+  }
+  radius { md: 14 }
+  shadow { md: 0 2 4 color.ink/10, 0 4 12 color.ink/8 }
+  space  { 9: 96 }          // numeric keys are legal (v0.7)
+}
+
+.card {
+  background: color.card
+  color: color.ink/85       // alpha modifier
+  radius: md
+  shadow: md
+  padding: space.9          // your 96px spacing step
+}

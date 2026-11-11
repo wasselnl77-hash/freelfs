@@ -1,0 +1,12 @@
+#!/bin/bash
+# /etc/rc.d/init.d/dbus -- the D-Bus system bus
+
+. /etc/rc.d/functions
+
+start_dbus() {
+	install -d -m 755 -o messagebus -g messagebus /run/dbus
+	dbus-uuidgen --ensure
+	dbus-daemon --system
+}
+
+daemon_service "$1" "D-Bus system bus" /run/dbus/pid start_dbus

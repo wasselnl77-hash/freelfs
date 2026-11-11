@@ -1,0 +1,6 @@
+fonts {
+  Fraunces: 500 700 800
+  Brand: from "/fonts/brand.woff2" 400
+}
+.hero { gradient: mesh #14102a, #ff7a1a at 15% 20%, #3949ab at 80% 70% }
+.floor { texture: oak-planks symmetrical }     // mirrored tiles: no seam, no obvious repeat

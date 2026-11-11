@@ -1,0 +1,2 @@
+.a { behavior x { color: red } motion y { from { opacity: 0 } } }
+

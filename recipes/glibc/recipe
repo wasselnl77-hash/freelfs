@@ -1,0 +1,102 @@
+# The GNU C library. The locales the test suites of other packages need are
+# included; the installer adds more.
+pkgname=glibc
+version=2.44
+release=1
+summary="The GNU C library"
+url=https://www.gnu.org/software/libc/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(linux-api-headers tzdata)
+source=(https://ftpmirror.gnu.org/glibc/glibc-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/glibc-fhs-1.patch
+        https://www.linuxfromscratch.org/patches/lfs/13.1/glibc-$version-upstream_fixes-1.patch)
+sha256=(37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667
+        643552db030e2f2d7ffde4f558e0f5f83d3fabf34a2e0e56ebdb49750ac27b0d
+        500567ff0a22e295bfe3b55e9b397796f71a19f01e1ff7fb29c9189482ee1809)
+
+prepare() {
+	patch -Np1 -i "$srcdir/glibc-fhs-1.patch"
+	patch -Np1 -i "$srcdir/glibc-$version-upstream_fixes-1.patch"
+}
+
+build() {
+	mkdir -p build
+	cd build
+	echo "rootsbindir=/usr/sbin" > configparms # ldconfig and sln: /sbin is a link
+	../configure --prefix=/usr \
+		--disable-werror \
+		--disable-nscd \
+		libc_cv_slibdir=/usr/lib \
+		--enable-stack-protector=strong \
+		--enable-kernel=5.10
+	make
+}
+
+check() {
+	cd build
+	make check
+}
+
+package() {
+	cd build
+	sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
+	install -d "$pkgdir/etc/ld.so.conf.d"
+	touch "$pkgdir/etc/ld.so.conf"
+	make DESTDIR="$pkgdir" install
+	sed '/RTLDLIST=/s@/usr@@g' -i "$pkgdir/usr/bin/ldd"
+	rm -f "$pkgdir/etc/ld.so.cache" # made by the ldconfig trigger
+
+	# Binaries ask for the loader in /lib64 (x86_64) or /lib (aarch64);
+	# /lib is a symlink to usr/lib, /lib64 a real directory.
+	case $CARCH in
+		x86_64)
+			install -d "$pkgdir/lib64"
+			ln -s ../usr/lib/ld-linux-x86-64.so.2 "$pkgdir/lib64/ld-linux-x86-64.so.2"
+			ln -s ../usr/lib/ld-linux-x86-64.so.2 "$pkgdir/lib64/ld-lsb-x86-64.so.3"
+			;;
+	esac
+
+	install -d "$pkgdir/usr/lib/locale"
+	local l i f n
+	for l in C:UTF-8:C.UTF-8 cs_CZ:UTF-8:cs_CZ.UTF-8 de_DE:ISO-8859-1:de_DE \
+		de_DE@euro:ISO-8859-15:de_DE@euro de_DE:UTF-8:de_DE.UTF-8 \
+		el_GR:ISO-8859-7:el_GR en_GB:ISO-8859-1:en_GB en_GB:UTF-8:en_GB.UTF-8 \
+		en_HK:ISO-8859-1:en_HK en_PH:ISO-8859-1:en_PH en_US:ISO-8859-1:en_US \
+		en_US:UTF-8:en_US.UTF-8 es_ES:ISO-8859-15:es_ES@euro es_MX:ISO-8859-1:es_MX \
+		fa_IR:UTF-8:fa_IR fr_FR:ISO-8859-1:fr_FR fr_FR@euro:ISO-8859-15:fr_FR@euro \
+		fr_FR:UTF-8:fr_FR.UTF-8 is_IS:ISO-8859-1:is_IS is_IS:UTF-8:is_IS.UTF-8 \
+		it_IT:ISO-8859-1:it_IT it_IT:ISO-8859-15:it_IT@euro it_IT:UTF-8:it_IT.UTF-8 \
+		ja_JP:EUC-JP:ja_JP ja_JP:UTF-8:ja_JP.UTF-8 nl_NL@euro:ISO-8859-15:nl_NL@euro \
+		ru_RU:KOI8-R:ru_RU.KOI8-R ru_RU:UTF-8:ru_RU.UTF-8 se_NO:UTF-8:se_NO.UTF-8 \
+		ta_IN:UTF-8:ta_IN.UTF-8 tr_TR:UTF-8:tr_TR.UTF-8 \
+		zh_CN:GB18030:zh_CN.GB18030 zh_HK:BIG5-HKSCS:zh_HK.BIG5-HKSCS \
+		zh_TW:UTF-8:zh_TW.UTF-8; do
+		IFS=: read -r i f n <<< "$l"
+		I18NPATH="$pkgdir/usr/share/i18n" localedef --prefix="$pkgdir" -i "$i" -f "$f" "$n"
+	done
+
+	cat > "$pkgdir/etc/nsswitch.conf" <<-EOF
+		# /etc/nsswitch.conf
+
+		passwd: files
+		group: files
+		shadow: files
+
+		hosts: files dns
+		networks: files
+
+		protocols: files
+		services: files
+		ethers: files
+		rpc: files
+	EOF
+	cat > "$pkgdir/etc/ld.so.conf" <<-EOF
+		# /etc/ld.so.conf
+		/usr/local/lib
+		/opt/lib
+
+		include /etc/ld.so.conf.d/*.conf
+	EOF
+}

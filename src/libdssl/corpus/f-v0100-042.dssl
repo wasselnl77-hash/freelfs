@@ -1,0 +1,4 @@
+.steps { counter-reset: step }
+.step::before { counter-increment: step; content: counter(step) ". " }
+.n::after { content: counters(item, ".") }
+.z { counter-set: step 4 }

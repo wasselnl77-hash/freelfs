@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-extension-lib-009.dssl","hint":"every \"{\" needs a matching \"}\"","line":1,"message":"1 block(s) were never closed with \"}\""}],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"tilt","value":""}],"kind":"selector","line":1,"sel":".t"}],"kind":"root"}}

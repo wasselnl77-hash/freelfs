@@ -1,0 +1,21 @@
+pkgname=libplacebo
+version=7.387.0
+release=1
+summary="Video rendering helpers (colour, scaling, tone mapping) used by mpv"
+url=https://code.videolan.org/videolan/libplacebo
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc lcms2)
+makedepends=(meson ninja python jinja2 markupsafe)
+source=(libplacebo-$version.tar.gz::https://github.com/haasn/libplacebo/archive/refs/tags/v$version.tar.gz)
+sha256=(f9e62d3774a9c4cfd198ec3abaa88294aaade2e31c04d5ab02bcf4abc98b1df5)
+build_style=meson
+# mpv requires libplacebo even when it does not draw with it. FreeLFS's mpv is used
+# through libmpv's software renderer (flvideo), so no GPU backend is built:
+# no Vulkan, OpenGL, Direct3D, shader compilers. The git submodules are not in
+# GitHub's tarball; only the optional fast_float is missing (a slower strtod).
+configure_args=(-D vulkan=disabled -D opengl=disabled -D d3d11=disabled -D glslang=disabled
+	-D shaderc=disabled -D lcms=enabled -D dovi=disabled -D libdovi=disabled -D demos=false
+	-D tests=false -D unwind=disabled -D xxhash=disabled)
+check() { :; }

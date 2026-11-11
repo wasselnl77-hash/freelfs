@@ -1,0 +1,14 @@
+.a { gradient: mesh red at 1 2, blue at 3 4 }
+.b { gradient: conic around, red, blue }
+.c { gradient: mesh red, blue at 1 2 }
+.d { gradient: radial 12px 4px, red -> blue }
+.e { gradient: linear 90, red 10 20, blue 30 }
+.f { gradient: linear 90 in oklab longer hue, red, blue }
+.g { gradient: linear 90 in srgb-linear, red, blue }
+.h { gradient: repeating radial circle, red 0 4, blue 4 8 }
+.i { gradient: linear , red -> blue }
+.j { gradient: linear 45, rgb(1 2 3) -> hsl(4 5% 6%) -> #abc/50 }
+.k { gradient: radial at center, color.ink -> white/10 -> transparent }
+.l { gradient: linear to top left, #f00 -> #00f + conic from 10deg at 10px 10px, red, blue tile 8 no-repeat }
+.m { gradient: linear 90, red, blue tile 8 offset 1 2 repeat-x }
+

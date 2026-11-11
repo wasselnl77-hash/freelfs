@@ -1,0 +1,5 @@
+.pane {
+  glass: 18 saturate 1.6
+  tilt: 10 lift 1.04 glare
+  border: 1 solid white/35
+}

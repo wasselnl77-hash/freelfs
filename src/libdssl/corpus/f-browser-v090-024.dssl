@@ -1,0 +1,7 @@
+#c { texture: grain }
+#g { background: linear-gradient(red, blue); texture: noise }
+#s { background-image: linear-gradient(red, blue); background-size: cover; texture: grain }
+#r { background-image: linear-gradient(red, blue) } #r.tex { texture: grain }
+.a { texture: grain } .b { texture: lines }
+#n { texture: grain } #n.none { texture: none }
+.box { width: 80px; height: 60px; margin: 4px; display: inline-block }

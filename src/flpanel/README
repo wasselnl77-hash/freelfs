@@ -1,0 +1,113 @@
+flpanel -- the FreeLFS panel and start menu
+===========================================
+
+The bottom panel (44 px) and the start menu popup. One process, one fl_shell
+binding (protocol: src/flcomp/protocol/fl-shell.xml). Needs flcomp; it exits
+with a message under any other compositor.
+
+Panel: start button, one entry per window, keyboard layout, Wi-Fi, volume,
+battery (only when /sys has one), clock. Windows show their icon only;
+panel_labels=1 in ~/.config/freelfs/desktop.conf adds the name (flsettings
+has the switch). theme= and panel_labels= are re-read when the file changes.
+Workspace pager (fl_shell 5, left of the layout indicator, only when there is more than one workspace):
+a small grid, the workspace in view filled with the accent colour, cells with windows marked; a click
+switches, the wheel steps, a right click shows the compositor's overview (Super+Tab).
+Clicking a window entry activates it (going to its workspace), or minimizes it if it is focused. The
+layout indicator cycles de, us, uk, fr (fl_shell set_keyboard_layout). Wi-Fi
+opens flsettings; the battery opens its flyout (below), the clock the notification centre.
+
+Menu: opened by the start button or by fl_shell's menu_toggle (Super).
+Search, five categories, programs, Lock (greyed out until /usr/bin/fllock
+exists; fllock asks flcomp for the lock, see src/fllock), Log out (fl_shell logout), Shut down (runs `poweroff`).
+Programs are the .desktop files in the applications directory of $XDG_DATA_HOME
+(default ~/.local/share) and every $XDG_DATA_DIRS entry (default
+/usr/local/share:/usr/share); /usr/share, ~/.local/share/flatpak/exports/share
+and /var/lib/flatpak/exports/share (what Flatpak exports) are always looked at.
+Apps outside the four categories (games, media, graphics ...) show under All
+programs. apps.py menu_dirs tests the search path. Beyond the usual keys, X-FreeLFS-Glyph=X sets
+the character on the program's tile. Categories: Network/WebBrowser/Email ->
+Internet; Office/TextEditor -> Office; System/Utility/TerminalEmulator/
+FileManager/PackageManager -> System; Settings -> Settings.
+Keys in the menu: type to search, Up/Down, Enter, Esc.
+Entries whose program is not installed (TryExec, or the first word of Exec,
+not found in PATH: GVim without its X11 build) are left out, as are NoDisplay
+and Hidden ones. Terminal=true entries run in flterm; if the program fails the
+window waits for Enter so the message can be read.
+
+Tray (right side): battery from /sys/class/power_supply (not shown when there
+is none; accent while charging, red at 15% or less), network from
+/sys/class/net (Wi-Fi or wired icon, slashed when there is no link), volume
+from wpctl. Volume: a click opens the flyout (flyout.c: slider, percent, mute button;
+drag or click the bar, Left/Right/Up/Down 5%, PageUp/PageDown 10%, Home/End, M
+mutes, Esc closes), scrolling over the icon changes it by 5%, a right click
+mutes, and the laptop keys (XF86AudioRaiseVolume, LowerVolume, Mute, via
+fl_shell volume_key) do the same. Every change shows at once and wpctl follows
+in the background: only one wpctl runs at a time, and the latest wanted level
+and mute state are what it is told, so a drag is a few calls. After the last
+change one get-volume corrects the display if it differs. Changing the level
+of a muted output unmutes it; opening the flyout never changes the volume. The
+only timer besides the clock fires every 5 s, reads a few small files and
+redraws only on a change; wpctl is asked in a child process through a pipe
+(at start, after a change, every 25 s, once a minute while it keeps failing),
+so the panel never waits for it.
+
+Notifications (notify.c): the panel is the notification daemon, org.freedesktop.Notifications
+on the session bus (spec 1.2: Notify, CloseNotification, GetCapabilities, GetServerInformation,
+NotificationClosed, ActionInvoked; capabilities actions, body, icon-static, persistence), so
+there is no second process. libdbus runs on a private connection whose fd is in flui's loop;
+the panel starts before the session script starts dbus-daemon, so connecting is retried every
+second (every ten after 90 tries). If another daemon owns the name the panel leaves it alone.
+Cards: a transparent surface at the top right of the screen (fl_shell 4 set_notifications), at
+most four stacked, newest on top: tile (a built-in icon for known apps, else the first letter),
+app name, summary, body (3 lines), up to three action buttons (the key "default" has no
+button, it is the click on the card). Left edge: accent for normal, red for critical, grey for
+low. They go away after 6 s (low 4 s; critical and expire_timeout 0 stay until dismissed; an
+explicit timeout wins), wait while the pointer rests on the stack, and are dismissed by the
+cross, a click on the card or an action. Not shown while the screen is locked (their time
+starts when it is unlocked). Markup tags are stripped, the entities decoded; images
+(image-data, image-path) and theme icons are not drawn.
+Centre: click the clock. A flyout above it with Do not disturb (a switch; desktop.conf
+notify_dnd=1; no cards for low and normal ones, critical ones still show, everything is in the
+history), Clear all, and the history (50 entries, newest first, with a cross each, scrolls with
+the wheel; a click on an entry runs its default action). A badge with the number of unread ones
+sits left of the time, a slashed bell while Do not disturb is on. The history is kept in
+$XDG_RUNTIME_DIR/flpanel-notifications (survives a panel restart, not the session).
+Extra D-Bus interface org.freelfs.Notifications on the same object: SetDoNotDisturb(b),
+GetDoNotDisturb, ClearAll, ToggleCenter, GetCount.
+flnotify (libdbus only, like notify-send): flnotify [-a APP] [-i ICON] [-u low|normal|critical]
+[-t MS] [-A KEY=LABEL]... [-r ID] [-T] [-w] SUMMARY [BODY] prints the id; -w waits and prints
+"action KEY" / "closed REASON". flnotify --dnd on|off|toggle|status, --clear, --center, --count.
+
+Battery (battery.c): the icon with the percentage is shown only when /sys/class/power_supply has a
+BAT* (two batteries are added up; $FLPANEL_POWER_SUPPLY names another directory, tests);
+accent while charging, red at 15 % or less, a small accent mark while power saving is on. Click:
+a flyout with the level, state (on battery, charging, fully charged, plugged in not charging),
+time left or until full (energy or charge over the smoothed rate, "Calculating" for the first
+readings) and the draw in watts, and the Power saving switch. Power saving is desktop.conf
+power_saver=1: flcomp dims the backlight to 70 % and draws at most 30 frames a second (src/flcomp
+power.c), and the panel runs `flpower saver on` (setuid root, group seat), which sets every CPU's
+governor to powersave and its energy preference to power, keeping the old values in
+/run/flpower-saver for `flpower saver off`; at the start of a session with the setting on the CPU
+part is applied again (the governor resets at boot). Warnings use the notifications: at 10 % a
+card offers "Turn on power saving", at 5 % a critical one stays until the charger is plugged in;
+each shows once per discharge (resets above 15 % or when charging starts).
+
+Tests: make check (needs ../flcomp built, dbus-daemon, python3): tests/power.sh runs flpower against
+a made-up cpu directory (FLPOWER_CPU and FLPOWER_STATE are honoured only when not root);
+tests/notify.sh runs a private session bus, a headless flcomp, the real flpanel and flnotify
+through ids, cards, stacking, expiry with reason, replace, CloseNotification, the click on a card,
+Do not disturb, the centre (flnotify, clock click, Esc, click outside), history across a panel
+restart, the lock, and low battery warnings (NOTIFY_OUT=DIR keeps screenshots).
+FLUI_PPM=out.ppm flpanel --cards|--center|--battery renders made-up notification cards (out.ppm.3),
+the centre (out.ppm.4) or the battery flyout (out.ppm.5) without a compositor.
+FLUI_PPM=out.ppm flpanel --demo [--menu] [--volume] renders without a
+compositor (out.ppm is the panel, out.ppm.1 the menu, out.ppm.2 the volume
+flyout). FLPANEL_NOBAT=1 hides the battery. apps.py volume runs the tray with
+a slow stand-in wpctl. FLPANEL_APPS=DIR replaces the
+.desktop directories.
+
+Build: make; make install (PREFIX, DESTDIR). Needs libflui.
+
+Clock: calls tzset() each time it draws, so a new /etc/localtime (Settings > Date & time)
+shows within the minute, at once when Settings sets tz_changed= in desktop.conf;
+clock_24h=0 there switches it to 12-hour ("Mon 9 Nov  3:32 PM").

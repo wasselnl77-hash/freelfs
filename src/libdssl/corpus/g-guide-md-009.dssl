@@ -1,0 +1,6 @@
+behavior old-leather {
+  texture: bump scale 6 depth 4 octaves 3 color #1b1008 color2 #6b4a2b blend overlay
+}
+
+.sofa   { background: #5a3a22; use old-leather }
+.marble { background: #f4f1ea; texture: noise scale 120 octaves 5 contour 0.04 color #6c6877 color2 #f4f1ea blend multiply }

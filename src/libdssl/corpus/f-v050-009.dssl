@@ -1,0 +1,9 @@
+
+    motion pulse {
+      from { opacity: 1 }
+      to { opacity: 0.4 }
+    }
+    .dot {
+      animate: pulse 1600 infinite alternate
+    }
+  

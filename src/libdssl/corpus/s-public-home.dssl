@@ -1,0 +1,551 @@
+// =========================================================================
+// home.dssl: the landing page
+//
+// One loud thing: the live editor in the hero, which rewrites the page it
+// sits on. Everything below it is a plain two-column read: a heading on the
+// left, the answer on the right, no cards.
+// =========================================================================
+
+// ------------------------------------------------------------------- hero
+
+.hero {
+  padding-top: fluid 36 80
+  padding-bottom: fluid 48 96
+}
+
+.hero-grid {
+  display: grid
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr)
+  gap: fluid 32 64
+  align-items: start
+}
+
+@media (width <= 980) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr)
+  }
+}
+
+.hero-copy {
+  min-width: 0
+  max-width: 600
+}
+
+.hero-title {
+  font-size: fluid 38 68
+  font-weight: 760
+  line-height: 1.02
+  letter-spacing: -0.035em
+  margin: 0 0 space.4
+  text-wrap: balance
+  font-variation-settings: "wdth" 86
+}
+
+.hero-sub {
+  font-size: 19
+  line-height: 1.6
+  color: color.ink
+  margin: 0 0 space.3
+}
+
+.hero-sub-2 {
+  color: color.muted
+  margin-bottom: space.5
+}
+
+.hero-sub a {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
+}
+
+.hero-ctas {
+  row: gap 12 center wrap
+}
+
+.hero-link {
+  font-weight: 600
+  padding: 12 8
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 5
+}
+
+.hero-link:hover {
+  text-decoration-thickness: 4
+}
+
+.hero-facts {
+  margin: space.5 0 0
+  color: color.muted
+  font-size: 15
+}
+
+// ------------------------------------------------- the live editor
+
+.try {
+  min-width: 0
+  display: flex
+  flex-direction: column
+  background: color.code-bg
+  radius: lg
+  overflow: hidden
+  // the one thing on the site that floats, so the one shadow
+  shadow: lg
+}
+
+.try-bar {
+  row: gap 12 between
+  align: center
+  padding: 9 12 9 22
+  background: color.code-line
+  color: color.code-com
+  font-family: font.mono
+  font-size: 12.5
+}
+
+.try-tools {
+  row: gap 8 center
+}
+
+.try-tool {
+  font-family: font.mono
+  font-size: 12
+  color: color.code-ink/85
+  border: 1 solid color.code-com/50
+  radius: md
+  padding: 5 11
+  cursor: pointer
+  transition: 130
+}
+
+.try-tool:hover {
+  color: color.code-key
+  border-color: color.code-key
+}
+
+.try-editor {
+  display: block
+  width: 100%
+  height: 322
+  border: 0
+  resize: none
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
+  font-size: 13.5
+  line-height: 1.75
+  padding: 18 22
+  tab-size: 2
+  white-space: pre
+  overflow: auto
+  caret-color: color.code-key
+  focus-visible {
+    outline: 3 solid color.accent
+    outline-offset: -3
+  }
+}
+
+// status line: calm green when it applied, warning tape when it did not
+.try-status {
+  column: gap 6
+  padding: 12 22
+  min-height: 62
+  font-size: 14
+  line-height: 1.5
+  transition: 160
+}
+
+.try-good {
+  background: color.code-bg
+  color: color.code-sel
+  border-top: 1 solid color.code-line
+}
+
+.try-bad {
+  background: color.tape
+  color: color.tape-ink
+}
+
+.try-err b {
+  font-weight: 700
+}
+
+.try-err code {
+  font-family: font.mono
+  font-size: 13
+  font-weight: 700
+  background: color.tape-ink/12
+  padding: 0 5
+  radius: sm
+}
+
+.try-result {
+  padding: 22
+  background: color.card
+}
+
+.try-button {
+  cursor: pointer
+  border: 0
+  font-family: inherit
+  font-size: 16
+  font-weight: 600
+}
+
+// -------------------------------------------------------------- the rest
+
+.block {
+  padding-top: fluid 40 72
+}
+
+.split {
+  display: grid
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr)
+  gap: fluid 24 72
+  align-items: start
+}
+
+@media (width <= 900) {
+  .split {
+    grid-template-columns: minmax(0, 1fr)
+  }
+}
+
+// the heading stays put while the long answer scrolls past it
+.split-head {
+  position: sticky
+  top: 92
+}
+
+@media (width <= 900) {
+  .split-head {
+    position: static
+  }
+}
+
+.split-body {
+  min-width: 0
+}
+
+.split p code,
+.split li code,
+.split dd code {
+  font-family: font.mono
+  font-size: 0.86em
+  background: color.ink/8
+  padding: 1 6
+  radius: sm
+}
+
+.split p a,
+.split-body a:not(.btn) {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
+}
+
+// ----------------------------------------- four things CSS leaves to you
+
+.fight {
+  padding-bottom: space.4
+  margin-bottom: space.4
+  border-bottom: 1 solid color.line
+}
+
+.fight:last-child {
+  border-bottom: 0
+  margin-bottom: 0
+  padding-bottom: 0
+}
+
+.fight h3 {
+  font-size: 22
+  font-weight: 680
+  letter-spacing: -0.015em
+  margin: 0 0 space.2
+}
+
+.fight p {
+  margin: 0 0 8
+  font-size: 17
+  line-height: 1.55
+}
+
+// which language a sentence is about: a structural label, so it stays
+.lang {
+  display: inline-block
+  font-family: font.mono
+  font-size: 11.5
+  font-weight: 700
+  padding: 2 7
+  radius: sm
+  margin-right: 10
+  vertical-align: 1
+}
+
+.lang-css {
+  background: color.ink/10
+  color: color.muted
+}
+
+.lang-dssl {
+  background: color.accent
+  color: color.accent-ink
+}
+
+// ---------------------------------------------------- the same card, twice
+
+.versus {
+  column: gap space.4
+}
+
+.versus-label {
+  font-family: font.mono
+  font-size: 13
+  color: color.muted
+  margin: 0 0 8
+}
+
+// --------------------------------------------------------- engine parts
+
+.parts {
+  margin: 0
+}
+
+.part {
+  display: grid
+  grid-template-columns: 190px minmax(0, 1fr)
+  gap: space.4
+  padding: space.3 0
+  border-top: 1 solid color.line
+}
+
+.part:first-child {
+  border-top: 0
+  padding-top: 0
+}
+
+@media (width <= 560) {
+  .part {
+    grid-template-columns: minmax(0, 1fr)
+    gap: 4
+  }
+}
+
+.part dt {
+  font-weight: 680
+  font-size: 17
+}
+
+.part dd {
+  margin: 0
+  color: color.ink/85
+  line-height: 1.6
+}
+
+// ------------------------------------------------------------- limits
+
+.limits {
+  margin: 0 0 space.4
+  padding: 0
+  column: gap 12
+}
+
+.limits li {
+  position: relative
+  padding-left: 22
+  font-size: 17
+  line-height: 1.6
+}
+
+.limits li::before {
+  content: ""
+  position: absolute
+  left: 2
+  top: 0.62em
+  size: 8
+  background: color.tape
+  border: 1 solid color.ink/40
+  radius: 1
+}
+
+.limits li b {
+  font-weight: 700
+}
+
+.limits-exit {
+  margin: 0 0 space.4
+  font-size: 17
+  line-height: 1.65
+}
+
+// ------------------------------------------------------------- install
+
+.install {
+  column: gap space.5
+}
+
+.install-row h3 {
+  font-size: 19
+  font-weight: 680
+  margin: 0 0 space.2
+}
+
+.install-row p {
+  margin: space.2 0 0
+  color: color.muted
+  font-size: 15.5
+  line-height: 1.6
+}
+
+.install-downloads {
+  row: gap 10 wrap
+}
+
+// ------------------------------------------------------------- live effects
+// Each demo is real DSSL: aura, glass, tilt, texture and slider, running here.
+
+.show-sub { max-width: 640; margin: 0 0 space.6 }
+
+.show-grid {
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))
+  gap: space.4
+}
+
+.show-card {
+  column: gap 12
+  padding: space.4
+  background: color.card
+  border: 1 solid color.line
+  radius: lg
+}
+
+.show-demo {
+  position: relative
+  height: 190
+  radius: md
+  display: grid
+  place-items: center
+  overflow: visible
+}
+
+.show-code {
+  font-family: font.mono
+  font-size: 12.5
+  background: color.code-bg
+  color: color.code-ink
+  radius: sm
+  padding: 8 10
+  overflow-x: auto
+  white-space: nowrap
+}
+
+.show-text { margin: 0; font-size: 14.5; line-height: 1.6; color: color.muted }
+.show-text code { font-family: font.mono; font-size: 13; color: color.ink }
+
+.show-link {
+  font-weight: 700
+  font-size: 14
+  color: color.accent
+  align-self: start
+  text-underline-offset: 3
+  focus-visible { outline: 2 solid color.accent; outline-offset: 3 }
+}
+
+// fire: an aura recipe, written out in full so the page is its own example
+behavior show-flame {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70 shape flame glowing behind
+}
+
+.show-demo-fire { background: #0b0a12 }
+
+.show-orb {
+  width: 120
+  height: 76
+  radius: lg
+  background: #1c1a28
+  color: #e9e4f5
+  display: grid
+  place-items: center
+  font-size: 14
+}
+
+.show-fire { use show-flame }
+
+// glass and tilt over a colourful backdrop
+.show-demo-glass {
+  background: linear-gradient(135deg, #ff7a00, #c2185b 55%, #3949ab)
+  overflow: hidden
+}
+
+.show-blob { position: absolute; radius: full }
+.show-blob-a { width: 110; height: 110; left: 14%; top: 8%; background: #ffe14a }
+.show-blob-b { width: 90; height: 90; right: 10%; bottom: 6%; background: #40e0d0 }
+
+.show-pane {
+  position: relative
+  column: gap 4
+  width: 66%
+  padding: 18 16
+  glass: 16 saturate 1.6
+  tilt: 12 lift 1.05 glare
+  border: 1 solid white/40
+  radius: lg
+  color: white
+  font-size: 13
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/30, transparent 60%)
+}
+
+.show-pane b { font-size: 17 }
+
+// textures
+.show-demo-tex {
+  display: grid
+  grid-template-columns: 1fr 1fr
+  gap: 8
+  place-items: stretch
+  background: transparent
+}
+
+.show-tex {
+  radius: md
+  background-color: #b8a58a
+  color: #1b1408
+  font-size: 12
+  padding: 8
+  display: grid
+  place-items: end start
+}
+
+.show-tex-wood { texture: wood }
+.show-tex-marble { texture: marble }
+.show-tex-carbon { texture: carbon; color: white }
+.show-tex-hex { texture: hex }
+
+// slider
+.show-demo-slider {
+  background: #101018
+  padding: 0 18
+}
+
+.show-range {
+  width: 100%
+  slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 56, graph-gap 3, fill #77ccff, track 3 #34445a, thumb 14 #ffffff, shape bar
+}
+
+.show-more {
+  margin: 28 0 0
+  font-size: 16
+  color: color.muted
+  max-width: 70ch
+  a { color: color.accent; font-weight: 700 }
+}
+.show-more code { font-family: font.mono; font-size: 14; color: color.ink }

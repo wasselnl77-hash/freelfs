@@ -1,0 +1,134 @@
+@layer tokens, base, components, utilities, pin;
+
+@layer tokens {
+:where(:root) {
+  --dssl-color-ink: #16161d;
+  --dssl-color-paper: #faf7f2;
+  --dssl-color-card: #ffffff;
+  --dssl-color-muted: #6f6a7a;
+  --dssl-color-line: #e5ded2;
+  --dssl-color-accent: oklch(62% 0.19 35);
+  --dssl-color-accent-ink: #fff6ee;
+  --dssl-color-ok: #2e7d4f;
+  --dssl-color-err: #b3372e;
+  --dssl-space-1: 4px;
+  --dssl-space-2: 8px;
+  --dssl-space-3: 12px;
+  --dssl-space-4: 16px;
+  --dssl-space-5: 24px;
+  --dssl-space-6: 32px;
+  --dssl-space-7: 48px;
+  --dssl-space-8: 64px;
+  --dssl-radius-sm: 8px;
+  --dssl-radius-md: 14px;
+  --dssl-radius-lg: 22px;
+  --dssl-radius-full: 999px;
+  --dssl-shadow-sm: 0px 1px 2px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent), 0px 1px 3px color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  --dssl-shadow-md: 0px 2px 4px color-mix(in oklab, var(--dssl-color-ink) 10%, transparent), 0px 4px 12px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent);
+  --dssl-shadow-lg: 0px 4px 8px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent), 0px 12px 32px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent);
+  --dssl-shadow-xl: 0px 8px 16px color-mix(in oklab, var(--dssl-color-ink) 14%, transparent), 0px 24px 64px color-mix(in oklab, var(--dssl-color-ink) 16%, transparent);
+  --dssl-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dssl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+}
+
+@layer components {
+:where(.tl) {
+  border-left: 2px solid var(--dssl-color-line);
+  margin-left: 8px;
+  padding-left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dssl-space-6);
+  margin-top: var(--dssl-space-5);
+}
+
+:where(.tl-item) {
+  position: relative;
+}
+
+:where(.tl-item)::before {
+  content: "";
+  position: absolute;
+  left: -33px;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dssl-color-accent);
+  border: 2px solid var(--dssl-color-paper);
+  box-shadow: 0px 0px 0px 2px color-mix(in oklab, var(--dssl-color-accent) 25%, transparent);
+}
+
+:where(.tl-item-add)::before {
+  background: var(--dssl-color-ok);
+  box-shadow: 0px 0px 0px 2px color-mix(in oklab, var(--dssl-color-ok) 25%, transparent);
+}
+
+:where(.tl-date) {
+  font-size: 14px;
+  color: var(--dssl-color-muted);
+}
+
+:where(.tl-item h3) {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 6px 0px 12px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  max-width: 680px;
+}
+
+:where(.tl-item p) {
+  font-size: 16.5px;
+  color: var(--dssl-color-ink);
+  line-height: 1.65;
+  margin: 0px 0px 14px;
+  max-width: 680px;
+}
+
+:where(.tl-why) {
+  font-size: 14px;
+  color: var(--dssl-color-ink);
+  background: color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  border-left: 3px solid var(--dssl-color-accent);
+  padding: 8px 14px;
+  border-radius: 0px var(--dssl-radius-md) var(--dssl-radius-md) 0px;
+  display: block;
+  margin-bottom: 12px;
+  line-height: 1.55;
+  max-width: 680px;
+}
+
+:where(.tl-version) {
+  font-family: var(--dssl-font-mono);
+  font-size: 12px;
+  color: var(--dssl-color-muted);
+  border: 1px solid var(--dssl-color-line);
+  padding: 3px 9px;
+  border-radius: var(--dssl-radius-full);
+  display: inline-block;
+  margin-bottom: 8px;
+  margin-right: 6px;
+  background: var(--dssl-color-card);
+}
+
+:where(.vote-badge) {
+  font-family: var(--dssl-font-mono);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--dssl-radius-full);
+  border: 1px solid color-mix(in oklab, var(--dssl-color-ok) 35%, transparent);
+  color: var(--dssl-color-ok);
+  background: color-mix(in oklab, var(--dssl-color-ok) 8%, transparent);
+  display: inline-block;
+}
+
+:where(.vote-badge-veto) {
+  border-color: color-mix(in oklab, var(--dssl-color-err) 35%, transparent);
+  color: var(--dssl-color-err);
+  background: color-mix(in oklab, var(--dssl-color-err) 8%, transparent);
+}
+}

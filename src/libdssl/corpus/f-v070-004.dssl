@@ -1,0 +1,2 @@
+tokens { space { 12: 160 } }
+.c { margin: space.12 }

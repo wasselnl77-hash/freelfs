@@ -1,0 +1,4 @@
+# Let the desktop's users (group seat) change the screen brightness: the
+# Display page of flsettings writes the backlight's sysfs file.
+# SPDX-License-Identifier: MIT
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/usr/bin/chgrp seat /sys$devpath/brightness", RUN+="/usr/bin/chmod g+w /sys$devpath/brightness"

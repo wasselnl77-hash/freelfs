@@ -1,0 +1,1 @@
+.a { contain: layout paint; content-visibility: auto; text-decoration-thickness: from-font; writing-mode: vertical-rl }

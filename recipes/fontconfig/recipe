@@ -1,0 +1,19 @@
+pkgname=fontconfig
+version=2.18.3
+release=1
+summary="Font configuration and customization library"
+url=https://www.freedesktop.org/wiki/Software/fontconfig/
+license=(HPND-sell-variant)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc freetype expat)
+makedepends=(gperf)
+source=(https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/$version/fontconfig-$version.tar.xz)
+sha256=(4f7b554a38cdf78c033f666c8871f3749e14a094f65a07f630c91ed0b43d35e3)
+build_style=autotools
+# --disable-cache-build: do not run fc-cache at install time (it would run
+# on the build host's DESTDIR); the font cache is built on the target.
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-docs
+	--disable-cache-build --docdir=/usr/share/doc/fontconfig-$version)
+
+check() { :; } # some tests download fonts over the network

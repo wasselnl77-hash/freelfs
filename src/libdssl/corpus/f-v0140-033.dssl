@@ -1,0 +1,2 @@
+tokens { color { c: #123456 } }
+motion pop { from { opacity: 0 } to { opacity: 1 } }

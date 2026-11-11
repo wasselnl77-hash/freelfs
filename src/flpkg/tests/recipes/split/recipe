@@ -1,0 +1,29 @@
+# Test recipe: a split package with per-package metadata, an owner
+# exception, a hard link and a symlink.
+pkgname=(hello hello-doc)
+pkgbase=hello
+version=1.0
+release=2
+summary="flpkg test program"
+license=(MIT)
+arch=(any)
+source=(hello.c)
+sha256=(08be7667b14aebe8b114151754dd1d7fb9e18df9832b6476752163ebbeadb292)
+
+build() {
+	gcc -O2 -o hello hello.c
+}
+
+package_hello() {
+	depends=(glibc)
+	owner=("/usr/bin/hello 0 5 2755")
+	install -Dm755 hello "$pkgdir/usr/bin/hello"
+	ln "$pkgdir/usr/bin/hello" "$pkgdir/usr/bin/hello2"
+	ln -s hello "$pkgdir/usr/bin/hi"
+}
+
+package_hello-doc() {
+	summary="Documentation for hello"
+	groups=(docs)
+	install -Dm644 hello.c "$pkgdir/usr/share/doc/hello/example.c"
+}

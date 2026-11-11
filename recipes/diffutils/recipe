@@ -1,0 +1,12 @@
+pkgname=diffutils
+version=3.12
+release=1
+summary="Finds differences between files (diff, cmp, sdiff)"
+url=https://www.gnu.org/software/diffutils/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://ftpmirror.gnu.org/diffutils/diffutils-$version.tar.xz)
+sha256=(7c8b7f9fc8609141fdea9cece85249d308624391ff61dedaf528fcb337727dfd)
+build_style=autotools

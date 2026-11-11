@@ -1,0 +1,1 @@
+.card::before { content: "x"; animate: pop 400 }

@@ -1,0 +1,1 @@
+#r { position: absolute; left: 100px; top: 300px; width: 300px; aura-particle: #7fe -> transparent count 30 life 400 speed 10 dir up spread 20 from thumb }

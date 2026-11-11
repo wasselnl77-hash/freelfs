@@ -1,0 +1,4 @@
+.card {
+  color: red
+  @signal on(true) { color: blue }
+}

@@ -1,0 +1,23 @@
+pkgname=flview
+version=0.1
+release=2
+summary="FreeLFS image viewer: folder browsing, zoom, rotate, trash, wallpaper"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland libpng libjpeg-turbo libwebp)
+makedepends=(flui libpng libjpeg-turbo libwebp)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flview" "$srcdir/flview"
+	cd "$srcdir/flview"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flview"
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,173 @@
+@layer tokens, base, components, utilities, pin;
+
+@layer tokens {
+:where(:root) {
+  --dssl-color-ink: #16161d;
+  --dssl-color-paper: #faf7f2;
+  --dssl-color-card: #ffffff;
+  --dssl-color-muted: #6f6a7a;
+  --dssl-color-line: #e5ded2;
+  --dssl-color-accent: oklch(62% 0.19 35);
+  --dssl-color-accent-ink: #fff6ee;
+  --dssl-color-ok: #2e7d4f;
+  --dssl-color-err: #b3372e;
+  --dssl-space-1: 4px;
+  --dssl-space-2: 8px;
+  --dssl-space-3: 12px;
+  --dssl-space-4: 16px;
+  --dssl-space-5: 24px;
+  --dssl-space-6: 32px;
+  --dssl-space-7: 48px;
+  --dssl-space-8: 64px;
+  --dssl-radius-sm: 8px;
+  --dssl-radius-md: 14px;
+  --dssl-radius-lg: 22px;
+  --dssl-radius-full: 999px;
+  --dssl-shadow-sm: 0px 1px 2px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent), 0px 1px 3px color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  --dssl-shadow-md: 0px 2px 4px color-mix(in oklab, var(--dssl-color-ink) 10%, transparent), 0px 4px 12px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent);
+  --dssl-shadow-lg: 0px 4px 8px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent), 0px 12px 32px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent);
+  --dssl-shadow-xl: 0px 8px 16px color-mix(in oklab, var(--dssl-color-ink) 14%, transparent), 0px 24px 64px color-mix(in oklab, var(--dssl-color-ink) 16%, transparent);
+  --dssl-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dssl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+}
+
+@layer components {
+:where(.bench-wrap) {
+  max-width: 880px;
+  margin: 0px auto;
+}
+
+:where(.bench-title) {
+  font-size: clamp(34px, calc(26.286px + 2.143vw), 52px);
+  font-weight: 760;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0px;
+  font-variation-settings: "wdth" 88;
+}
+
+:where(.bench-sub) {
+  color: var(--dssl-color-muted);
+  margin: 8px 0px 0px;
+}
+
+:where(.bench-controls) {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 24px 0px;
+}
+
+:where(.bench-btn) {
+  padding: 10px 18px;
+  border-radius: var(--dssl-radius-md);
+  background: var(--dssl-color-card);
+  border: 1px solid var(--dssl-color-line);
+  color: var(--dssl-color-ink);
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-size: 14px;
+}
+
+:where(.bench-btn:hover) {
+  background: color-mix(in oklab, var(--dssl-color-accent) 10%, transparent);
+  border-color: var(--dssl-color-accent);
+  translate: 0px -1px;
+}
+
+:where(.bench-btn:active) {
+  translate: 0px 0px;
+}
+
+:where(.bench-btn.on) {
+  background: color-mix(in oklab, var(--dssl-color-accent) 16%, transparent);
+  border-color: var(--dssl-color-accent);
+}
+
+:where(.bench-btn:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+:where(.bench-btn:disabled:hover) {
+  background: var(--dssl-color-card);
+  border-color: var(--dssl-color-line);
+  translate: 0px 0px;
+}
+
+:where(.bench-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0px;
+}
+
+:where(.bench-table th) {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--dssl-color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dssl-color-ink);
+}
+
+:where(.bench-table td) {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--dssl-color-line);
+  font-size: 14px;
+}
+
+:where(.bench-table td.num) {
+  text-align: right;
+}
+
+:where(.bench-lane-css) {
+  color: var(--dssl-color-muted);
+}
+
+:where(.bench-stage) {
+  height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--dssl-color-line);
+  border-radius: var(--dssl-radius-md);
+  margin: 12px 0px;
+  position: relative;
+}
+
+:where(.bench-stage:empty) {
+  display: none;
+}
+
+:where(.bench-stage-item) {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--dssl-color-line);
+  background: var(--dssl-color-card);
+  color: var(--dssl-color-ink);
+  font-size: 13px;
+}
+
+:where(.bench-note) {
+  font-size: 13px;
+  color: var(--dssl-color-muted);
+  margin: 6px 0px;
+}
+
+:where(.bench-freeze-stats) {
+  font-size: 13px;
+  color: var(--dssl-color-ok);
+  margin: 4px 0px;
+}
+
+:where(.bench-err) {
+  color: var(--dssl-color-err);
+  font-size: 13px;
+}
+
+@media (max-width: 700) {
+:where(.bench-table th, .bench-table td) {
+  padding: 6px 6px;
+  font-size: 12px;
+}
+}
+}

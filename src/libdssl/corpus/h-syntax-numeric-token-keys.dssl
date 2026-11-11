@@ -1,0 +1,3 @@
+tokens { space { 9: 96 10: 120 } pill: 999 card: 22 }
+.a { padding: space.9; margin: pill }
+

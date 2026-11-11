@@ -1,0 +1,16 @@
+# A layout change: /var and /etc become links into sysflfs
+pkgname=layout
+version=1.0
+release=1
+summary="Moves /var and /etc into /sysflfs"
+license=(MIT)
+arch=(any)
+source=()
+sha256=()
+
+package() {
+	cd "$pkgdir"
+	install -d sysflfs/data sysflfs/settings
+	ln -s sysflfs/data var
+	ln -s sysflfs/settings etc
+}

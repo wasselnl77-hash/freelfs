@@ -1,0 +1,37 @@
+pkgname=mpv
+version=0.42.0
+release=2
+summary="Media player and libmpv (used by flvideo through the software render API)"
+url=https://mpv.io/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc ffmpeg libass libplacebo libva libdisplay-info libdrm alsa-lib pipewire lcms2 zlib)
+makedepends=(meson ninja pkgconf python)
+source=(mpv-$version.tar.gz::https://github.com/mpv-player/mpv/archive/refs/tags/v$version.tar.gz)
+sha256=(bcfebbfa2b65a6d88dc97ea18117831072373e38b5785a2afb874ed4df5070dd)
+build_style=meson
+# No window system or GPU code at all: libmpv renders in software (vo=libmpv with
+# the "sw" render API) and the player draws into the caller's buffer. Hardware
+# decoding is VA-API, copied back to memory (hwdec=vaapi-copy) where the GPU and
+# its driver exist. Audio: PipeWire, else ALSA. No scripting (Lua, JavaScript),
+# no network streams of its own, no discs.
+configure_args=(-D gpl=true -D cplayer=true -D libmpv=true -D tests=false
+	-D lua=disabled -D javascript=disabled -D libcurl=disabled -D libarchive=disabled
+	-D cdda=disabled -D dvdnav=disabled -D dvda=disabled -D libbluray=disabled
+	-D uchardet=disabled -D zimg=disabled -D rubberband=disabled -D vapoursynth=disabled
+	-D libavdevice=disabled -D sdl2-gamepad=disabled -D x11-clipboard=disabled -D sixel=disabled
+	-D caca=disabled -D jack=disabled -D pulse=disabled -D openal=disabled -D sndio=disabled
+	-D wayland=disabled -D x11=disabled -D drm=enabled -D gbm=disabled -D egl=disabled
+	-D gl=disabled -D plain-gl=disabled -D vulkan=disabled -D shaderc=disabled -D spirv-cross=disabled
+	-D vaapi=enabled -D vaapi-drm=enabled -D vaapi-wayland=disabled -D vaapi-x11=disabled
+	-D vdpau=disabled -D xv=disabled -D subrandr=disabled -D lcms2=enabled -D pipewire=enabled
+	-D alsa=enabled -D jpeg=enabled -D iconv=enabled -D build-date=false)
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	# No window system code: the player cannot open a window itself, so its menu entry
+	# ("mpv Media Player") would only mislead; the video player is flvideo ("Videos").
+	rm -f "$pkgdir/usr/share/applications/mpv.desktop"
+}

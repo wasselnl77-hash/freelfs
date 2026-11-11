@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v072-012.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"stays legal\""}],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"animate","value":""}],"kind":"state","line":1,"name":"seen"}],"kind":"root"}}

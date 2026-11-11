@@ -1,0 +1,1 @@
+.a { padding-top: env(safe-area-inset-top, 20) }

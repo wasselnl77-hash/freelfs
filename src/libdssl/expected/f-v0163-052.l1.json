@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0163-052.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"substitutes every &\""}],"tree":{"children":[{"children":[{"children":[],"kind":"selector","line":1,"sel":".x &, & + &"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

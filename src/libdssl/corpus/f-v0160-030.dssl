@@ -1,0 +1,1 @@
+#plain { padding-top: 40px } #one { padding-top: 33px } #fam { padding-top: 4px; padding-left: 5px } #env { padding-bottom: env(safe-area-inset-bottom, 21px) } #none { padding-top: 50px } #late { padding-top: 33px }

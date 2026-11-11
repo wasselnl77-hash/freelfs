@@ -1,0 +1,8 @@
+
+    .a { gradient: linear 135, #ff0055 -> #00d4ff }
+    .b { gradient: linear to bottom right, red, blue }
+    .c { gradient: linear 90, #ff0055 20% -> #00d4ff 80% }
+    .d { gradient: radial circle at center, white -> black }
+    .e { gradient: conic from 45 at center, red, blue }
+    .f { gradient: linear, cyan, magenta }
+  

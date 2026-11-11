@@ -1,0 +1,15 @@
+// Features that the CSS lane lowers by itself (not part of the engine's static lane, see README):
+// animate: becomes a CSS animation, stack: gets a child rule, seen is applied unconditionally.
+motion rise { from { opacity: 0 } to { opacity: 1 } }
+motion bob { essential
+  0% { top: 0 } 100% { top: 4 } }
+.a { animate: rise 400 }
+.b { animate: bob 1200 infinite alternate, rise 200 delay 50 }
+.c, .d { stack: center }
+.card { opacity: 0; seen { opacity: 1 } }
+.e:seen > .f { color: red }
+.g::after { content: ""; animate: rise 100 }
+@media 700 { .h { animate: rise 1s snap forwards } }
+.jit { animate: rise 400 jitter 100; color: blue }
+pin { .p { animate: rise 300 } }
+.sig { @signal on { color: red } }

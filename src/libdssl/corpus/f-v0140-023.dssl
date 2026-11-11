@@ -1,0 +1,6 @@
+div { position: absolute }
+#attr { left: 0; top: 5px }
+#js { left: 0; top: 40px }
+#short { margin: 0 }
+#brd { border: 1 solid #fff; border-color: color.ink }
+#brd.on { border-color: red }

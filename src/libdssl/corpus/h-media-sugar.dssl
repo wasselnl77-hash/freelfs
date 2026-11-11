@@ -1,0 +1,16 @@
+.a {
+  @media 768 { padding: 24 }
+  @media <= 480 { padding: 12 }
+  @media 480..960 { gap: 4 }
+  @media dark { gap: 1 }
+  @media Light { gap: 2 }
+  @media reduced-motion { gap: 3 }
+  @media (width >= 768) { gap: 4 }
+  @media (width >= 1.5px) { gap: 4 }
+  @media (400 <= width <= 800) { gap: 5 }
+  @media (min-width: 40em) and (max-width: 90) { gap: 6 }
+  @media >= 700 { gap: 7 }
+  @media print { gap: 8 }
+  @media 1.5..2.5 { gap: 9 }
+}
+

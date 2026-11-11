@@ -1,0 +1,1 @@
+.sprite { outline-shape: 3 color.ink }       // follows the picture's alpha, not its box; outline-shape: none clears it

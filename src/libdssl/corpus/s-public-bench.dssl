@@ -1,0 +1,129 @@
+// bench.dssl, the benchmark view. The page measures the engine; the engine
+// styles the page. tabular numbers come from the JS side (canvas of fonts
+// varies), everything else lives here.
+
+.bench-wrap {
+  max-width: 880
+  margin: 0 auto
+}
+
+.bench-title {
+  font-size: fluid 34 52
+  font-weight: 760
+  line-height: 1.05
+  letter-spacing: -0.03em
+  margin: 0
+  font-variation-settings: "wdth" 88
+}
+
+.bench-sub {
+  color: color.muted
+  margin: 8 0 0
+}
+
+.bench-controls {
+  row: gap 10 wrap
+  margin: 24 0
+}
+
+.bench-btn {
+  padding: 10 18
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  color: color.ink
+  cursor: pointer
+  transition: 150
+  font-size: 14
+
+  hover {
+    background: color.accent/10
+    border-color: color.accent
+    translate: 0 -1
+  }
+  active { translate: 0 0 }
+}
+
+.bench-btn.on {
+  background: color.accent/16
+  border-color: color.accent
+}
+
+.bench-btn:disabled {
+  opacity: 0.55
+  cursor: default
+  hover {
+    background: color.card
+    border-color: color.line
+    translate: 0 0
+  }
+}
+
+.bench-table {
+  width: 100%
+  border-collapse: collapse
+  margin: 12 0
+}
+
+.bench-table th {
+  text-align: left
+  padding: 8 10
+  border-bottom: 2 solid color.ink
+  font-size: 14
+  font-weight: 700
+  color: color.ink
+}
+
+.bench-table td {
+  padding: 8 10
+  border-bottom: 1 solid color.line
+  font-size: 14
+}
+
+.bench-table td.num {
+  text-align: right
+}
+
+.bench-lane-css  { color: color.muted }
+.bench-lane-live { }
+.bench-lane-frozen { }
+
+.bench-stage {
+  height: 300
+  overflow: hidden
+  border: 1 solid color.line
+  radius: md
+  margin: 12 0
+  position: relative
+}
+
+.bench-stage:empty { display: none }
+
+.bench-stage-item {
+  padding: 5 10
+  border-bottom: 1 solid color.line
+  background: color.card
+  color: color.ink
+  font-size: 13
+}
+
+.bench-note {
+  font-size: 13
+  color: color.muted
+  margin: 6 0
+}
+
+.bench-freeze-stats {
+  font-size: 13
+  color: color.ok
+  margin: 4 0
+}
+
+.bench-err {
+  color: color.err
+  font-size: 13
+}
+
+@media (max-width: 700) {
+  .bench-table th, .bench-table td { padding: 6 6; font-size: 12 }
+}

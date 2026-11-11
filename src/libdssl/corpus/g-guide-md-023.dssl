@@ -1,0 +1,3 @@
+.orb { aura-glow: color.accent 28 pulse 1600 }                                  // colour, then radius
+.hot { aura-particle: #ffd24a -> #ff6a00 -> rgba(255,40,0,0) 60 up from top }   // colour stops, count, direction
+.big { aura: glow #ff7a00 30 flicker 0.3, particles #fd0 count 60 shape flame glowing behind }

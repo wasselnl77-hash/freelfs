@@ -1,0 +1,1 @@
+motion w { 0%, 100% { opacity: 1 } 40% { opacity: 0 } }

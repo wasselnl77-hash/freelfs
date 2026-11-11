@@ -1,0 +1,13 @@
+flsetup -- first boot: choose the keyboard
+==========================================
+
+Started by `flcomp --firstboot` when /etc/keyboard.conf is missing. Four
+layouts (QWERTZ German, QWERTY US, QWERTY UK, AZERTY French), a preview of
+the keys and a field to try them in (it uses the chosen layout at once, not
+the compositor's). Continue writes `LAYOUT=de` (de, us, uk, fr) to
+/etc/keyboard.conf and exits 0; exit 1 if the window was closed unsaved.
+
+FL_KEYBOARD_CONF=FILE overrides the path (tests). FLUI_PPM=out.ppm renders
+the window without a compositor.
+
+Build: make; make install (PREFIX, DESTDIR). Needs libflui.

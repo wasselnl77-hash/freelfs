@@ -1,0 +1,30 @@
+pkgname=openssl
+version=4.0.1
+release=1
+summary="TLS and general-purpose cryptography library"
+url=https://www.openssl.org/
+license=(Apache-2.0)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib)
+source=(https://github.com/openssl/openssl/releases/download/openssl-$version/openssl-$version.tar.gz)
+sha256=(2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09)
+
+build() {
+	./config --prefix=/usr \
+		--openssldir=/etc/ssl \
+		--libdir=lib \
+		shared \
+		zlib-dynamic
+	make
+}
+
+check() {
+	make test
+}
+
+package() {
+	make DESTDIR="$pkgdir" INSTALL_LIBS= MANSUFFIX=ssl install
+	mv "$pkgdir/usr/share/doc/openssl" "$pkgdir/usr/share/doc/openssl-$version"
+	cp -fr doc/* "$pkgdir/usr/share/doc/openssl-$version"
+}

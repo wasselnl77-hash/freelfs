@@ -1,0 +1,82 @@
+@layer tokens, base, components, utilities, pin;
+
+@layer tokens {
+:where(:root) {
+  --dssl-color-ink: #16161d;
+  --dssl-color-paper: #faf7f2;
+  --dssl-color-card: #ffffff;
+  --dssl-color-muted: #6f6a7a;
+  --dssl-color-line: #e5ded2;
+  --dssl-color-accent: oklch(62% 0.19 35);
+  --dssl-color-accent-ink: #fff6ee;
+  --dssl-color-ok: #2e7d4f;
+  --dssl-color-err: #b3372e;
+  --dssl-space-1: 4px;
+  --dssl-space-2: 8px;
+  --dssl-space-3: 12px;
+  --dssl-space-4: 16px;
+  --dssl-space-5: 24px;
+  --dssl-space-6: 32px;
+  --dssl-space-7: 48px;
+  --dssl-space-8: 64px;
+  --dssl-radius-sm: 8px;
+  --dssl-radius-md: 14px;
+  --dssl-radius-lg: 22px;
+  --dssl-radius-full: 999px;
+  --dssl-shadow-sm: 0px 1px 2px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent), 0px 1px 3px color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  --dssl-shadow-md: 0px 2px 4px color-mix(in oklab, var(--dssl-color-ink) 10%, transparent), 0px 4px 12px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent);
+  --dssl-shadow-lg: 0px 4px 8px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent), 0px 12px 32px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent);
+  --dssl-shadow-xl: 0px 8px 16px color-mix(in oklab, var(--dssl-color-ink) 14%, transparent), 0px 24px 64px color-mix(in oklab, var(--dssl-color-ink) 16%, transparent);
+  --dssl-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dssl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+}
+
+@layer components {
+:where(.m) {
+  background-image: linear-gradient(90deg, red 10px, blue 20px);
+}
+
+:where(.o) {
+  background-image: ;
+}
+
+:where(.p) {
+  background-image: linear-gradient(90deg, red, blue);
+  background-image: url(x.png);
+}
+
+:where(.q) {
+  background-image: linear-gradient(90deg, red, blue);
+  background: url(x.png);
+}
+
+:where(.r) {
+  background-image: linear-gradient(90deg, red, blue);
+  background-image: none;
+}
+
+:where(.s) {
+  background-image: radial-gradient(circle farthest-side at 10px 10px, red, blue);
+}
+
+:where(.t) {
+  background-image: conic-gradient(at 50% 50%, red, blue);
+}
+
+:where(.u) {
+  background-image: conic-gradient(from 10deg at center, red, blue);
+}
+
+:where(.v) {
+  background-image: linear-gradient(-45deg, red, blue);
+}
+
+:where(.w) {
+  background-image: linear-gradient(90deg in hsl longer hue, red, blue);
+}
+
+:where(.x) {
+  background-image: linear-gradient(180deg in srgb, red, blue);
+}
+}

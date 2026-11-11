@@ -1,0 +1,1 @@
+.orb { position: absolute; left: 300px; top: 200px; width: 120px; height: 120px; background: #202030; radius: 20; aura-glow: #ff8800 40 }

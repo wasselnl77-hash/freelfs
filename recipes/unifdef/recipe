@@ -1,0 +1,15 @@
+pkgname=unifdef
+version=2.12
+release=1
+summary="Removes #ifdef lines from source (WebKit build tool)"
+url=https://dotat.at/prog/unifdef/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://dotat.at/prog/unifdef/unifdef-$version.tar.gz)
+sha256=(fba564a24db7b97ebe9329713ac970627b902e5e9e8b14e19e024eb6e278d10b)
+build() { make CC="cc -std=gnu17"; }
+check() { :; }
+package() { make prefix=/usr DESTDIR="$pkgdir" install; }

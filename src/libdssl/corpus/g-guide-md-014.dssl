@@ -1,0 +1,3 @@
+@signal screen in (menu, shop, settings) { .overlay { opacity: 1 } }
+@signal screen not in (playing) { .hud { display: none } }
+@signal screen != menu { .back { display: block } }

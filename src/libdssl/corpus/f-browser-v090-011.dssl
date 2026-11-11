@@ -1,0 +1,2 @@
+aura-glow: currentColor 40
+  aura-particle: color currentColor count 30 life 600 speed 30 dir up from top texture(grain scale 2) }

@@ -1,0 +1,50 @@
+flgm -- General Manager, the FreeLFS task manager
+=================================================
+
+    general-manager [--tab processes|performance|startup|users|details]
+
+Opens with Ctrl+Shift+Esc (flcomp, seat.c) or from the start menu. Built on libflui;
+everything comes from /proc and /sys, no root needed. The window refreshes once a second
+(one timer, nothing else wakes it); process data is only read while Processes, Users or
+Details is showing. Idle: about 17 MB RSS, about 0.4 % of a core on Performance and about
+1 % on Processes with 330 processes.
+
+Tabs
+  Processes     Apps (processes of a program that has a .desktop file, with the whole tree
+                below it), Background processes (your own), System processes (root, service
+                users, kernel threads), grouped and expandable. CPU, Memory, Disk, Network
+                columns with accent-tinted cells; the column headers show the machine totals.
+                Click a header to sort. End task (button or Delete) sends SIGTERM to the
+                selected row, all processes of a group included; Shift+Delete sends SIGKILL.
+                Memory is private memory (resident minus shared). Disk is read+write bytes per
+                second from /proc/PID/io, which only your own processes allow: others show a
+                dash. Network per process is always a dash (needs root); the header shows the
+                total of all adapters.
+  Performance   CPU, Memory, every disk, every network adapter, every GPU, each with a
+                sparkline on the left and a 60 second graph, numbers and facts on the right.
+                CPU has an Overall / Logical processors switch. GPU busy percent and VRAM come
+                from /sys/class/drm/cardN/device (amdgpu); drivers without them show "not
+                reported". Up and Down move through the list; a window that is too short
+                scrolls the page.
+  Startup apps  .desktop files in ~/.config/autostart (XDG_CONFIG_HOME) and the system
+                directories (/etc/xdg/autostart, XDG_CONFIG_DIRS). The switch writes
+                Hidden=true into the user's file; for a system entry it writes a small
+                override file (X-FreeLFS-Override=true) that is removed when it is switched
+                on again. The session script (src/flcomp/session) starts them at login: the user's
+                file of the same name wins, Hidden=true, X-GNOME-Autostart-enabled=false, an
+                OnlyShowIn/NotShowIn that excludes FreeLFS, a missing TryExec and the override
+                files switch an entry off (checked in QEMU, build/m10-features.*).
+  Users         One row per user with the totals; expand for that user's apps and programs.
+  Details       Flat table: name, PID, status, user, CPU, memory, command line. Sortable.
+
+Keys: Ctrl+F search (Esc clears it), Ctrl+1..5 or Ctrl+PageUp/PageDown switch tabs, Up/Down/
+PageUp/PageDown/Home/End move, Right/Left expand and collapse, Enter toggles, Delete ends the task.
+
+Test hooks: GM_INTERVAL_MS (refresh interval, at least 50), --sort, --expand APP|all,
+--select TEXT, --search TEXT, --cores, --size WxH, --perf cpu|memory|disk|network|gpu.
+Headless screenshots: FLUI_PPM=FILE FLUI_PPM_DELAY=3500 GM_INTERVAL_MS=250 (see docs/m7/gm-*.png).
+
+Tests
+  make check          sys.c, proc.c, startup.c against the host /proc and a scratch autostart dir
+  tests/e2e.sh        headless flcomp + the window: Ctrl+Shift+Esc starts it, search, Down, Delete
+                      ends a victim process of its own, screenshots (needs FLCOMP=, GM_SYSROOT=)

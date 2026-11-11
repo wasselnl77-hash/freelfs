@@ -1,0 +1,2 @@
+motion rise { from { opacity: 0 } }
+.card { seen { animate: rise 400 } }

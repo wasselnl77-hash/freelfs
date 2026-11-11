@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xcb-util-keysyms
+version=0.4.1
+release=1
+summary="Key symbol helpers for XCB"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libxcb)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/xcb/xcb-util-keysyms-0.4.1.tar.xz)
+sha256=(7c260a5294412aed429df1da2f8afd3bd07b7cba3fec772fba15a613a6d5c638)
+build_style=autotools
+configure_args=(--disable-static --disable-devel-docs --without-doxygen)
+check() { :; }

@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0100-036.dssl","line":1,"message":"block is missing a header before \"{\""},{"file":"f-v0100-036.dssl","hint":"property names are lower-case words with dashes (my-prop), or dotted tokens (color.accent)","line":1,"message":"\"\"v\"\" is not a valid property name"}],"tree":{"children":[],"kind":"root"}}

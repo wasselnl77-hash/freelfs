@@ -1,0 +1,27 @@
+pkgname=gst-plugins-base
+version=1.28.6
+release=2
+summary="GStreamer base plugins and libraries (playback, audio, video, GL)"
+url=https://gstreamer.freedesktop.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gstreamer orc mesa libdrm zlib alsa-lib libpng libjpeg-turbo wayland libogg libvorbis opus)
+makedepends=(meson ninja python wayland-protocols)
+source=(https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-$version.tar.xz)
+sha256=(0ba699c7c6c66f4ba640be78cb38a24715add9683f3e3a199f5369dc5a4f04ac)
+build_style=meson
+# Everything off except what playback and WebKit need; GL through EGL on
+# Wayland/GBM (no X11, no GLX).
+configure_args=(-D auto_features=disabled -D introspection=disabled -D doc=disabled -D tests=disabled
+	-D examples=disabled -D tools=enabled -D nls=disabled -D orc=enabled
+	-D adder=enabled -D app=enabled -D audioconvert=enabled -D audiomixer=enabled
+	-D audiorate=enabled -D audioresample=enabled -D audiotestsrc=enabled
+	-D compositor=enabled -D encoding=enabled -D gio=enabled -D overlaycomposition=enabled
+	-D pbtypes=enabled -D playback=enabled -D rawparse=enabled -D subparse=enabled
+	-D ogg=enabled -D vorbis=enabled -D opus=enabled
+	-D tcp=enabled -D typefind=enabled -D videoconvertscale=enabled -D videorate=enabled
+	-D videotestsrc=enabled -D volume=enabled -D alsa=enabled
+	-D gl=enabled -D gl_api=gles2 -D gl_platform=egl -D gl_winsys=wayland,egl
+	-D gl-png=enabled -D gl-jpeg=enabled)
+check() { :; }

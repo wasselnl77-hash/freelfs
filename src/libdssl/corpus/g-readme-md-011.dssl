@@ -1,0 +1,7 @@
+@media (max-width: 860) { .nav-links { display: none } }
+@media dark   { .card { background: #1c1714 } }
+@media reduced-motion { .hero { animate: none } }
+
+@container (min-width: 480) { .widget { grid-template-columns: 1 1 1 } }
+
+@signal menuOpen { .nav-links { column: gap 2; display: flex } }

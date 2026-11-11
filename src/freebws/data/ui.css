@@ -1,0 +1,41 @@
+/* FreeBWS internal pages: the FreeLFS look. Flat, sharp corners, IBM Plex. */
+:root {
+	--bg: #1d2125; --panel: #272c33; --raised: #343a43; --line: #3a4048;
+	--text: #d8dce0; --dim: #8a9199; --accent: #3f9b63; --accent-hi: #4cb374; --err: #d96c5f;
+	color-scheme: dark;
+}
+* { box-sizing: border-box; border-radius: 0; }
+html { background: var(--bg); }
+body { margin: 0; font: 14px/1.5 "IBM Plex Sans", sans-serif; color: var(--text); background: var(--bg); }
+a { color: var(--accent-hi); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; }
+h2 { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 28px 0 8px; }
+p { margin: 0 0 10px; }
+.dim { color: var(--dim); }
+code, .mono { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+.page { max-width: 760px; margin: 0 auto; padding: 28px 24px 60px; }
+.head { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.head .sp { flex: 1; }
+.box { background: var(--panel); border: 1px solid var(--line); }
+.row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--line); min-height: 46px; }
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row .sub { color: var(--dim); font-size: 12.5px; }
+button, .btn, input, select { font: inherit; color: var(--text); }
+button, .btn { background: var(--raised); border: 1px solid var(--line); padding: 5px 14px; cursor: pointer; display: inline-block; }
+button:hover, .btn:hover { background: #3d444e; text-decoration: none; }
+button.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.accent:hover { background: var(--accent-hi); }
+button.small { padding: 2px 9px; font-size: 12.5px; }
+button.danger:hover { background: #4a2e2b; border-color: var(--err); }
+input[type=text], select { background: var(--bg); border: 1px solid var(--line); padding: 6px 9px; min-width: 0; }
+input[type=text]:focus, select:focus, button:focus-visible { outline: 0; border-color: var(--accent); }
+select { padding-right: 24px; }
+/* a switch: a flat track with a square knob */
+.sw { position: relative; width: 38px; height: 20px; flex: none; background: var(--bg); border: 1px solid var(--line); cursor: pointer; padding: 0; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: var(--dim); transition: left .1s; }
+.sw.on { background: var(--accent); border-color: var(--accent); }
+.sw.on::after { left: 21px; background: #fff; }
+.empty { padding: 26px 14px; color: var(--dim); text-align: center; }
+.tag { font-size: 11.5px; color: var(--dim); border: 1px solid var(--line); padding: 0 6px; }

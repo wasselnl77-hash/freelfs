@@ -1,0 +1,19 @@
+pkgname=util-linux
+version=2.42.2
+release=1
+summary="Miscellaneous system utilities (mount, fdisk, agetty, ...)"
+url=https://github.com/util-linux/util-linux
+license=(GPL-2.0-or-later LGPL-2.1-or-later BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses readline zlib libcap libxcrypt)
+owner=("/usr/bin/wall 0 5 2755")
+source=(https://www.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-$version.tar.xz)
+sha256=(03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a)
+build_style=autotools
+configure_args=(--bindir=/usr/bin --libdir=/usr/lib --runstatedir=/run --sbindir=/usr/sbin
+	--disable-chfn-chsh --disable-login --disable-nologin --disable-su --disable-setpriv
+	--disable-runuser --disable-pylibmount --disable-liblastlog2 --disable-static
+	--without-python --without-systemd --without-systemdsystemunitdir
+	--disable-makeinstall-chown ADJTIME_PATH=/var/lib/hwclock/adjtime
+	--docdir=/usr/share/doc/util-linux-$version)

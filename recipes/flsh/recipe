@@ -1,0 +1,28 @@
+# The FreeLFS shell, from src/flsh in the FreeLFS tree.
+pkgname=flsh
+version=0.1
+release=2
+summary="The FreeLFS shell: POSIX syntax, colours, suggestions, Tab menus"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsh" "$srcdir/flsh"
+	cd "$srcdir/flsh"
+	make clean
+	make
+}
+
+check() {
+	cd "$srcdir/flsh"
+	make check
+}
+
+package() {
+	cd "$srcdir/flsh"
+	make DESTDIR="$pkgdir" install
+}

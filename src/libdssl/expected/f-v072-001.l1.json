@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":2,"prop":"background","value":"#26201a"},{"children":[{"kind":"decl","line":3,"prop":"background","value":"#c0392b"}],"kind":"state","line":3,"name":"hover"}],"kind":"selector","line":1,"sel":".card"}],"kind":"root"}}

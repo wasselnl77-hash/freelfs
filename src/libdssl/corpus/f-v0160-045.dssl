@@ -1,0 +1,1 @@
+#im { position: absolute; left: 150px; top: 150px; width: 100px; height: 100px; aura-glow: #f00 25 essential around alpha intensity 2 }

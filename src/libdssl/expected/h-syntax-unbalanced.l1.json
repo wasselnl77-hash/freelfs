@@ -1,0 +1,1 @@
+{"errors":[{"file":"h-syntax-unbalanced.dssl","line":4,"message":"unexpected \"}\""}],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"color","value":"red"},{"children":[{"kind":"decl","line":2,"prop":"color","value":"blue"}],"kind":"selector","line":2,"sel":".b"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

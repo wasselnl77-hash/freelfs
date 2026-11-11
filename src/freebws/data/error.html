@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>@TITLE@</title>
+<style>
+/* FreeBWS error page: the "oh no." screen of the crash screen (src/flcrash), as a web page */
+:root { --field: #1f3d2e; --white: #f0f2f4; color-scheme: dark; }
+* { box-sizing: border-box; border-radius: 0; }
+html, body { margin: 0; background: var(--field); color: var(--white); }
+body { font: 17px/1.55 "IBM Plex Sans", sans-serif; min-height: 100vh; }
+main { padding: 6vh 8vw 5vh; max-width: 1100px; }
+.oh { display: inline-block; font-weight: 700; font-size: clamp(34px, 6.4vw, 78px); line-height: 1; letter-spacing: .02em;
+      transform: scaleX(2.8); transform-origin: 0 50%; margin: 0 0 1vh; white-space: nowrap; }
+.face { font-size: clamp(44px, 7vw, 96px); line-height: 1.1; margin: 2vh 0 2vh; font-weight: 300; }
+h1 { font-size: 30px; font-weight: 600; margin: 0 0 10px; }
+p { margin: 0 0 22px; color: rgba(240,242,244,.8); max-width: 38em; }
+.keys { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 26px; align-items: flex-start; }
+a.key { display: flex; align-items: center; gap: 16px; color: var(--white); text-decoration: none; }
+a.key kbd { display: inline-block; min-width: 84px; text-align: center; font: 600 15px "IBM Plex Sans", sans-serif; padding: 6px 10px;
+            border: 2px solid rgba(240,242,244,.43); background: rgba(240,242,244,.1); }
+a.key:hover kbd, a.key:focus kbd { background: rgba(240,242,244,.2); }
+a.key.main span { font-weight: 600; }
+dl { display: grid; grid-template-columns: 110px 1fr; gap: 3px 0; margin: 0; font: 13.5px "IBM Plex Mono", monospace; color: rgba(240,242,244,.6); }
+dd { margin: 0; color: rgba(240,242,244,.85); word-break: break-all; }
+dt { margin: 0; }
+</style></head>
+<body><main>
+<div class="oh">oh no.</div>
+<div class="face">@FACE@</div>
+<h1>@TITLE@</h1>
+<p>@TEXT@</p>
+<div class="keys">@BUTTONS@</div>
+<dl><dt>Code</dt><dd>@CODE@</dd><dt>Address</dt><dd>@URL@</dd><dt>Detail</dt><dd>@DETAIL@</dd></dl>
+</main>
+<script>
+var n = 0, pend = {};
+document.addEventListener('fb-reply', function () {});
+function fb(cmd, args) {
+	var msg = { cmd: cmd };
+	for (var k in args || {}) msg[k] = args[k];
+	document.dispatchEvent(new CustomEvent('fb-call', { detail: JSON.stringify({ id: ++n, msg: msg }) }));
+}
+function go(act) {
+	if (act === 'home') fb('open', { url: 'freebws://start' });
+	else fb(act);
+}
+document.querySelectorAll('a[data-act]').forEach(function (a) {
+	a.addEventListener('click', function (e) { e.preventDefault(); go(a.getAttribute('data-act')); });
+});
+document.addEventListener('keydown', function (e) {
+	if (e.ctrlKey || e.altKey || e.metaKey) return;
+	var k = e.key, a = null;
+	if (k === 'Enter') a = document.querySelector('a.main');
+	else if (k === 'Escape') a = document.querySelector('a[data-act=home]');
+	else if (k === 'c' || k === 'C') a = document.querySelector('a[data-act=tls-proceed]');
+	else if (k === 'o' || k === 'O') a = document.querySelector('a[data-act=blocked-proceed]');
+	if (a) { e.preventDefault(); go(a.getAttribute('data-act')); }
+});
+</script></body></html>

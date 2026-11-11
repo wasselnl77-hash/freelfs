@@ -1,0 +1,5 @@
+.nav-links {
+  display: none
+  column: gap 2   // warning: "column:" expands to display: flex and
+                  // overrides the earlier "display: none", menu stays open
+}

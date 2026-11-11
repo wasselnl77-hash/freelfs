@@ -1,0 +1,20 @@
+# build output
+*.o
+*.a
+*.so
+*.so.*
+__pycache__/
+*.pyc
+*.ppm
+
+# compiled binaries (ELF)
+/src/flcomp/flcomp
+/src/flcomp/tests/shmclient
+/src/fllock/fllock
+/src/fllock/fllock-check
+/src/flpanel/flnotify
+/src/flpanel/flpanel
+/src/flpanel/flpower
+/src/flsh/flsh
+/src/snappel/snappel
+/src/snappel/tests/ops_test

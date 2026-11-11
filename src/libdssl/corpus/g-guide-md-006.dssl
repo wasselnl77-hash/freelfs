@@ -1,0 +1,7 @@
+.card {
+  @media dark { background: #181310 }       // one-word sugar
+  @media 768 { padding: 24 }                // bare width = min-width
+  @media <= 480 { padding: 12 }
+  @container (min-width: 400px) { column: gap 4 }
+  @signal theme==dark { border-color: color.accent }
+}

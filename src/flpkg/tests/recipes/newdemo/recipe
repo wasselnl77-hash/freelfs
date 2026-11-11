@@ -1,0 +1,10 @@
+# Test package that replaces demo (a rename).
+pkgname=newdemo
+version=3.0
+release=1
+summary="flpkg test package replacing demo"
+arch=(any)
+provides=("demo=3.0")
+conflicts=(demo)
+replaces=(demo)
+package() { mkdir -p "$pkgdir/usr/share/newdemo" && echo 3 > "$pkgdir/usr/share/newdemo/x"; }

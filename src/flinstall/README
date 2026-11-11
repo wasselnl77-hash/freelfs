@@ -1,0 +1,116 @@
+flinstall -- the FreeLFS installer ("FreeLFS install")
+=====================================================
+
+Two programs, C17, MIT.
+
+  flinstall          (/usr/bin) the window, on libflui. Steps: Language, Keyboard, Wi-Fi,
+                     Disk, Account, Time zone, Summary, Install (progress, then Restart).
+                     It never touches a disk.
+  flinstall-helper   (/usr/libexec) the privileged half. Installed setuid root for the group
+                     seat (recipe owner= "... 0 98 4750", like flpower and fltime-set).
+
+The start menu entry (flinstall.desktop, System) has TryExec=/run/live, a directory only the
+live system has (flinitrd), so an installed system does not show it. Nothing else is live
+specific in the window; the helper checks for itself.
+
+The steps
+  Language    12 languages; sets LANG for programs through /etc/profile.d/20-lang.sh (a text
+              console keeps C.UTF-8). It suggests a keyboard and a time zone. FreeLFS itself
+              stays English.
+  Keyboard    the four libflui layouts with the key preview and a field to try them. Written
+              to /etc/keyboard.conf on the new system: the first boot (flsetup) then does not
+              ask, so that step is "moved here" for installed systems; the live system still
+              asks at its own first boot.
+  Wi-Fi       flsettings' wifi.c (iwd over D-Bus), copied at build time. Known networks
+              (/var/lib/iwd/*.psk, *.open, *.8021x) are copied to the new system. Can be skipped.
+  Disk        pick a disk (the live medium, disks with something mounted and read-only disks
+              are shown but cannot be chosen), then
+                Use the whole disk   (default) new GPT: ESP 512 MiB + btrfs for the rest
+                Install next to existing partitions   only free space: the largest gap
+                             holding at least 6.5 GiB gets ESP + btrfs; GPT disks only; no
+                             existing partition is touched (sfdisk --append). A blank disk
+                             is treated like the whole disk.
+                Manual       the partition editor: list and bar of the disk, make a partition
+                             in a free gap (System, Boot, Swap, Data; size), delete, "use as"
+                             (/ , /boot, swap, /drives/NAME), format (kept or erased),
+                             new GPT. One disk at a time. / is always btrfs with the layout,
+                             /boot is FAT32 (an existing one may be kept), data is ext4 or
+                             btrfs (or kept).
+  Account     full name, user name, password twice. Names are refused if they are a link in
+              /usr (bin include lib libexec local sbin share src), already a user or group of
+              the system, or not [a-z_][a-z0-9_-]{0,31}. The password needs 4 characters; the
+              window draws it as squares and wipes it after sending it; root gets the same
+              password. The user is in users (primary) and seat, audio, video, render,
+              wheel, netdev.
+  Time zone   the world map and search of libflui (A10), default from the language.
+  Summary     the helper's own list of what will happen (a "check"), erasing in red, and for
+              erasing a box to tick before the button says "Erase and install".
+  Install     five steps, a progress bar for the copy, the last lines of what the helper runs.
+
+What the helper does (everything is checked again there)
+  Real mode needs euid 0, the live system (/run/live/rom is a squashfs and / an overlay) and a
+  disk that /sys lists, that is not the live medium, not read-only, nothing mounted. The window
+  never names a path: it sends the device it got from the helper's list.
+  1  sfdisk: --append / --delete, or a new GPT; the new partitions get random PARTUUIDs, the
+     helper finds their nodes by PARTUUID afterwards.
+  2  wipefs and mkfs.fat / mkswap / mkfs.ext4 / mkfs.btrfs for the extra partitions.
+  3  in a private mount namespace: tmpfs stage dir, an overlay of the live squashfs
+     (/run/live/rom) with the changes below, @home filled with the links of /usr and the new
+     home, then one `mkfs.btrfs --rootdir --subvol default:@ --subvol @home --subvol @snapshots`
+     (as build/50-image.sh does): no mounting of the new disk, no per-file copying.
+     Progress is the helper's read count over the size of the source.
+     The changes: fstab (file systems by UUID/PARTUUID, three btrfs lines, ESP, swap, data),
+     keyboard.conf, profile.d/20-lang.sh, timezone + localtime, flpkg.conf snapshots = 5
+     again, the live notes taken out of /etc/issue, the live user "tester" removed from
+     passwd/shadow/group/gshadow, the new user added (sha512 crypt), root's hash, /usr/NAME
+     from /etc/skel owned by the new uid.
+  4  the ESP: flboot.conf (root=PARTUUID=...) written first, `flboot-install --esp DIR` into a
+     staging directory, the kernel next to it, then mcopy (mtools) writes it into the
+     partition: no mount. The kernel comes from /run/live/iso/live/vmlinuz-* (build/53-iso.sh
+     puts it there; the squashfs has no /boot), else /boot.
+  5  sync.
+  The helper uses its own tools from PATH=/usr/sbin:/usr/bin:/sbin:/bin: sfdisk wipefs
+  mkfs.btrfs mkfs.fat mkfs.ext4 mkswap mcopy flboot-install (sgdisk is not in FreeLFS: sfdisk
+  does the same), and refuses to start an install if one is missing, before writing anything.
+
+The protocol (stdin/stdout, one line each, fields separated by TAB)
+  window -> helper   disks | set KEY VALUE (mode whole|free|manual, disk, user, fullname,
+                     password, lang, keyboard, tz) | part reset|newtable|delete DEV|
+                     create START SIZE esp|root|swap|data (bytes) | format ID FS LABEL |
+                     mount ID MOUNTPOINT | check | install | quit
+                     New partitions are called new1, new2 ... in the order of the create lines.
+  helper -> window   HELLO MODE, DISK/PART/FREE ... END, OK, ERR text, PLAN lines + OK for a
+                     check, then for install STEP n total text, PROGRESS pct, CMD text (a
+                     command run or, in a dry run, that would be run), LOG text, DONE | FAIL.
+
+--dry-run   questions run (sfdisk -d, blkid -p, /sys, /proc: read only); everything that would
+            write, format, mount or copy is printed as CMD lines and not done.
+
+Test hooks (refused when the helper runs with more privilege than its caller, i.e. setuid)
+  --image FILE        a regular file instead of a disk (never a device; checked with stat)
+  --source DIR        the live tree to copy (default /run/live/rom)
+  --kernel FILE  --iwd DIR  --workdir DIR
+  FLINSTALL_FAKE=DIR  fake disks for a dry run: disks.txt (name, bytes, removable, model,
+                      flags live|ro), NAME.dump (sfdisk -d output), NAME.fs
+  In image mode the helper partitions the file, formats scratch files and dd's them in at
+  the partition offsets (a file has no partition nodes), and runs the stage in a user and
+  mount namespace, so no privilege is needed.
+Window: FLINSTALL_HELPER="cmd args" replaces the helper, FLINSTALL_RESTART replaces
+`flpower restart`; with FLUI_PPM: FLINSTALL_STEP=0..7 and FLINSTALL_TEST=disk=N,mode=N,
+user=,full=,pw=,pw2=,lang=,kbd=,zone=,edit,edops=...,sel=,running=PCT,done,failed,confirm,
+nodry (see apply_test in flinstall.c).
+
+Tests
+  tests/image-test.sh SCRATCH   the helper for real on sparse files in SCRATCH (needs a root
+                                with the tools: FLFS_IMAGE_ROOT); reads the result back with
+                                btrfs restore and mtools. Never names a device.
+  tests/install.py              the window clicked through in headless flcomp, dry-run helper
+                                on tests/fixture; checks what the helper was sent.
+
+Not covered by any test here (needs root and a disk): the real-disk path, the setuid helper,
+booting what it made, the kernel re-reading the partition table, the restart.
+Not supported (decided): dual boot with Windows, other boot loaders, BIOS boot, encryption,
+LVM/RAID, an own swap file.
+
+The root account: FI_ROOT_SAME_PASSWORD in common.h is the one-line switch. 1 (now): root gets the first
+user's password; 0: root is locked (shadow field "!"); the window's note follows.

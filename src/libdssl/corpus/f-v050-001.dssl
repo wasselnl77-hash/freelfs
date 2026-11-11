@@ -1,0 +1,7 @@
+
+    .card::before {
+      content: ""
+      background: color.accent
+      width: 12
+    }
+  

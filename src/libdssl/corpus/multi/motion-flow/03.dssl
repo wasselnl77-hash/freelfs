@@ -1,0 +1,4 @@
+.d { animate: fall 100 }
+.e { animate: rise 100 }
+.f { animation: fall 1s }
+

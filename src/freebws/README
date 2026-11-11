@@ -1,0 +1,117 @@
+FreeBWS -- the FreeLFS web browser
+==================================
+
+WPE WebKit (wpewebkit, libwpe, wpebackend-fdo) in a libflui window: a tab row,
+a toolbar with back, forward, reload and an address bar that also searches
+(Brave Search by default), star, ad blocker shield, downloads and menu buttons, a
+bookmarks bar, and the page as a wl_subsurface of the window. Ad blocker, search
+engines, downloads, bookmarks, dark mode and error pages: see "Features" below and
+docs/M8-BROWSER.md.
+
+  freebws [URL]     default: freebws://start
+  Ctrl-L, F6, Alt-D, a click   address bar, all selected (Enter loads,
+                               Escape puts the page's address back, twice
+                               returns to the page)
+  F5, Ctrl-R        reload     Alt-Left, Alt-Right   back, forward
+  An address without a scheme gets https:// when it looks like a host (a dot,
+  no spaces; IP addresses and localhost get http://), anything else is a
+  search with the chosen engine. The window title is the page title.
+
+Tabs (tabstrip.c draws the row)
+  Ctrl-T            new tab (start page, address bar ready)
+  Ctrl-W, Ctrl-F4   close the tab (the last one closes the window)
+  Ctrl-Shift-T      reopen the tab closed last (the last 8 are kept)
+  Ctrl-Tab, Ctrl-PageDown       next tab        Ctrl-Shift-Tab, Ctrl-PageUp   previous
+  Alt-1 .. Alt-8    that tab    Alt-9   the last tab (Ctrl-1 .. 9 too)
+  Click a tab to select it; the x on the active or hovered tab, or a middle
+  click on any tab, closes it; + opens a new tab. A spinner shows a tab that
+  is loading, a dimmer title one that was discarded.
+  target=_blank and window.open open a tab in front (related to the opener, so
+  window.opener works); Ctrl-click and middle-click on a link open one in the
+  background. window.close() closes the tab.
+  All tabs share one WebKitWebContext and the one network process. WebKit sees
+  background tabs as hidden (it throttles them). A background tab that was not
+  looked at for 10 minutes, or the oldest one when less than a fifth of the memory
+  (at most 384 MB) is free, is discarded: its web view is destroyed, its
+  back/forward list kept, and selecting it loads the page again (scroll position
+  and form input are lost). Tabs that load or play audio are never discarded.
+
+How the page gets on screen
+  WebKit's web process draws into a private Wayland display that
+  wpebackend-fdo runs inside freebws. Each finished frame arrives in freebws
+  as either
+    shm     (no GPU, llvmpipe): copied into a wl_shm buffer of the window's
+            subsurface;
+    dmabuf  (a GPU): the buffer's file descriptors are passed to flcomp with
+            zwp_linux_dmabuf_v1, no copy in freebws; flcomp reads them (flcomp
+            README, "dmabuf").
+  freebws picks dmabuf when flcomp announces tiled modifiers (a real GPU) and has written
+  $XDG_RUNTIME_DIR/flcomp-dmabuf-planes (its GPU path takes multi-plane buffers, which a Radeon makes:
+  an older flcomp would drop the connection at the first frame), else shm. FREEBWS_BUFFERS=shm or
+  =dmabuf forces one, so does buffers=shm|dmabuf|auto in ~/.config/freebws/config. Only the active
+  tab's frames are shown; the others are dropped (shm: the last frame of a tab is kept to show while
+  its page repaints after a switch).
+  The dmabuf mode gives wpebackend-fdo an EGLDisplay of its own (GBM on /dev/dri/renderD*, the first
+  that works; FREEBWS_RENDER_NODE=/dev/dri/renderD129 picks one): only then does the web process find
+  zwp_linux_dmabuf_v1 in the private display and draw with the GPU. (Before release 9 this called
+  wpe_fdo_initialize_dmabuf(), which is the "dmabuf pool" mode in which the embedder must allocate
+  the buffers itself; the web process's first create_buffer got "no memory" and a real GPU showed a
+  blank window.) Safety net: a GPU path that delivers no frame in 12 seconds, or a compositor that
+  ends the connection with a protocol error in the first minute, makes the browser write buffers=shm
+  and start again with the CPU path.
+  Tested on the Radeon 610M (radeonsi, DCC buffers) in a headless flcomp on its render node, and in
+  QEMU with virgl (virtio-vga-gl); the bare-metal run of the whole desktop is the user's laptop.
+
+libflui's loop runs inside GLib's main loop as a GSource (fl_app_prepare and
+fl_app_dispatch), so WebKit's signals and libflui's input share one thread.
+
+Memory (measured in QEMU at 1 GB and 2 GB, docs/M8-BROWSER.md, "Memory")
+  cache model DOCUMENT_VIEWER (no page cache: back reloads), ProcessSwapOn-
+  CrossSiteNavigation off (a tab keeps its web process across origins),
+  Skia CPU rendering unless a GPU is announced, discarding of background tabs.
+  Environment (testing): FREEBWS_CACHE=viewer|document|browser,
+  FREEBWS_FEATURES=Name=0|1,... (WebKit features, replaces the default list),
+  FREEBWS_MP=limit_mb,conservative,strict,kill,poll_s (memory pressure settings),
+  FREEBWS_DISCARD_IDLE=seconds (0: never), FREEBWS_DISCARD_MB=free MB,
+  FREEBWS_SHARE=1 (all tabs in one web process: related views).
+
+DSSL
+  Pages with DSSL tags (<link rel="stylesheet/dssl">, <link rel="stylesheet"
+  type="text/dssl">, <style type="text/dssl">, <script type="text/dssl">) are
+  styled natively: libdssl lowers the sheets to CSS in the browser process and
+  the page gets <style data-dssl-native> elements and the `dssl-ready` event.
+  A sheet that needs the engine (texture, aura, @signal, seen, ..., see
+  src/libdssl/dssl.h), a page that scripts `DSSL.` itself, or a style-src CSP
+  that blocks inline styles, sends the whole page to the bundled JavaScript
+  engine (freebws-dssl://engine/..., never the network). <html data-dssl-mode>
+  is "native" or "engine"; stderr gets a "freebws: dssl: ..." line per page.
+  FREEBWS_DSSL=engine always uses the engine. Test pages in
+  /usr/share/freebws: dssl-native-test.html (native), dssl-test.html (texture:
+  engine), tabs-test.html (links for the tab features).
+
+Features
+  Ad blocker (on by default)   EasyList, EasyPrivacy and uBlock filters, converted by freebws's own
+            converter (abp.c) to WebKit content filters, plus cosmetic filtering, scriptlets and a
+            YouTube ad remover. Shield button: blocked count, switch for the site you are on.
+            Lists: /usr/share/freebws/lists (baked snapshot, licenses in LICENSES there), newer ones
+            weekly in ~/.local/share/freebws/adblock/lists. freebws --adblock-update does it by hand.
+            First start: a one-time build of about 10 s (a child process, 400 MB for a moment);
+            pages wait for it. FREEBWS_ADB_SKIP=net,css,js,yt leaves a part out (finding what
+            breaks a site), FREEBWS_ADB_LOG=1 logs it.
+  Search    Brave Search, DuckDuckGo, Google, Startpage, Bing, Ecosia (freebws://settings); address bar and
+            start page follow it. Config: ~/.config/freebws/config.
+  Downloads Saved to ~/downloads (changeable); toolbar button with a progress ring and a small panel
+            (cancel, retry, open, show in folder), freebws://downloads (Ctrl-J). The WPE API cannot
+            pause or resume a download.
+  Bookmarks Ctrl-D (again removes), bar under the address bar (Ctrl-Shift-B), folders (a dropdown),
+            freebws://bookmarks (Ctrl-Shift-O): edit, move, delete, import from the HTML file Firefox
+            or Chromium export. Stored in ~/.local/share/freebws/bookmarks.json.
+  Dark mode Settings (all pages) and the menu (this site): pages that are light are turned dark with
+            a filter, pages that are dark already are left alone. Web pages only.
+  Errors    offline, no such server, connection refused, TLS (continue anyway), blocked by the ad
+            blocker (open anyway), crashed tab: the "oh no." screen of the crash screen, Enter retries.
+  Settings  freebws://settings (menu button).
+  Testing   FREEBWS_HOME=DIR puts config, data and cache under DIR, FREEBWS_DATADIR=DIR is
+            /usr/share/freebws, FREEBWS_EVAL=js runs a script in each page after 3 s and logs it.
+
+Not there yet: find in page, history, zoom, private window, WebKit's sandbox (needs bubblewrap).

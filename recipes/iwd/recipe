@@ -1,0 +1,32 @@
+pkgname=iwd
+version=3.12
+release=2
+summary="iNet wireless daemon (Wi-Fi client) and iwctl"
+url=https://iwd.wiki.kernel.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc readline dbus)
+source=(https://www.kernel.org/pub/linux/network/wireless/iwd-$version.tar.xz)
+sha256=(d89a5e45c7180170e19be828f9e944a768c593758094fc57a358d0e7c4cb1a49)
+build_style=autotools
+# Not in BLFS. The tarball bundles its own copy of ell (Embedded Linux
+# library), which the default build uses, so there is no separate ell recipe.
+# --disable-systemd-service: sysvinit. --disable-manual-pages: needs rst2man.
+# The D-Bus policy goes to /usr/share/dbus-1/system.d (from dbus-1.pc).
+# Needs kernel crypto API (AF_ALG) support at run time.
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-systemd-service
+	--disable-manual-pages)
+
+check() { :; } # the unit tests need AF_ALG kernel support
+
+# FreeLFS settings, from config/iwd in the FreeLFS tree: iwd does DHCP itself
+# for Wi-Fi interfaces; the resolvconf stand-in feeds /etc/resolv.conf; users in
+# group seat may use iwd over D-Bus (the stock policy knows root, wheel, netdev).
+package() {
+	local c=$startdir/../../config/iwd
+	make DESTDIR="$pkgdir" install
+	install -Dm644 "$c/main.conf" "$pkgdir/etc/iwd/main.conf"
+	install -Dm755 "$c/resolvconf" "$pkgdir/usr/lib/iwd/bin/resolvconf"
+	install -Dm644 "$c/seat-dbus.conf" "$pkgdir/usr/share/dbus-1/system.d/iwd-seat.conf"
+}

@@ -1,0 +1,2 @@
+raw { .a { background: url(http://x.com/a.png) } }
+.b { color: red }

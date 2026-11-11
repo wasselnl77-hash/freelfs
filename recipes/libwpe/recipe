@@ -1,0 +1,15 @@
+pkgname=libwpe
+version=1.16.3
+release=1
+summary="General-purpose library for the WPE WebKit port"
+url=https://wpewebkit.org/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libxkbcommon libepoxy)
+makedepends=(meson ninja)
+source=(https://wpewebkit.org/releases/libwpe-$version.tar.xz)
+sha256=(c880fa8d607b2aa6eadde7d6d6302b1396ebc38368fe2332fa20e193c7ee1420)
+build_style=meson
+configure_args=(-D default-backend=libWPEBackend-fdo-1.0.so.1 -D enable-xkb=true -D build-docs=false)
+check() { :; }

@@ -1,0 +1,21 @@
+FreeBWS ad blocker: the filter lists in this directory
+======================================================
+
+The program code of FreeBWS is MIT licensed. The lists below are data files that are
+read at run time and are not part of the program; each keeps its own license. They are
+separate works placed next to the program (mere aggregation); nothing links them into
+the program, and FreeBWS' converter only reads them.
+
+  easylist.txt, easyprivacy.txt   https://easylist.to/
+      EasyList and EasyPrivacy, dual licensed: GNU GPL version 3 or later, or
+      Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0).
+      https://easylist.to/pages/licence.html   (we use them under the GPL-3.0 option;
+      the GPL text is COPYING-GPL3 in this directory)
+
+  ublock-filters.txt, ublock-quick-fixes.txt, ublock-unbreak.txt, ublock-privacy.txt
+      uBlock filters (filters.min, quick-fixes, unbreak, privacy.min) from
+      https://github.com/uBlockOrigin/uAssets , GNU GPL version 3 (COPYING-GPL3).
+
+If you change a list and pass it on, the license of that list applies to your version.
+The weekly update downloads newer copies of the same lists from the addresses in
+lists.conf into ~/.local/share/freebws/adblock/lists.

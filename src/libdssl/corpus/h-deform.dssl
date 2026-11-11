@@ -1,0 +1,13 @@
+.a { bend: 20; bend-y: -12; bend-up: 5deg; fold: 3 }
+.b { bend: lots }
+.c { bend-around: 90 }
+.d { bend-around: 171 }
+.e { bend-around: -170 }
+.f { stretch: 1.2 }
+.g { stretch: 1.4 vertical }
+.h { stretch: 2 Y }
+.i { stretch: 0 }
+.j { stretch: .5 x }
+.k { stretch: big }
+.l { bend: 0.5; fold: -.5; bend-y: 1deg }
+

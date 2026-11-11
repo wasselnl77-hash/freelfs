@@ -1,0 +1,3 @@
+.wall { texture: bricks }
+.floor { texture: herringbone }
+.sky { texture: starfield }

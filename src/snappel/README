@@ -1,0 +1,42 @@
+snappel -- the FreeLFS screenshot tool
+======================================
+
+Takes pictures of the screen through flcomp's fl_screencopy protocol, lets you annotate them,
+and saves them to ~/pictures/screenshots (snappel-YYYY-MM-DD-HHMMSS.png) or the clipboard.
+
+Keys (handled by flcomp, which starts snappel)
+  Print                 whole screen, saved, with a notification (click it to open the picture)
+  Shift+Print           region: the screen freezes under a selection rectangle
+  Super+Shift+S         the Snappel window
+  Without snappel installed, Print still saves the whole screen itself (flcomp/shot.c).
+
+Command line
+  snappel                 the Snappel window: Full screen, Window, Region, delay None/3/5/10 s
+  snappel --full          the whole screen, saved, notification (no window at all)
+  snappel --region        select an area: drag, then Save (Enter), Copy, Edit or Esc
+  snappel --window        click a window; the picture is that window alone, even when covered
+    --delay N             wait N seconds first (flcomp leaves Snappel's own windows out)
+    --edit                open the editor with the picture instead of saving at once
+    --output FILE         write the PNG to FILE instead of ~/pictures (no notification);
+                          exit 0 when written, 1 on cancel or failure. flportal uses this:
+                          snappel --full --output F, snappel --region --output F
+
+The editor
+  Tools: Arrow, Box, Text, Highlight, Blur, Pixelate, Crop. Six colours, width 1-6 (also the text
+  size and the blur strength). Drag on the picture; Text: click, type, Enter. Undo takes back the
+  last annotation exactly (the original is kept, the annotations are replayed). Ctrl+Z undo,
+  Ctrl+C copy, Ctrl+S save. Save, Copy (image/png on the clipboard; a small process holds it until
+  something else is copied, like wl-copy), Open in (Image viewer, Files, Browser: whichever is
+  installed), New (back to the start window).
+
+Files
+  snappel.c  windows and the capture flow      img.c  pictures, PNG, the annotation tools
+  cap.c      fl_screencopy client, clipboard    tests/ops_test.c, tests/run.sh
+
+Tests (make check)
+  tests/ops_test   the tools on in-memory pictures
+  tests/run.sh     the real snappel against a headless flcomp (needs ../flcomp built, python3):
+                   --full, --output, --region with Save/Esc/Copy, --window, and the Snappel window
+                   with the editor (Box, Save, Undo). SNAPPEL_OUT=DIR keeps the screenshots.
+  snappel --demo start|editor|menu|region|window with FLUI_PPM=FILE renders a made-up screen,
+  no compositor (docs/m7/snappel-*.png).

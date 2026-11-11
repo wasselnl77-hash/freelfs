@@ -1,0 +1,11 @@
+.a {
+  color red
+  : blue
+  9: 3
+  Bad_Prop: 1
+  --ok.dotted: 1
+  -x: 1
+  truncate
+  visually-hidden
+}
+

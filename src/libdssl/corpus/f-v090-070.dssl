@@ -1,0 +1,6 @@
+behavior fire { aura-glow: #f80 20
+ aura-particle: #fd0 5 up }
+.torch { use fire
+ background: #222
+ texture: grain }
+input[type=range] { slider: fill #f80 }

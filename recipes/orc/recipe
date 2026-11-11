@@ -1,0 +1,15 @@
+pkgname=orc
+version=0.4.44
+release=1
+summary="Optimized inner loops for GStreamer"
+url=https://gstreamer.freedesktop.org/projects/orc.html
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja)
+source=(https://gstreamer.freedesktop.org/src/orc/orc-$version.tar.xz)
+sha256=(4aeb97aea2b58224029dc2b23d7d064cfa990cb4fb8c4da440bcbe9c95bc5d2d)
+build_style=meson
+configure_args=(-D tests=disabled -D examples=disabled -D benchmarks=disabled)
+check() { :; }

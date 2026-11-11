@@ -1,0 +1,8 @@
+
+.card:nth-child(2) { color: red }
+.b:not(.x) { color: blue }
+.c:is(.d, .e) { color: green }
+.f:where(.g) { color: teal }
+.h:has(> img) { color: gold }
+.list { .item:nth-child(odd) { color: pink } }
+.a:not(.b, .c) { color: gray }

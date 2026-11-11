@@ -1,0 +1,1 @@
+.card { seen { opacity: 0 -> 1 } }

@@ -1,0 +1,39 @@
+# Built with every x86_64 CPU variant and a run-time choice (--enable-fat):
+# by default GMP tunes itself to the build machine's CPU.
+pkgname=gmp
+version=6.3.0
+release=1
+summary="Arbitrary precision arithmetic library"
+url=https://gmplib.org/
+license=(LGPL-3.0-or-later GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc gcc-libs)
+source=(https://ftpmirror.gnu.org/gmp/gmp-$version.tar.xz)
+sha256=(a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898)
+
+prepare() {
+	sed -i '/long long t1;/,+1s/()/(...)/' configure
+}
+
+build() {
+	local cpu=()
+	case $CARCH in
+		x86_64) cpu=(--build=x86_64-pc-linux-gnu --enable-fat) ;;
+		aarch64) cpu=(--build=aarch64-unknown-linux-gnu) ;;
+	esac
+	./configure --prefix=/usr "${cpu[@]}" \
+		--enable-cxx \
+		--disable-static \
+		--docdir=/usr/share/doc/gmp-$version
+	make
+	make html
+}
+
+check() {
+	make check
+}
+
+package() {
+	make DESTDIR="$pkgdir" install install-html
+}

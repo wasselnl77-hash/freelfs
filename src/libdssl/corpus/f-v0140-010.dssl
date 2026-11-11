@@ -1,0 +1,2 @@
+tokens { shadow { pop: 0 4 0 #000 } radius { pill: 99 } }
+.a { shadow: pop; radius: pill }

@@ -1,0 +1,2 @@
+.b { position: absolute; top: 20px; width: 170px; height: 330px; background: #888 }
+#b1 { left: 20px; texture: bricks } #b2 { left: 215px; texture: herringbone } #b3 { left: 410px; texture: tartan } #b4 { left: 605px; texture: mermaid } #b5 { left: 800px; texture: terrazzo } #b6 { left: 995px; background: #07091a; texture: starfield }

@@ -1,0 +1,12 @@
+.a {
+  @signal theme == dark { color: red }
+  @signal screen in (a, b) { color: blue }
+  @signal on { color: green }
+  @signal x != "q q" { color: red }
+  @signal s not in (a,'b', "c") { color: red }
+  @signal bad !! { color: red }
+  @signal e in ( ) { color: red }
+  @signal n == 'x' { color: red }
+}
+@signal ok { .b { color: red } }
+

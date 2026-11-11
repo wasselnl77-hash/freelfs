@@ -1,0 +1,13 @@
+pkgname=xz
+version=5.8.3
+release=1
+summary="LZMA and XZ compression"
+url=https://tukaani.org/xz/
+license=(0BSD GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com//tukaani-project/xz/releases/download/v$version/xz-$version.tar.xz)
+sha256=(fff1ffcf2b0da84d308a14de513a1aa23d4e9aa3464d17e64b9714bfdd0bbfb6)
+build_style=autotools
+configure_args=(--disable-static --docdir=/usr/share/doc/xz-$version)

@@ -1,0 +1,15 @@
+tokens { color { ink: #16161d } }
+@layer utilities { .toolbar { row: gap 8 between center } }
+.card {
+  background: color.card
+  hover { background: #f5f0e8 }
+  seen { opacity: 1 }
+  display: grid
+  animate: rise 400
+  ::before { content: "→" }
+}
+pin { .legal { color: red } }
+@media dark { .card { background: #111 } }
+@signal theme == dark { .card { background: #000 } }
+motion rise { from { opacity: 0 } to { opacity: 1 } }
+raw { @font-face { font-family: X; src: url(x.woff2) } }

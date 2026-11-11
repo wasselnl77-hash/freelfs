@@ -1,0 +1,267 @@
+#!/bin/sh
+# flreport -- collect what is needed to see why something does not work on this
+# computer: logs, kernel messages, devices from /sys, settings, mounts, network.
+# SPDX-License-Identifier: MIT
+#
+#   flreport [-o DIR] [-q]
+#
+# Writes ~/freelfs-report-YYYYMMDD-HHMMSS.tar.gz (DIR instead of ~ with -o) and
+# prints its path as the last line. Runs as an ordinary user, on a console or in
+# the desktop; everything that needs more rights is simply left out. The report
+# holds device ids, network names and logs, no passwords and no file contents
+# other than the settings listed in config/.
+# Bring it back on a USB stick: copy it with Files to the stick.
+
+out_dir=${HOME:-/tmp}
+quiet=0
+while [ $# -gt 0 ]; do
+	case $1 in
+	-o) out_dir=${2:?usage: flreport [-o DIR] [-q]}; shift ;;
+	-q) quiet=1 ;;
+	-h | --help)
+		echo "usage: flreport [-o DIR] [-q]"
+		echo "  Saves a report of logs and hardware info as DIR/freelfs-report-DATE.tar.gz (DIR: your home)."
+		exit 0
+		;;
+	*) echo "usage: flreport [-o DIR] [-q]" >&2; exit 2 ;;
+	esac
+	shift
+done
+[ -d "$out_dir" ] && [ -w "$out_dir" ] || out_dir=/tmp
+
+stamp=$(date +%Y%m%d-%H%M%S)
+name=freelfs-report-$stamp
+tmp_base=${XDG_RUNTIME_DIR:-/tmp}
+[ -d "$tmp_base" ] && [ -w "$tmp_base" ] || tmp_base=/tmp
+work=$(mktemp -d "$tmp_base/flreport.XXXXXX") || { echo "flreport: no place to work in" >&2; exit 1; }
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+r=$work/$name
+mkdir -p "$r/logs" "$r/config" "$r/hw" || exit 1
+
+say() { [ "$quiet" = 1 ] || echo "flreport: $*" >&2; }
+
+# run FILE CMD ARGS... : the command's output (and errors) into FILE, at most 20 s
+run() {
+	f=$1
+	shift
+	{
+		echo "\$ $*"
+		if command -v timeout >/dev/null 2>&1; then
+			timeout 20 "$@" 2>&1
+		else
+			"$@" 2>&1
+		fi
+		echo "[exit status $?]"
+	} >>"$r/$f"
+}
+# sh FILE 'SCRIPT' : the same for a shell snippet
+sh_run() {
+	f=$1
+	shift
+	{
+		echo "\$ $*"
+		if command -v timeout >/dev/null 2>&1; then
+			timeout 20 sh -c "$1" 2>&1
+		else
+			sh -c "$1" 2>&1
+		fi
+		echo "[exit status $?]"
+	} >>"$r/$f"
+}
+# copy FILE [DIR [PREFIX]]: a text file as it is (a tail of the last 4000 lines when it is long);
+# in logs/ and similar the file keeps its name (PREFIX in front when given), elsewhere the path is the name
+grab() {
+	[ -r "$1" ] && [ -f "$1" ] || return 0
+	d=$r/${2:-config}
+	mkdir -p "$d"
+	case ${2:-config} in
+	logs) n=$3${1##*/} ;;
+	*) n=$(printf '%s' "$1" | tr '/' '_'); n=${n#_} ;;
+	esac
+	while [ -e "$d/$n" ]; do n=$n.2; done
+	tail -n 4000 "$1" >"$d/$n" 2>/dev/null
+}
+
+say "collecting, this takes a few seconds"
+
+# ---- summary --------------------------------------------------------------------------
+{
+	echo "FreeLFS report $stamp"
+	echo "made by: $(id -un) (uid $(id -u)), tty: $(tty 2>/dev/null)"
+	echo
+	echo "-- release"
+	cat /etc/os-release 2>/dev/null
+	for f in /etc/freelfs-release /usr/share/freelfs/version; do [ -r "$f" ] && cat "$f"; done
+	echo
+	echo "-- kernel"
+	uname -a
+	cat /proc/cmdline
+	echo
+	echo "-- live system: $([ -e /run/live ] && echo yes || echo no)"
+	echo "-- uptime: $(cut -d' ' -f1 /proc/uptime) s"
+	echo
+	echo "-- machine"
+	for k in sys_vendor product_name product_version board_vendor board_name bios_vendor bios_version bios_date chassis_type; do
+		[ -r /sys/class/dmi/id/$k ] && echo "$k: $(cat /sys/class/dmi/id/$k)"
+	done
+	grep -m1 'model name' /proc/cpuinfo
+	echo "cpus: $(grep -c '^processor' /proc/cpuinfo)"
+	grep -E '^(MemTotal|MemAvailable|SwapTotal):' /proc/meminfo
+	[ -d /sys/firmware/efi ] && echo "boot: UEFI" || echo "boot: BIOS"
+	echo
+	echo "-- time"
+	date
+	echo "hardware clock: $(cat /sys/class/rtc/rtc0/date 2>/dev/null) $(cat /sys/class/rtc/rtc0/time 2>/dev/null)"
+	echo
+	echo "-- session"
+	echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR WAYLAND_DISPLAY=$WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP"
+	echo "HOME=$HOME LANG=$LANG"
+} >"$r/summary.txt" 2>&1
+
+# ---- logs -----------------------------------------------------------------------------
+rt=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+state=${XDG_STATE_HOME:-$HOME/.local/state}
+for f in "$rt"/flcomp.log "$rt"/flcomp.log.1 "$rt"/session.log "$rt"/*.log; do
+	[ -f "$f" ] && [ ! -e "$r/logs/${f##*/}" ] && grab "$f" logs
+done
+for f in "$state"/freelfs/log/*; do
+	[ -f "$f" ] && grab "$f" logs state-
+done
+for f in "$state"/freelfs/*/*.log "$state"/freelfs/*.log; do
+	[ -f "$f" ] && grab "$f" logs state-
+done
+for f in /var/log/*; do
+	case ${f##*/} in btmp* | wtmp* | lastlog* | faillog*) continue ;; esac
+	[ -f "$f" ] && grab "$f" logs var-log-
+done
+run logs/dmesg.txt dmesg
+[ -r /proc/last_kmsg ] && grab /proc/last_kmsg logs
+ls "$rt" >"$r/logs/runtime-dir-listing.txt" 2>&1
+# a log may have been written under another name by a program started by hand
+ls -la "$state/freelfs" "$state/freelfs/log" >>"$r/logs/runtime-dir-listing.txt" 2>&1
+
+# ---- devices: what lspci and lsusb would show, from /sys ------------------------------
+{
+	echo "# slot class vendor:device subsystem driver (modalias)"
+	for d in /sys/bus/pci/devices/*; do
+		[ -d "$d" ] || continue
+		drv=$(readlink "$d/driver" 2>/dev/null)
+		printf '%s class=%s %s:%s sub=%s:%s driver=%s irq=%s (%s)\n' "${d##*/}" "$(cat "$d/class" 2>/dev/null)" \
+			"$(cat "$d/vendor" 2>/dev/null)" "$(cat "$d/device" 2>/dev/null)" \
+			"$(cat "$d/subsystem_vendor" 2>/dev/null)" "$(cat "$d/subsystem_device" 2>/dev/null)" \
+			"${drv##*/}" "$(cat "$d/irq" 2>/dev/null)" "$(cat "$d/modalias" 2>/dev/null)"
+	done
+} >"$r/hw/pci.txt" 2>&1
+{
+	echo "# bus-port vid:pid manufacturer / product, driver of the first interface"
+	for d in /sys/bus/usb/devices/*; do
+		[ -f "$d/idVendor" ] || continue
+		drv=$(readlink "$d:1.0/driver" 2>/dev/null)
+		printf '%s %s:%s %s / %s  [%s] speed=%s\n' "${d##*/}" "$(cat "$d/idVendor")" "$(cat "$d/idProduct")" \
+			"$(cat "$d/manufacturer" 2>/dev/null)" "$(cat "$d/product" 2>/dev/null)" "${drv##*/}" "$(cat "$d/speed" 2>/dev/null)"
+	done
+} >"$r/hw/usb.txt" 2>&1
+grab /proc/bus/input/devices hw
+grab /proc/asound/cards hw
+grab /proc/partitions hw
+grab /proc/interrupts hw
+grab /proc/iomem hw
+grab /proc/cpuinfo hw
+grab /proc/meminfo hw
+grab /proc/modules hw
+grab /proc/version hw
+{
+	echo "# graphics: /dev/dri and the connectors"
+	ls -l /dev/dri 2>&1
+	for c in /sys/class/drm/*; do
+		[ -e "$c/status" ] || continue
+		echo "== ${c##*/}: status=$(cat "$c/status") enabled=$(cat "$c/enabled" 2>/dev/null) edid=$(wc -c <"$c/edid" 2>/dev/null) bytes"
+		sed 's/^/   /' "$c/modes" 2>/dev/null | head -n 12
+	done
+	for c in /sys/class/drm/card*/device; do
+		[ -d "$c" ] || continue
+		echo "== ${c%/device}: driver=$(readlink "$c/driver" | sed 's|.*/||') vendor=$(cat "$c/vendor") device=$(cat "$c/device")"
+	done
+} >"$r/hw/graphics.txt" 2>&1
+{
+	echo "# backlight and power"
+	for b in /sys/class/backlight/*; do
+		[ -d "$b" ] || continue
+		echo "== $b type=$(cat "$b/type" 2>/dev/null) brightness=$(cat "$b/brightness" 2>/dev/null) max=$(cat "$b/max_brightness" 2>/dev/null)"
+		ls -l "$b/brightness" 2>&1
+	done
+	for p in /sys/class/power_supply/*; do
+		[ -d "$p" ] || continue
+		echo "== $p"
+		for k in type status capacity capacity_level technology cycle_count model_name voltage_now energy_now energy_full energy_full_design power_now online; do
+			[ -r "$p/$k" ] && echo "   $k=$(cat "$p/$k")"
+		done
+	done
+	for t in /sys/class/thermal/thermal_zone*; do
+		[ -r "$t/temp" ] && echo "thermal ${t##*/}: $(cat "$t/type") $(cat "$t/temp")"
+	done
+	for t in /sys/class/rfkill/*; do
+		[ -r "$t/type" ] && echo "rfkill ${t##*/}: $(cat "$t/type") $(cat "$t/name") soft=$(cat "$t/soft") hard=$(cat "$t/hard")"
+	done
+	echo "-- firmware files the kernel looked for and did not find:"
+	dmesg 2>/dev/null | grep -i -E 'firmware.*(fail|not found|error|direct)|failed to load' | head -n 30
+} >"$r/hw/power-backlight-rfkill.txt" 2>&1
+run hw/modules-loaded.txt lsmod
+
+# ---- network ---------------------------------------------------------------------------
+{
+	run net.txt ip -br link
+	run net.txt ip -br addr
+	run net.txt ip route
+	run net.txt ip -6 route
+	sh_run net.txt 'cat /etc/resolv.conf; echo; ls -l /etc/resolv.conf'
+	sh_run net.txt 'ls /run/iwd-resolv 2>&1; cat /run/iwd-resolv/* 2>&1'
+	sh_run net.txt 'cat /etc/hosts'
+	sh_run net.txt 'iwctl device list; for n in /sys/class/net/wl*; do d=${n##*/}; [ -e "$n" ] || continue; iwctl station $d show; iwctl station $d get-networks; done'
+	sh_run net.txt 'for d in /sys/class/net/*; do echo "${d##*/}: $(cat $d/operstate) mtu=$(cat $d/mtu) driver=$(readlink $d/device/driver 2>/dev/null | sed "s|.*/||")"; done'
+	sh_run net.txt 'ps -eo pid,args | grep -E "[i]wd|[d]hcpcd|[f]l-sntp|[n]tp"'
+	# does it work: name lookup, a TLS connection, and what time the server thinks it is
+	sh_run net.txt 'getent hosts example.com'
+	sh_run net.txt 'curl -sS -m 10 -o /dev/null -w "http=%{http_code} dns=%{time_namelookup}s connect=%{time_connect}s tls=%{time_appconnect}s total=%{time_total}s ip=%{remote_ip}\n" https://example.com/'
+	sh_run net.txt 'curl -sSI -m 10 https://example.com/ | grep -i "^date:"; date -u'
+} >/dev/null 2>&1
+
+# ---- settings ---------------------------------------------------------------------------
+conf=${XDG_CONFIG_HOME:-$HOME/.config}
+grab "$conf/freelfs/desktop.conf"
+grab "$conf/freebws/config"
+for f in /etc/keyboard.conf /etc/rc.conf /etc/fstab /etc/flpkg.conf /etc/hostname /etc/fltime.conf /etc/iwd/main.conf /etc/os-release /etc/flsnap.conf; do
+	grab "$f"
+done
+sh_run config/autostart.txt 'ls -l "${XDG_CONFIG_HOME:-$HOME/.config}/autostart" /etc/xdg/autostart 2>&1'
+
+# ---- disks, memory, processes -----------------------------------------------------------
+run mounts.txt cat /proc/mounts
+run mounts.txt df -h
+run mounts.txt free -m
+sh_run mounts.txt 'for b in /sys/block/*; do echo "${b##*/}: $(cat $b/size) sectors  model=$(cat $b/device/model 2>/dev/null)  rotational=$(cat $b/queue/rotational 2>/dev/null)"; done'
+run processes.txt ps -eo pid,ppid,user,rss,stat,etime,args
+run processes.txt uptime
+
+# ---- packages and apps ------------------------------------------------------------------
+run packages.txt flpkg list
+run packages.txt flatpak --version
+run packages.txt flatpak remotes --user -d
+run packages.txt flatpak list --user --columns=application,version,size,installation
+run packages.txt flatpak list --user --runtime --columns=application,version,size
+sh_run packages.txt 'du -sh "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak" 2>&1'
+sh_run audio.txt 'wpctl status 2>&1 | grep -v "^.\[1;93mW"'
+sh_run audio.txt 'cat /proc/asound/cards'
+
+# ---- crashes ----------------------------------------------------------------------------
+sh_run crashes.txt 'grep -h -i -E "segfault|general protection|trap|oom|killed process|call trace|BUG:|WARNING:" /var/log/kern.log /var/log/dmesg.log 2>/dev/null | tail -n 60'
+sh_run crashes.txt 'dmesg 2>/dev/null | grep -i -E "segfault|oom|killed process|amdgpu.*(error|fail|timeout)|rtw89.*(fail|error)" | tail -n 60'
+sh_run crashes.txt 'grep -h -i -E "crash|abort|segmentation|fatal|assert|error:|failed" "$XDG_RUNTIME_DIR/flcomp.log" 2>/dev/null | tail -n 80'
+
+(cd "$work" && tar czf "$work/$name.tar.gz" "$name") || { echo "flreport: tar failed" >&2; exit 1; }
+if ! cp "$work/$name.tar.gz" "$out_dir/$name.tar.gz" 2>/dev/null; then
+	out_dir=/tmp
+	cp "$work/$name.tar.gz" "$out_dir/$name.tar.gz" || { echo "flreport: cannot write the report" >&2; exit 1; }
+fi
+say "saved $out_dir/$name.tar.gz ($(wc -c <"$out_dir/$name.tar.gz") bytes)"
+echo "$out_dir/$name.tar.gz"

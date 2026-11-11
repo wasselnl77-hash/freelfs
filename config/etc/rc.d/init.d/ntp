@@ -1,0 +1,26 @@
+#!/bin/bash
+# /etc/rc.d/init.d/ntp -- sets the clock from a time server (fl-sntp)
+#
+# On unless /etc/fltime.conf says NTP=0 (Settings > Date & time switches it, through
+# fltime-set). SERVERS="a b" in the same file replaces the default, pool.ntp.org.
+# The daemon keeps asking until the network is up, so this can start before it.
+
+. /etc/rc.d/functions
+
+NTP=1
+[ -r /etc/fltime.conf ] && . /etc/fltime.conf
+
+start_ntp() {
+	[ -x /usr/sbin/fl-sntp ] || return 1
+	setsid /usr/sbin/fl-sntp < /dev/null > /dev/null 2>&1 &
+	echo $! > /run/ntp.pid
+	sleep 0.2
+	pid_alive /run/ntp.pid
+}
+
+case $1 in
+	start) [ "$NTP" = 0 ] && exit 0 ;;   # switched off: nothing to start
+	restart) [ "$NTP" = 0 ] && set -- stop ;;
+esac
+
+daemon_service "$1" "time synchronisation" /run/ntp.pid start_ntp

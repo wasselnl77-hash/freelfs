@@ -1,0 +1,1 @@
+@css { @keyframes x { from { opacity: 0 } } }

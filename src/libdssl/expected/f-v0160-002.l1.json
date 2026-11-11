@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0160-002.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"on one line is two tokens\""}],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"pill","value":"999 card: 22"}],"kind":"selector","line":1,"sel":"radius"}],"kind":"root"}}

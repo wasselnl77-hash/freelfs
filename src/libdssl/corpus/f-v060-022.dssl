@@ -1,0 +1,1 @@
+.btn { transition: 200 snap bend, 150 stretch, 100 fold }

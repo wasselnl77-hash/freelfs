@@ -1,0 +1,22 @@
+# GnuPG 2.4 (the long-term series), only what gpgme needs to check OSTree's
+# GPG signatures (Flathub signs its commits): gpg, gpgv, gpg-agent, gpgconf.
+# No S/MIME (gpgsm), smartcards, dirmngr/keyservers (so no LDAP, GnuTLS or
+# SQLite), TPM or Web Key Service.
+pkgname=gnupg
+version=2.4.9
+release=1
+summary="GNU Privacy Guard: gpg, gpgv and gpg-agent"
+url=https://gnupg.org/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libgpg-error libgcrypt libassuan libksba npth zlib bzip2 readline)
+makedepends=(gettext)
+source=(https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-$version.tar.bz2)
+sha256=(dd17ab2e9a04fd79d39d853f599cbc852062ddb9ab52a4ddeb4176fd8b302964)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-gpgsm --disable-scdaemon
+	--disable-dirmngr --disable-keyboxd --disable-tpm2d --disable-wks-tools --disable-doc
+	--disable-ldap --disable-gnutls --disable-sqlite --disable-ntbtls --disable-card-support
+	--disable-photo-viewers --disable-gpgtar)
+check() { :; }

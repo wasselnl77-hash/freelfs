@@ -1,0 +1,8 @@
+# Commands for build/m11-x11-gpu.sh: an account "tester" without a password (US layout), the helpers and the X11
+# test client (flcomp's tests/xclient) from the second disk, then the login screen again. Throwaway image copy.
+{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null && echo made && id tester
+mkdir -p /usr/tester/.config/freelfs && printf 'keyboard=us\n' > /usr/tester/.config/freelfs/desktop.conf && chown -R tester: /usr/tester/.config
+printf 'LAYOUT=us\n' > /etc/keyboard.conf
+mkdir -p /mnt/m10 && mount -o ro /dev/vdb /mnt/m10 && cp /mnt/m10/m10app.sh /usr/bin/m10app && cp /mnt/m10/m10sh.sh /usr/bin/m10sh && cp /mnt/m10/xclient /usr/bin/xclient && chmod 755 /usr/bin/m10app /usr/bin/m10sh /usr/bin/xclient && umount /mnt/m10 && echo helpers-copied
+echo "== versions"; flpkg list | grep -E "^(flcomp|freebws|xwayland|mesa|flreport) "
+sleep 3; pkill -x flcomp; sleep 6; pgrep -x flgreet-ui >/dev/null && echo greeter-again

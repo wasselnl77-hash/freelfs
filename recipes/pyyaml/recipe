@@ -1,0 +1,15 @@
+pkgname=pyyaml
+version=6.0.3
+release=1
+summary="YAML parser and emitter for Python (pure Python build)"
+url=https://pyyaml.org/
+license=(MIT)
+# built without libyaml/Cython, so it is the pure-Python implementation, but
+# the wheel is still tagged for the platform
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(python)
+source=(https://pypi.org/packages/source/P/PyYAML/pyyaml-$version.tar.gz)
+sha256=(d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f)
+build_style=python
+pyname=PyYAML

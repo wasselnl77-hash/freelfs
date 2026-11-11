@@ -1,0 +1,147 @@
+#!/bin/bash
+# /etc/rc.d/rc.sysinit -- one-time system setup at boot, run by init.
+
+. /etc/rc.conf
+. /etc/rc.d/functions
+
+# The boot screen first: the status lines below then stay off the screen
+# (Esc, or a failing step, shows them). It needs nothing but /dev.
+mountpoint -q /proc || mount -n -t proc proc /proc -o nosuid,noexec,nodev
+mountpoint -q /run || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
+[ -x /sysflfs/sbin/flsplash ] && /sysflfs/sbin/flsplash
+
+. /etc/os-release
+printf '\n\033[1;34m%s\033[0m\n\n' "$PRETTY_NAME"
+
+# The kernel mounts /dev itself (CONFIG_DEVTMPFS_MOUNT); the rest is ours.
+kernel_fs() {
+	mountpoint -q /proc || mount -n -t proc proc /proc -o nosuid,noexec,nodev
+	mountpoint -q /sys || mount -n -t sysfs sysfs /sys -o nosuid,noexec,nodev
+	mountpoint -q /run || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
+	mountpoint -q /dev || mount -n -t devtmpfs devtmpfs /dev -o mode=0755,nosuid
+	mkdir -p /dev/pts /dev/shm /run/lock
+	chmod 1777 /run/lock
+	mountpoint -q /dev/pts || mount -n -t devpts devpts /dev/pts -o gid=5,mode=620
+	mountpoint -q /dev/shm || mount -n -t tmpfs tmpfs /dev/shm -o nosuid,nodev
+	mountpoint -q /sys/fs/cgroup ||
+		mount -n -t cgroup2 cgroup2 /sys/fs/cgroup -o nosuid,noexec,nodev
+}
+step "Mounting kernel file systems" kernel_fs
+
+if [ ${#MODULES[@]} -gt 0 ]; then
+	step "Loading kernel modules" modprobe -a "${MODULES[@]}"
+fi
+
+udev_start() {
+	udevd --daemon &&
+		udevadm trigger --action=add --type=subsystems &&
+		udevadm trigger --action=add --type=devices &&
+		udevadm settle
+}
+step "Starting udev and waiting for devices" udev_start
+
+# Check file systems while the root is still read-only. fsck returns 1 when
+# it fixed something, 2 when a reboot is needed, 4 and up on errors.
+stat_busy "Checking file systems"
+fsck -A -T -a -t noopts=_netdev > /dev/null
+rc=$?
+if [ "$rc" -ge 4 ]; then
+	stat_fail
+	echo "File system errors need manual repair. Starting a root shell;"
+	echo "the system reboots when you leave it."
+	sulogin
+	reboot -f
+elif [ "$rc" -ge 2 ]; then
+	stat_done
+	echo "fsck changed the root file system: rebooting."
+	reboot -f
+fi
+stat_done
+
+step "Remounting root read-write" remount_root rw
+step "Mounting local file systems" mount -a -t nonfs,nfs4,smbfs,cifs -O no_netdev
+step "Activating swap" swapon -a
+
+# Ownership that the rootless build could not set. flpkg keeps a list of it;
+# an image built without packages has config/ownership.list instead, applied
+# once and again when the list changes.
+fix_owners() {
+	local list=/usr/share/freelfs/ownership.list stamp=/var/lib/freelfs/ownership.done
+	local path uid gid mode
+	if command -v flpkg > /dev/null; then
+		flpkg fix-owners > /dev/null
+		return
+	fi
+	[ -r "$list" ] || return 0
+	[ "$stamp" -nt "$list" ] && return 0
+	while read -r path uid gid mode _; do
+		case $path in '' | \#*) continue ;; esac
+		[ -e "$path" ] || continue
+		chown "$uid:$gid" "$path" && chmod "$mode" "$path" || return 1
+	done < "$list"
+	mkdir -p "${stamp%/*}"
+	touch "$stamp"
+}
+step "Setting file ownership" fix_owners
+
+set_hostname() {
+	local h=freelfs
+	[ -r /etc/hostname ] && read -r h < /etc/hostname
+	hostname "$h"
+}
+step "Setting hostname" set_hostname
+
+# The kernel sets the clock from the RTC itself when that is in UTC (and
+# says so in hctosys); hwclock is only needed for a clock in local time.
+set_clock() {
+	if [ "$HARDWARECLOCK" = localtime ]; then
+		hwclock --hctosys --localtime
+	elif [ "$(cat /sys/class/rtc/rtc0/hctosys 2> /dev/null)" != 1 ]; then
+		hwclock --hctosys --utc
+	fi
+}
+step "Setting the system clock" set_clock
+
+# First boot: flsetup asks for the keyboard on the screen. Without a usable
+# screen the layout stays US. The console and the desktop share the choice.
+first_boot() {
+	splash_handover
+	HOME=/root flcomp --firstboot && return 0
+	/sysflfs/sbin/flsplash --text 2> /dev/null
+	echo LAYOUT=us > /etc/keyboard.conf
+}
+if [ ! -e /etc/keyboard.conf ] && command -v flcomp > /dev/null; then
+	step "First boot: choose the keyboard" first_boot
+fi
+if [ -z "$KEYMAP" ] && [ -r /etc/keyboard.conf ]; then
+	. /etc/keyboard.conf
+	KEYMAP=$LAYOUT
+fi
+
+console_setup() {
+	local tty
+	[ -z "$KEYMAP" ] || loadkeys -q "$KEYMAP" || return 1
+	[ -z "$CONSOLEFONT" ] && return 0
+	for tty in /dev/tty[1-6]; do
+		setfont -C "$tty" "$CONSOLEFONT" || return 1
+	done
+}
+if [ -n "$KEYMAP$CONSOLEFONT" ]; then
+	step "Setting up the console" console_setup
+fi
+
+step "Applying kernel settings" sysctl -q --system
+step "Bringing up loopback" ip link set lo up
+
+login_records() {
+	: > /run/utmp
+	chgrp utmp /run/utmp
+	chmod 664 /run/utmp
+	# login records belong to no package, so upgrades never empty them
+	[ -e /var/log/wtmp ] || install -m 664 -g utmp /dev/null /var/log/wtmp
+	[ -e /var/log/lastlog ] || install -m 664 -g utmp /dev/null /var/log/lastlog
+	[ -e /var/log/btmp ] || install -m 600 /dev/null /var/log/btmp
+	[ -e /var/log/faillog ] || install -m 644 /dev/null /var/log/faillog
+	dmesg > /var/log/dmesg.log
+}
+step "Setting up login records" login_records

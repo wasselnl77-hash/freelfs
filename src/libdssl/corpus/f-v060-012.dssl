@@ -1,0 +1,4 @@
+
+    tokens { color { flame: #ff5533 } }
+    .a { gradient: linear 135, color.flame -> color.ink/40 -> color.paper }
+  

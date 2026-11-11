@@ -1,0 +1,12 @@
+pkgname=packaging
+version=26.3
+release=1
+summary="Core utilities for Python packages"
+url=https://packaging.pypa.io/
+license=(Apache-2.0 OR BSD-2-Clause)
+arch=(any)
+groups=(base)
+depends=(python)
+source=(https://files.pythonhosted.org/packages/source/p/packaging/packaging-$version.tar.gz)
+sha256=(94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79)
+build_style=python

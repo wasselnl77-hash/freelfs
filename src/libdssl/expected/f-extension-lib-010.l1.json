@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-extension-lib-010.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"right after \"{\" it still offers property\""}],"tree":{"children":[],"kind":"root"}}

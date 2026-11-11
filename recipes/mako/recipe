@@ -1,0 +1,13 @@
+pkgname=mako
+version=1.4.1
+release=1
+summary="Hyperfast and lightweight templating for Python"
+url=https://www.makotemplates.org/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(python markupsafe)
+source=(https://pypi.org/packages/source/M/Mako/mako-$version.tar.gz)
+sha256=(d7904710b662996425a21627710c4777c45053146942cf8a7aebf757c92b8c27)
+build_style=python
+pyname=Mako

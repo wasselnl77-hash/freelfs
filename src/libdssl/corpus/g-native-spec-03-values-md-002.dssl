@@ -1,0 +1,6 @@
+.a {
+  width: calc(100% - 24)
+  background: oklch(62% 0.19 35)
+  grid-template-columns: repeat(4, 1fr)
+  transform: scale(1.2)
+}

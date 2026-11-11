@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0120-009.dssl","hint":"move it out of the enclosing block","line":1,"message":"fonts { } must be top-level - fonts load for the whole page"}],"tree":{"children":[{"children":[{"children":[],"kind":"fonts","line":1}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

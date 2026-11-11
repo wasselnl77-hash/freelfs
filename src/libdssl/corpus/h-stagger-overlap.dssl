@@ -1,0 +1,11 @@
+.a { stagger: 60 }
+.b { stagger: 120ms }
+.c { stagger: 1s }
+.d { stagger: none }
+.e { stagger: soon }
+.f { overlap: allow }
+.g { overlap: none }
+.h { overlap: deny }
+.i { overlap: AUTO }
+.j { overlap: maybe }
+

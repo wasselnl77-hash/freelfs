@@ -1,0 +1,3 @@
+behavior fire { aura-glow: #ff7a00 36 pulse 900 flicker 0.35 }   // (the full recipe is above)
+
+.blue-fire { use fire; aura-glow: #3a7bff 36 pulse 900 flicker 0.35 }

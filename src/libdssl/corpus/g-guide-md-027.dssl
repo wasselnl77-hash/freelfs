@@ -1,0 +1,4 @@
+input.price {
+  slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 52, graph-gap 3,
+          fill #77ccff, track 3 #34445a, thumb 14 #fff, shape bar
+}

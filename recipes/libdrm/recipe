@@ -1,0 +1,17 @@
+pkgname=libdrm
+version=2.4.134
+release=1
+summary="Userspace library for the kernel Direct Rendering Manager"
+url=https://dri.freedesktop.org/libdrm/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc udev)
+source=(https://dri.freedesktop.org/libdrm/libdrm-$version.tar.xz)
+sha256=(ac5e74d157830eb8bee44c6a6bf3ad49774ef0dd2a72bdad74a8f20308b52a95)
+build_style=meson
+# No libpciaccess in the base system, so libdrm_intel is not built (auto).
+configure_args=(-D udev=true -D valgrind=disabled -D man-pages=disabled
+	-D cairo-tests=disabled -D tests=false)
+
+check() { :; } # tests are not built

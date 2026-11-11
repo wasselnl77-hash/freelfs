@@ -1,0 +1,8 @@
+.a {
+  color: red
+  hover { color: blue }
+  padding: 4
+  @media 768 { margin: 1 }
+  gap: 2
+}
+

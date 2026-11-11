@@ -1,0 +1,52 @@
+flsnap -- btrfs snapshots of the system
+=======================================
+
+flsnap keeps read-only snapshots of @ (the root subvolume) in @snapshots, which
+FreeLFS mounts at /.snapshots (build/50-image.sh, config/etc/fstab).
+
+  flsnap create [--reason TEXT] [--packages FILE] [--auto]   take one, prune, update flboot's list
+  flsnap list [--machine]     newest first (--machine: N, epoch, date, reason, packages, running; tab separated)
+  flsnap show N               date, reason and the package list of snapshot N
+  flsnap status               supported=, why=, keep=, count=, booted= (key=value lines)
+  flsnap delete N...          flsnap prune [--keep K]
+  flsnap rollback [N]         make snapshot N the current state (default: the one running)
+
+Files: /.snapshots/N (the subvolume), /.snapshots/N.info (epoch=, date=, reason=,
+then "[packages]" and one "name version" line per installed package),
+/.snapshots/.last (so numbers are not reused). /etc/flsnap.conf: keep = 8 (1..99,
+the oldest go first; the snapshot the system runs from is never removed).
+
+Before every flpkg transaction: flpkg runs /usr/libexec/flpkg/pre-transaction.d/*
+(src/flpkg/snapshot.c); 10-flsnap (hook-pre-transaction) runs `flsnap create --auto`
+with the reason "flpkg: upgrade foo, remove bar" and flpkg's package list. --auto is
+quiet on a system without the layout (the live image: flpkg.conf has snapshots = 0,
+and / is not btrfs there), and a failure only warns: the update goes on.
+
+Going back, in three steps: (1) boot "Start an earlier state" in flboot (src/flboot),
+which starts the snapshot read-only with rootflags=subvol=@snapshots/N; (2) check it;
+(3) "Make this the current state": the desktop notice (flsnap-notice, which the
+session should start once; it does nothing on a normal boot), Settings > Snapshots, or
+`flsnap rollback`. Rollback mounts the top level of the file system (subvolid=5) and
+  - moves @ to @snapshots/M, so the state left is a snapshot too ("before going back to #N"),
+  - makes a writable snapshot of @snapshots/N as the new @,
+  - sets it as the default subvolume (fstab mounts / without subvol=, flboot's default
+    entries rely on that),
+undoing the first two steps if one fails. Restart to use it. On a text console
+/etc/profile.d/flsnap-notice.sh says when the system runs from a snapshot.
+
+Kernels and the ESP are not part of a snapshot: flboot starts the newest kernel on
+the ESP with the snapshot's root, so an old state boots a newer kernel with the
+modules of the snapshot (/lib/modules). If the snapshot predates the running
+kernel's modules, pick the matching older kernel entry instead; this is untested.
+
+Privilege: flsnap is installed setuid root for the group seat (recipe owner=, like
+fltime-set), so Settings can run it. When it runs with more rights than its caller it
+clears the environment, uses compiled-in paths and reads no file the caller names.
+Arguments are validated: snapshot numbers are plain integers, reasons are cut to one
+printable line.
+
+Tests: `make check` runs tests/test-flsnap.sh on a mock backend (FLSNAP_MOCK=DIR:
+directories instead of subvolumes; FLSNAP_FLPKG a stand-in for flpkg list; both
+ignored when setuid). The btrfs calls themselves (btrfs subvolume snapshot -r /
+delete / show / set-default, mounting subvolid=5) need root and a mounted btrfs and
+were not run.

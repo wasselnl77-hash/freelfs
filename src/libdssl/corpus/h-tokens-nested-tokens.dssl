@@ -1,0 +1,3 @@
+tokens { tokens { a: 1 } x { tokens { b: 2 } } }
+.k { width: tokens.a; height: x.tokens.b }
+

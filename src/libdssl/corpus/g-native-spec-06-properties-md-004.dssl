@@ -1,0 +1,6 @@
+behavior focus-ring {
+  outline: 2 solid color.accent
+  outline-offset: 2
+}
+
+.btn { use focus-ring }

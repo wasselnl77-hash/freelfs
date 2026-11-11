@@ -1,0 +1,24 @@
+# flarchive (Archives), from src/flarchive in the FreeLFS tree.
+pkgname=flarchive
+version=0.1
+release=1
+summary="FreeLFS archive tool: browse and extract zip, tar.*, 7z, rar; create zip and tar.zst"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui libarchive wayland)
+makedepends=(flui libarchive)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flarchive" "$srcdir/flarchive"
+	cd "$srcdir/flarchive"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flarchive"
+	make DESTDIR="$pkgdir" install
+}

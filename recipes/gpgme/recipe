@@ -1,0 +1,18 @@
+# The C library only (no C++, Python or Qt bindings): libostree and flatpak
+# use it for GPG signature checks, through the gpg of the gnupg package.
+pkgname=gpgme
+version=2.2.0
+release=1
+summary="GnuPG Made Easy: a C API to GnuPG"
+url=https://gnupg.org/software/gpgme/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libgpg-error libassuan gnupg)
+makedepends=()
+source=(https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-$version.tar.bz2)
+sha256=(7160e80e84dafd00d956c84891c533bb7ab16a6a54fbe1574b2f3acf0496977b)
+build_style=autotools
+configure_args=(--disable-static --enable-languages=no --disable-gpg-test --disable-gpgsm-test
+	--disable-gpgconf-test --disable-g13-test)
+check() { :; }

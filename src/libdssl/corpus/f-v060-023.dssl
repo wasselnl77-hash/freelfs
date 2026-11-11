@@ -1,0 +1,4 @@
+
+    .veil { pointer-events: none }
+    .hit { pointer-events: auto }
+  

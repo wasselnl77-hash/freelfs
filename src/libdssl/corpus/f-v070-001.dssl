@@ -1,0 +1,2 @@
+tokens { space { 9: 96 } }
+.a { padding: space.9 }

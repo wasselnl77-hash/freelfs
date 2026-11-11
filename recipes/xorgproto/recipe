@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xorgproto
+version=2024.1
+release=1
+summary="X.Org protocol headers"
+url=https://www.x.org/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=()
+makedepends=()
+source=(https://www.x.org/pub/individual/proto/xorgproto-2024.1.tar.xz)
+sha256=(372225fd40815b8423547f5d890c5debc72e88b91088fbfb13158c20495ccb59)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

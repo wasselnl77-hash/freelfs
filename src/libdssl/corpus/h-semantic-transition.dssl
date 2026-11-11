@@ -1,0 +1,17 @@
+.a { transition: 200 snap }
+.b { transition: 150 snap background-color, 300 transform }
+.c { transition: none }
+.d { transition: color .2s ease }
+.e { transition: 200ms }
+.f { transition: fast }
+.g { transition: 200 snap colour }
+.h { transition: 2s cubic-bezier(0.1, 0.2, 0.3, 1) opacity }
+.i { transition: 0.2s steps(4) }
+.j { transition: 200 bend }
+.k { transition: 1s, 2s }
+.l { transition: background .2s snap, 300 }
+.m { transition: }
+.n { transition: opacity 1s snap }
+.o { transition: .5s ease-in-out margin-left padding }
+.p { transition: 300 all }
+

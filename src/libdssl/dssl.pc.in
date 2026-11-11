@@ -1,0 +1,9 @@
+prefix=@PREFIX@
+libdir=@LIBDIR@
+includedir=${prefix}/include
+
+Name: dssl
+Description: Native DSSL front end: DSSL to CSS
+Version: @VERSION@
+Libs: -L${libdir} -ldssl -lm
+Cflags: -I${includedir}

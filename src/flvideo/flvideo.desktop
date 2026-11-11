@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Videos
+Comment=Play videos
+Exec=flvideo %f
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;video/mpeg;video/ogg;
+X-FreeLFS-Glyph=▶

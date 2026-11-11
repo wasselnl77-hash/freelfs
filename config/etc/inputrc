@@ -1,0 +1,32 @@
+# /etc/inputrc -- readline settings for every user
+
+# Allow the command prompt to wrap to the next line
+set horizontal-scroll-mode Off
+
+# 8-bit input and output
+set meta-flag On
+set input-meta On
+set convert-meta Off
+set output-meta On
+
+# none, visible or audible
+set bell-style none
+
+"\eOd": backward-word
+"\eOc": forward-word
+
+# linux console
+"\e[1~": beginning-of-line
+"\e[4~": end-of-line
+"\e[5~": beginning-of-history
+"\e[6~": end-of-history
+"\e[3~": delete-char
+"\e[2~": quoted-insert
+
+# xterm
+"\eOH": beginning-of-line
+"\eOF": end-of-line
+
+# Konsole
+"\e[H": beginning-of-line
+"\e[F": end-of-line

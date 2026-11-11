@@ -1,0 +1,40 @@
+pkgname=binutils
+version=2.47
+release=1
+summary="Assembler, linker and tools for object files"
+url=https://www.gnu.org/software/binutils/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib zstd)
+source=(https://sourceware.org/pub/binutils/releases/binutils-$version.tar.xz)
+sha256=(154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff)
+
+build() {
+	mkdir -p build
+	cd build
+	../configure --prefix=/usr \
+		--sysconfdir=/etc \
+		--enable-ld=default \
+		--enable-plugins \
+		--enable-shared \
+		--disable-werror \
+		--enable-64-bit-bfd \
+		--enable-new-dtags \
+		--with-system-zlib \
+		--with-lib-path=/usr/lib \
+		--enable-default-hash-style=gnu
+	make tooldir=/usr
+}
+
+check() {
+	cd build
+	make -k check
+}
+
+package() {
+	cd build
+	make DESTDIR="$pkgdir" tooldir=/usr install
+	rm -rf "$pkgdir"/usr/lib/lib{bfd,ctf,ctf-nobfd,gprofng,opcodes,sframe}.a \
+		"$pkgdir/usr/share/doc/gprofng"
+}

@@ -1,0 +1,46 @@
+flpackages -- the Packages app
+==============================
+
+A window like flfiles: Installed and Available tabs, a search field, the
+package list, details with Install and Remove, a log strip with flpkg's output
+while a change runs, and a status bar.
+
+Reads run `flpkg list`, `flpkg search` and `flpkg info` as the person using
+the app. The Available tab needs a repo line in /etc/flpkg.conf and a synced
+index (`flpkg sync` as root); without a repo the app says so. Changes go
+through `flpkg-seat`.
+
+flpkg-seat is setuid root (mode 4750, root:seat, set by the recipe). It takes
+only `install NAME...` and `remove NAME...`, accepts a NAME only if it matches
+[a-z0-9+._-]+, starts with a letter or digit, is at most 64 characters and does
+not end in ".flpkg", clears the environment (PATH only), and runs
+`/usr/bin/flpkg install|remove -y -- NAME...`. Removal never uses --cascade, so
+flpkg refuses to remove what other packages need. The update of the package
+index is not offered (`flpkg sync` stays a root command).
+
+Flathub tab: the Flatpak app catalog, per user (`flatpak --user`: no root, no
+polkit, no helper; apps live in ~/.local/share/flatpak). Browse lists the whole
+catalog (`flatpak remote-ls --app --columns=application,name,version,description`,
+about 3000 lines, read once and searched in the window by name, ID and
+description); Installed lists `flatpak list --app`. Details come from
+`flatpak remote-info` or `flatpak info`; Install, Update, Remove, "Update all",
+"Remove unused" (runtimes) and Refresh (`update --appstream`) run as child
+processes with the log strip, and a bar that fills with the "Installing 2/4"
+steps flatpak prints. Open starts the app (`flatpak run`). The app ID goes to
+flatpak as one argument, only after a strict check. If flatpak is missing the
+tab says so; if the flathub remote is missing it offers "Add Flathub" (the
+session normally adds it at the first login, see src/flcomp/session). The first
+time, the appstream data is fetched (a few MB) so that names and descriptions
+are there.
+
+Tests: `make check` (flpkg-seat, no root needed), and
+src/flcomp/tests/apps.py flpackages (the window, headless).
+Test hooks: FLPACKAGES_FLPKG, FLPACKAGES_SEAT, FLPACKAGES_CONF and
+FLPACKAGES_FLATPAK replace the paths of flpkg, flpkg-seat, flpkg.conf and
+flatpak; FLPACKAGES_TAB=flathub opens on the Flathub tab. apps.py flathub runs
+the Flathub tab against a stand-in flatpak (screenshots
+docs/m7/packages-flathub-*.png).
+
+Replaced on the desktop by the Software Store (src/flstore, recipe flstore): this app is out of the
+desktop group and its menu entry is hidden (NoDisplay). It stays in the image because flstore
+depends on it for flpkg-seat.

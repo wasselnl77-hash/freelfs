@@ -1,0 +1,3 @@
+.a { color: red }
+.a:hover, .b > .c { opacity: .5 }
+.a::before { content: "x" }

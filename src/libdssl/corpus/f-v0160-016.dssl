@@ -1,0 +1,1 @@
+.a { touch-action: manipulation; overscroll-behavior: contain; scroll-snap-type: x mandatory; scroll-snap-align: start }

@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-browser-v090-011.dssl","line":2,"message":"unexpected \"}\""}],"tree":{"children":[{"kind":"decl","line":1,"prop":"aura-glow","value":"currentColor 40"},{"kind":"decl","line":2,"prop":"aura-particle","value":"color currentColor count 30 life 600 speed 30 dir up from top texture(grain scale 2)"}],"kind":"root"}}

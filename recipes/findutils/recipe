@@ -1,0 +1,13 @@
+pkgname=findutils
+version=4.11.0
+release=1
+summary="find, xargs and locate"
+url=https://www.gnu.org/software/findutils/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://ftpmirror.gnu.org/findutils/findutils-$version.tar.xz)
+sha256=(bfd19cb06cc71f3352d567e90284d8cdac02ac89774bbeadf0b533b0c11432fd)
+build_style=autotools
+configure_args=(--localstatedir=/var/lib/locate)

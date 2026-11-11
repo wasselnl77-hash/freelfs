@@ -1,0 +1,15 @@
+# libburnia: the ISO 9660 library under xorriso (group "live").
+pkgname=libisofs
+version=1.5.8.pl02
+release=1
+summary="Library to create ISO 9660 images"
+url=https://libburnia-project.org/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(live)
+depends=(glibc zlib acl attr)
+source=(https://files.libburnia-project.org/releases/libisofs-$version.tar.gz)
+sha256=(10bd584d8f00d8091e814902b9f0a3e209f16e938f510fc23ba05f3fa469db5a)
+worksrc=$pkgname-1.5.8
+build_style=autotools
+configure_args=(--disable-static)

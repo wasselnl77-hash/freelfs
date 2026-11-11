@@ -1,0 +1,2 @@
+motion tip { from { rotate: 0 } to { rotate: 12 } }
+.a { animate: tip 300 }

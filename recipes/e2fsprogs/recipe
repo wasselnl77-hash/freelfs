@@ -1,0 +1,39 @@
+pkgname=e2fsprogs
+version=1.47.4
+release=1
+summary="ext2/3/4 file system tools"
+url=https://e2fsprogs.sourceforge.net/
+license=(GPL-2.0-or-later LGPL-2.0-or-later MIT)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc util-linux)
+source=(https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v$version/e2fsprogs-$version.tar.gz)
+sha256=(2cec05f39c20ee621f14926195664e66e6017190ac8e4bbdb16d86082e43c5da)
+
+build() {
+	mkdir -p build
+	cd build
+	../configure --prefix=/usr \
+		--sysconfdir=/etc \
+		--enable-elf-shlibs \
+		--disable-libblkid \
+		--disable-libuuid \
+		--disable-uuidd \
+		--disable-fsck
+	make
+}
+
+check() {
+	cd build
+	make check
+}
+
+package() {
+	cd build
+	make DESTDIR="$pkgdir" install
+	rm -f "$pkgdir"/usr/lib/{libcom_err,libe2p,libext2fs,libss}.a
+	gunzip -f "$pkgdir/usr/share/info/libext2fs.info.gz"
+	makeinfo -o doc/com_err.info ../lib/et/com_err.texinfo
+	install -m644 doc/com_err.info "$pkgdir/usr/share/info"
+	sed 's/metadata_csum_seed,//' -i "$pkgdir/etc/mke2fs.conf"
+}

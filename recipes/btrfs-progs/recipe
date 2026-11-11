@@ -1,0 +1,18 @@
+pkgname=btrfs-progs
+version=7.3
+release=1
+summary="Btrfs file system tools"
+url=https://btrfs.readthedocs.io/
+license=(GPL-2.0-only LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc util-linux lzo zlib zstd e2fsprogs udev python)
+worksrc=btrfs-progs-v$version
+source=(https://www.kernel.org/pub/linux/kernel/people/kdave/btrfs-progs/btrfs-progs-v$version.tar.xz)
+sha256=(d37b63403d25fe025704c758e6a3da0979ae50c30c5f02aa78e4410e7b346e3a)
+build_style=autotools
+configure_args=(--disable-static --disable-documentation)
+
+check() {
+	: # the test suite needs root and loop devices
+}

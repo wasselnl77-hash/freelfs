@@ -1,0 +1,25 @@
+# flupdate (the update notifier), from src/flupdate in the FreeLFS tree.
+pkgname=flupdate
+version=0.1
+release=1
+summary="Daily update check with a desktop notification (never installs)"
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(bash flpkg flpanel)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flupdate" "$srcdir/flupdate"
+}
+
+check() {
+	cd "$srcdir/flupdate"
+	make check
+}
+
+package() {
+	cd "$srcdir/flupdate"
+	make DESTDIR="$pkgdir" install
+}

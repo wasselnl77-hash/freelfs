@@ -1,0 +1,15 @@
+pkgname=libjpeg-turbo
+version=3.2.0
+release=1
+summary="JPEG image codec with SIMD"
+url=https://libjpeg-turbo.org/
+license=(IJG AND BSD-3-Clause AND Zlib)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(cmake ninja nasm)
+source=(https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$version/libjpeg-turbo-$version.tar.gz)
+sha256=(6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e)
+build_style=cmake
+configure_args=(-D ENABLE_STATIC=FALSE -D CMAKE_INSTALL_DEFAULT_LIBDIR=lib)
+check() { :; }

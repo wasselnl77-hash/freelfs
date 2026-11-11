@@ -1,0 +1,14 @@
+motion rise-in {
+  from { opacity: 0; translate: 0 18 }
+}
+
+motion lift {
+  from { translate: 0 2 }
+}
+
+.gallery { stagger: 60 }
+
+.card {
+  seen { animate: rise-in 480 snap }   // plays once, when scrolled into view
+  hover { animate: lift 200 }          // WAAPI, reduced-motion aware
+}

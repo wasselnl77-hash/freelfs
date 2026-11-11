@@ -1,0 +1,22 @@
+flterm -- the FreeLFS terminal
+==============================
+
+flterm [-e COMMAND [ARGS...]]     runs flsh, or the command
+
+VT100/xterm subset: UTF-8, 16/256/24-bit colour, cursor movement, scroll
+regions, insert/delete, tabs, alternate screen, bracketed paste, DEC line
+drawing, window title (OSC 0/2), cursor and device reports. TERM is
+xterm-256color. No mouse reporting yet (the wheel scrolls the history, or
+sends Up/Down on the alternate screen, as `less` expects).
+
+Scrollback 2000 lines (wheel, Shift+PageUp/PageDown). Select with the mouse
+(double click: word, triple click: line); copy with Ctrl+Shift+C or
+Ctrl+Insert, paste with Ctrl+Shift+V, Shift+Insert or middle click.
+
+term.c is the emulator (no UI), main.c the window, keys and the pty. The
+16 ANSI colours are the boot-menu palette; the ground is #16191c in both
+themes. Memory: the scrollback allocates rows as they fill.
+
+Test: FLUI_PPM=out.ppm FLUI_PPM_DELAY=500 flterm -e COMMAND
+
+Build: make; make install (PREFIX, DESTDIR). Needs libflui.

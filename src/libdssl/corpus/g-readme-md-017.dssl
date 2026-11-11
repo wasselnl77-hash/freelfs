@@ -1,0 +1,6 @@
+.banner {
+  gradient: linear 135, color.accent -> color.ok
+  gradient-flow: 6s alternate       // the gradient drifts, forever, WAAPI
+}
+.head  { gradient-text: linear to right, color.accent, color.ink }
+.sw    { gradient: radial circle at 30% 20%, color.card -> color.ink }

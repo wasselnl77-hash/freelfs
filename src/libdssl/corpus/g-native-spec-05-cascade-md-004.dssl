@@ -1,0 +1,5 @@
+.a {
+  @media 768 { padding: 24 }
+  @media <= 480 { padding: 12 }
+  @media 480..960 { gap: 4 }
+}

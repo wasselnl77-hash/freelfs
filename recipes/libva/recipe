@@ -1,0 +1,18 @@
+pkgname=libva
+version=2.24.1
+release=1
+summary="Video Acceleration API (VA-API) runtime"
+url=https://github.com/intel/libva
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libdrm wayland)
+makedepends=(meson ninja pkgconf wayland-protocols)
+source=(https://github.com/intel/libva/releases/download/$version/libva-$version.tar.bz2)
+sha256=(eec6050b52876f229bd35e9df17cd31a06785e18e6f7990c445b584628483d67)
+build_style=meson
+# DRM and Wayland only: no X11, no GLX. The drivers (iHD, i965, mesa's radeonsi
+# and nouveau) are separate; ffmpeg and mpv probe at run time and fall back to
+# software decoding when there is no driver.
+configure_args=(-D with_x11=no -D with_glx=no -D with_wayland=yes -D disable_drm=false)
+check() { :; }

@@ -1,0 +1,6 @@
+.a { background: url(http://x.com/a.png) /* c */ ; color: red } // tail
+.b { content: "// not a comment /* nor this */" }
+.c { background: URL( 'x//y' ) }
+/* unterminated block comment
+.d { color: red }
+

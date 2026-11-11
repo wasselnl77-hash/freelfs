@@ -1,0 +1,16 @@
+body {
+  background: #f5f0e4
+  color: #26201a
+  padding: 40
+}
+
+.card {
+  background: #fdfaf2
+  border: 1 solid #ddd2bc
+  radius: 6
+  padding: 24
+
+  hover {
+    box-shadow: 0 6 18 #26201a/16
+  }
+}

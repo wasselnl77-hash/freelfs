@@ -1,0 +1,6 @@
+menu {
+  > li { padding: 8 0 }
+  > li:nth-child(odd) { background: color.paper }
+  > li:has(img) { row: gap 12 center }
+  > li:not(.divider) { border-bottom: 1 solid color.line }
+}

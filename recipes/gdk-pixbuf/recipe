@@ -1,0 +1,21 @@
+# Flatpak and xdg-desktop-portal link it to check icons. PNG and JPEG only,
+# built in (so no loaders.cache is needed at install time); no TIFF, no
+# glycin (Rust), no GIO file type sniffing (that needs shared-mime-info).
+pkgname=gdk-pixbuf
+version=2.44.8
+release=1
+summary="Image loading and scaling library"
+url=https://gitlab.gnome.org/GNOME/gdk-pixbuf
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib libpng libjpeg-turbo)
+makedepends=(meson ninja gettext)
+source=(https://download.gnome.org/sources/gdk-pixbuf/${version%.*}/gdk-pixbuf-$version.tar.xz)
+sha256=(919f529512961a12e81cd4b4b466a48c3933469e7f9a310c6513cd4fb252ba3c)
+build_style=meson
+configure_args=(--wrap-mode=nodownload -D png=enabled -D jpeg=enabled -D tiff=disabled -D gif=disabled
+	-D glycin=disabled -D others=disabled -D android=disabled -D builtin_loaders=png,jpeg
+	-D introspection=disabled -D man=false -D documentation=false -D gtk_doc=false -D tests=false
+	-D installed_tests=false -D gio_sniffing=false -D thumbnailer=disabled)
+check() { :; }

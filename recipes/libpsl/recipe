@@ -1,0 +1,15 @@
+pkgname=libpsl
+version=0.23.3
+release=1
+summary="Public suffix list library"
+url=https://rockdaboot.github.io/libpsl/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc icu)
+makedepends=(meson ninja python)
+source=(https://github.com/rockdaboot/libpsl/releases/download/$version/libpsl-$version.tar.gz)
+sha256=(93941f85a1e7bd593fa94f299233cb5dfc91cd144fd9a78a6ceb75001c5b03be)
+build_style=meson
+configure_args=(-D runtime=libicu -D builtin=true -D tests=false -D docs=false)
+check() { :; }

@@ -1,0 +1,109 @@
+# /etc/rc.d/functions -- shared helpers for the FreeLFS boot scripts.
+# Sourced, never run.
+
+COLS=$(stty size 2>/dev/null < /dev/console)
+COLS=${COLS#* }
+[ "${COLS:-0}" -gt 20 ] 2>/dev/null || COLS=80
+
+# The boot screen (flsplash). A failed step shows the text; the screen is
+# handed over before something else (flsetup) wants it.
+splash_text() {
+	local p
+	if [ -r /run/flsplash.pid ] && read -r p < /run/flsplash.pid && [ -n "$p" ]; then
+		kill -USR2 "$p" 2> /dev/null
+	fi
+	return 0
+}
+splash_handover() {
+	[ -x /sysflfs/sbin/flsplash ] && /sysflfs/sbin/flsplash --handover
+	return 0
+}
+
+# Old-school status lines:
+#   :: Mounting local file systems                                  [DONE]
+stat_busy() {
+	printf '\033[1;34m::\033[0m \033[1m%s\033[0m\033[%dG[\033[1;33mBUSY\033[0m]' \
+		"$1" "$((COLS - 6))"
+}
+stat_done() { printf '\033[%dG[\033[1;32mDONE\033[0m]\n' "$((COLS - 6))"; }
+stat_fail() { splash_text; printf '\033[%dG[\033[1;31mFAIL\033[0m]\n' "$((COLS - 6))"; }
+
+# step MESSAGE CMD... -- run CMD under a status line
+step() {
+	local m=$1
+	shift
+	stat_busy "$m"
+	if "$@"; then
+		stat_done
+	else
+		stat_fail
+		return 1
+	fi
+}
+
+# remount_root rw|ro -- remount /. The live system's root is an overlay on a
+# squashfs: always writable (in memory), and not remountable, so nothing to do.
+remount_root() {
+	[ "$(findmnt -no FSTYPE /)" = overlay ] && return 0
+	mount -o "remount,$1" /
+}
+
+# pid_alive PIDFILE -- true if the process in PIDFILE is running
+pid_alive() {
+	local pid
+	[ -r "$1" ] && read -r pid < "$1" && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+# pid_stop PIDFILE -- SIGTERM the process, wait up to 5 s, then SIGKILL
+pid_stop() {
+	local pid i
+	pid_alive "$1" || return 0
+	read -r pid < "$1"
+	kill "$pid"
+	for i in 1 2 3 4 5 6 7 8 9 10; do
+		kill -0 "$pid" 2>/dev/null || break
+		sleep 0.5
+	done
+	kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
+	rm -f "$1"
+}
+
+# daemon_service ACTION DESCRIPTION PIDFILE CMD... -- the whole init.d
+# script for a daemon that writes its own pid file.
+daemon_service() {
+	local action=$1 desc=$2 pidfile=$3
+	shift 3
+	case $action in
+		start)
+			stat_busy "Starting $desc"
+			if pid_alive "$pidfile" || "$@"; then stat_done; else stat_fail; return 1; fi
+			;;
+		stop)
+			step "Stopping $desc" pid_stop "$pidfile"
+			;;
+		restart)
+			daemon_service stop "$desc" "$pidfile" "$@"
+			daemon_service start "$desc" "$pidfile" "$@"
+			;;
+		status)
+			if pid_alive "$pidfile"; then
+				echo "$desc is running"
+			else
+				echo "$desc is stopped"
+				return 3
+			fi
+			;;
+		*)
+			echo "usage: ${0##*/} {start|stop|restart|status}" >&2
+			return 2
+			;;
+	esac
+}
+
+# enabled_services -- names from SERVICES in /etc/rc.conf, minus !disabled
+enabled_services() {
+	local s
+	for s in "${SERVICES[@]}"; do
+		case $s in !*) ;; *) echo "$s" ;; esac
+	done
+}

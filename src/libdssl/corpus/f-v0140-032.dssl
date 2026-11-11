@@ -1,0 +1,9 @@
+body { background: #14102a; color: #eee }
+.card { background: #f5efe0; padding: 10 }
+.fine { color: #222 }
+.wash-bad { background: #ffffff1a; color: #333 }
+.wash-ok { background: #ffffff1a; color: #fff }
+.pic { background-image: linear-gradient(red, blue); color: #801 }
+.big { color: #888; font-size: 30; background: #fff }
+.promo { place-items: center }
+.flexy { display: flex; place-items: center }

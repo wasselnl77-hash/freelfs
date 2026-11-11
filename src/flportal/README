@@ -1,0 +1,50 @@
+flportal -- the FreeLFS backend of xdg-desktop-portal
+=====================================================
+
+Flatpak apps reach the desktop through xdg-desktop-portal (the "frontend", D-Bus activated in
+the session). The frontend does the sandbox bookkeeping and asks a backend for what the desktop
+shows or knows. flportal is that backend: org.freedesktop.impl.portal.desktop.freelfs, one
+process, started by D-Bus activation on the first call (installed in /usr/libexec/flportal, with
+share/dbus-1/services/org.freedesktop.impl.portal.desktop.freelfs.service). xdg-desktop-portal
+finds it through share/xdg-desktop-portal/portals/freelfs.portal and chooses it through
+freelfs-portals.conf (XDG_CURRENT_DESKTOP=FreeLFS, set by src/flcomp/session) or, if the variable
+is missing, portals.conf (the same file).
+
+Interfaces
+  FileChooser   OpenFile (one, several, folders), SaveFile, SaveFiles. Looks like flfiles (places,
+                drives, toolbar, colours): list with Name / Size / Modified, filters (glob and
+                MIME), the app's extra choices (drop-downs, switches), accept_label, a name
+                field when saving, "Replace?" when the file exists, new folder, hidden files
+                (Ctrl-H or the switch), type-ahead, Alt-Left/Right/Up, Backspace, Ctrl-L.
+  AppChooser    the "Open with" list OpenURI shows: recommended programs first, then all that
+                have a .desktop file, with search.
+  Access        the Allow / Deny question (Screenshot asks it).
+  Notification  forwarded to org.freedesktop.Notifications, i.e. flpanel: title, body, icon name,
+                priority -> urgency, default action, up to three buttons; clicks come back as
+                ActionInvoked with the app's action name and target. The same id replaces.
+  Settings      org.freedesktop.appearance: color-scheme (theme= in desktop.conf: dark 1,
+                light 2), accent-color (accent=), contrast 0. desktop.conf is watched, so
+                SettingChanged goes out when Settings changes it.
+  Screenshot    runs `snappel --full --output FILE` (`--region` for interactive requests) and
+                answers with the file (~/pictures or XDG_PICTURES_DIR, screenshot-DATE.png).
+                snappel not installed or failing: response 2 (the portal says "other").
+                PickColor answers 2.
+
+Not implemented (the portals are simply not offered): Inhibit, Background, Account, Email,
+Wallpaper, ScreenCast, RemoteDesktop, GlobalShortcuts, Print, Secret. Dialogs are ordinary
+windows: no parent_window / modality (flcomp has no xdg-foreign yet).
+
+Needs a compositor for dialogs: the Wayland connection opens with the first dialog and closes
+with the last, so an idle flportal is a small GLib process. `flportal -v` (or
+FLPORTAL_VERBOSE=1) logs requests to stderr; D-Bus activated, that goes to the session log.
+
+Testing
+  make check            tests/portal.sh: private session bus, the real xdg-desktop-portal and
+                        permission store from a built root file system (ROOTFS=..., default
+                        ~/freelfs-work/rootfs-x86_64), flportal and libflui compiled against
+                        that root, run through its loader. Dialogs render to PPM files
+                        (FLPORTAL_SHOT=PREFIX: no compositor; each dialog is answered at once,
+                        cancelled, or accepted with FLPORTAL_TEST_ACCEPT, the selection set by
+                        FLPORTAL_TEST_SELECT / _NAME / _OVERLAY). python3 with PyGObject checks
+                        the answers. PORTAL_OUT=DIR keeps the pictures, TMPDIR=... moves the
+                        scratch directory; tests/ppm2png.py makes PNGs.

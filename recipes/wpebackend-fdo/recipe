@@ -1,0 +1,15 @@
+pkgname=wpebackend-fdo
+version=1.16.1
+release=1
+summary="WPE backend on freedesktop.org (Wayland, EGL/dmabuf/shm export)"
+url=https://wpewebkit.org/
+license=(BSD-2-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib libwpe wayland libepoxy)
+makedepends=(meson ninja)
+source=(https://wpewebkit.org/releases/wpebackend-fdo-$version.tar.xz)
+sha256=(544ae14012f8e7e426b8cb522eb0aaaac831ad7c35601d1cf31d37670e0ebb3b)
+build_style=meson
+configure_args=(-D build_docs=false)
+check() { :; }

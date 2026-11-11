@@ -1,0 +1,15 @@
+# Test package "demo", version 2: one file changed, one gone, one new.
+pkgname=demo
+version=2.0
+release=1
+summary="flpkg test package"
+arch=(any)
+owner=("/usr/bin/demo 0 5 2755")
+package() {
+	mkdir -p "$pkgdir"/usr/share/demo "$pkgdir"/usr/bin "$pkgdir"/etc
+	echo v2 > "$pkgdir/usr/share/demo/a.txt"
+	echo new > "$pkgdir/usr/share/demo/new.txt"
+	printf '#!/bin/sh\necho demo 2\n' > "$pkgdir/usr/bin/demo"
+	chmod 755 "$pkgdir/usr/bin/demo"
+	echo setting=2 > "$pkgdir/etc/demo.conf"
+}

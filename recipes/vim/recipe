@@ -1,0 +1,52 @@
+pkgname=vim
+version=9.2.1025
+release=1
+summary="Vi Improved, a text editor"
+url=https://www.vim.org/
+license=(Vim)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses acl attr)
+source=(https://github.com/vim/vim/archive/v$version/vim-$version.tar.gz)
+sha256=(cb0dbf701f8550bb54940304fa4d8b875e078db84967e5b36a0eb7ebe8a6d0cc)
+
+prepare() {
+	echo '#define SYS_VIMRC_FILE "/etc/vimrc"' >> src/feature.h
+	sed '/test_plugin_glvs/d' -i src/testdir/Make_all.mak
+}
+
+build() {
+	./configure --prefix=/usr
+	make
+}
+
+check() {
+	TERM=xterm-256color LANG=en_US.UTF-8 make -j1 test
+}
+
+package() {
+	local v=${version%.*} l
+	make DESTDIR="$pkgdir" install
+	ln -s vim "$pkgdir/usr/bin/vi"
+	for l in "$pkgdir"/usr/share/man/{,*/}man1/vim.1; do
+		ln -s vim.1 "$(dirname "$l")/vi.1"
+	done
+	install -d "$pkgdir/usr/share/doc"
+	ln -s "../vim/vim${v//./}/doc" "$pkgdir/usr/share/doc/vim-$version"
+	install -d "$pkgdir/etc"
+	cat > "$pkgdir/etc/vimrc" <<-"EOF"
+		" /etc/vimrc
+
+		" Ensure defaults are set before customizing settings, not after
+		source $VIMRUNTIME/defaults.vim
+		let skip_defaults_vim=1
+
+		set nocompatible
+		set backspace=2
+		set mouse=
+		syntax on
+		if (&term == "xterm") || (&term == "putty")
+		  set background=dark
+		endif
+	EOF
+}

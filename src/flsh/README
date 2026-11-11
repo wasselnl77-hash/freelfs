@@ -1,0 +1,50 @@
+flsh -- the FreeLFS shell
+=========================
+
+flsh is the interactive shell of FreeLFS, written from scratch in C. It
+runs POSIX shell syntax, so commands from tutorials and ~/.profile work,
+and adds comforts for typing:
+
+  * colours while you type: commands green, unknown commands red (before
+    you press Enter), arguments yellow, existing files underlined
+  * grey suggestions from your history: press Right (or End) to take one,
+    Ctrl-Right or Alt-F for one word of it
+  * Tab completion of commands, files, $variables and per-command words;
+    when several fit, a menu opens: Tab moves, Enter picks, Esc cancels
+  * Up/Down search the history for lines starting with what you typed,
+    Ctrl-R searches anywhere in it
+  * "grpe: no such command. Did you mean grep?"
+  * the prompt shows user, folder, git branch, and a red mark with the
+    exit status after a failure; commands over 5 seconds report their time
+
+Keys: Ctrl-A/E start/end, Ctrl-B/F or arrows move, Alt-B/F words,
+Ctrl-W/U/K delete word/to start/to end, Ctrl-Y paste back, Ctrl-T swap,
+Ctrl-L clear, Ctrl-C cancel, Ctrl-D leave (on an empty line), Alt-. last
+argument of the previous command.
+
+Files
+  /etc/flshrc, ~/.config/flsh/flshrc   read by interactive shells
+  /etc/profile, ~/.profile             read by login shells (flsh -l)
+  ~/.local/share/flsh/history          the history
+  /usr/share/flsh/completions/NAME.flsh, ~/.config/flsh/completions/NAME.flsh
+                                       completion rules, loaded on first use
+
+Completion rules (see the files in /usr/share/flsh/completions):
+  complete NAME -s '' -w 'a b c'     first argument: one of these words
+  complete NAME -s SUB -c 'command'  after "NAME SUB": words the command prints
+  complete NAME -f | -d | -C         files, directories, command names
+
+The easter egg (guard.c): an interactive flsh runs `flcrash --cant PATH...` before the external rm
+with -r, -R or --recursive; on a vital folder (/sysflfs, /boot, ...) it shows "You can't do that." and
+"Never mind" means rm is not run (status 1), "Continue" runs it. Scripts, `flsh -c` and rm itself are
+not affected, and without flcrash installed nothing is asked.
+
+The prompt: set PS1 (bash-style \u \h \w \W \$ escapes work), or define a
+function flsh_prompt whose output is the prompt.
+
+Scripting: POSIX sh, plus ${v/pat/rep}, ${v:off:len}, ${v^^} ${v,,},
+$'...', local, function NAME { }, source, echo -e, set -o pipefail.
+flsh is not bash: scripts that need bash (arrays, [[ ]]) should say
+#!/bin/bash, and FreeLFS keeps bash installed for them.
+
+License: MIT.

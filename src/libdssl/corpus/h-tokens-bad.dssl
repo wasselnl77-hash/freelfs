@@ -1,0 +1,4 @@
+.a { tokens { x: 1 } }
+tokens { hover { a: 1 } color { bad: nonsense } }
+tokens { color { x: } }
+

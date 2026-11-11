@@ -1,0 +1,39 @@
+flvideo -- the FreeLFS video player ("Videos")
+==============================================
+
+    flvideo [--start SECONDS] [--pause] FILE
+
+libmpv (recipe mpv, built without any window system or GPU code) demuxes, decodes, plays
+the sound (PipeWire, else ALSA) and draws the subtitles with libass. Pictures come out of
+mpv's software render API ("sw", vo=libmpv) into a buffer of this program, which flui puts
+in the window under the control bar. That is slower than GPU rendering on a 4K file but
+works on every machine, with no GL or EGL, and the memory use is the decoder plus one
+window-sized frame (the render buffer is the size of the video area, so a small window is
+also cheaper to scale into).
+
+Hardware decoding: hwdec=auto-copy-safe, i.e. VA-API decoding with the frames copied back to
+memory (the recipe ffmpeg and mpv are built with libva). It is used when the GPU has a
+VA-API driver (iHD, radeonsi, ...) and silently falls back to software decoding otherwise.
+FLVIDEO_HWDEC=no turns it off, FLVIDEO_HWDEC=vaapi-copy insists on it.
+
+Controls: play/pause, -10 s and +10 s, a seek bar (drag or click), speed (click cycles
+0.5x .. 2x), Audio and Subtitles menus (pick a track; Subtitles has "Off"), mute and volume,
+Fullscreen. In fullscreen the bar hides after 3 s without mouse movement.
+Keys: Space or K pause, Left/Right 5 s (Shift 30 s, Ctrl 60 s), J/L 10 s, Up/Down volume,
+M mute, F or F11 fullscreen, Escape leaves fullscreen, V next subtitle track (then off),
+A next audio track, [ and ] slower and faster, Q quit. Click the picture to pause, double
+click for fullscreen.
+Subtitles: tracks inside the file, and .srt/.ass/.sub files next to it with a similar name
+(sub-auto=fuzzy).
+Resume: the position is saved every 15 s and on exit to ~/.local/share/flvideo/resume.tsv and
+used the next time the same file is opened (not within the first or the last 10 s; a file
+that played to the end starts from the top).
+
+Fullscreen opens a second window and closes the first (libflui has no fullscreen toggle on a
+live window); playback continues in the same mpv instance.
+
+Not done: a file picker (open files from Files, which should pass the path), playlists, DVD
+or network streams, chapters in the UI, subtitle delay, screenshots.
+
+Test: make check needs the ffmpeg tool: it generates a clip (tests/mkclip.sh), renders a
+frame at a seek position, and checks that a second run resumes at the same frame.

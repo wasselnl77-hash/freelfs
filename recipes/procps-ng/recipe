@@ -1,0 +1,14 @@
+pkgname=procps-ng
+version=4.0.7
+release=1
+summary="Process tools: ps, top, free, sysctl, ..."
+url=https://gitlab.com/procps-ng/procps
+license=(GPL-2.0-or-later LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses)
+source=(https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-$version.tar.xz)
+sha256=(9d2021f47a4501c667862c9942a92d1953694b21d11bcd1702e83eb594e3d67d)
+build_style=autotools
+configure_args=(--docdir=/usr/share/doc/procps-ng-$version --disable-static --disable-kill
+	--enable-watch8bit)

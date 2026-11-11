@@ -1,0 +1,14 @@
+# Tab completion for flpkg
+complete flpkg -s '' -w 'install remove upgrade sync search list info files owns verify build repo key fix-owners snapshots history version help'
+complete flpkg -s install -c "flpkg search '' 2>/dev/null | sed -n 's|^[^ ]*/\([^ ]*\) .*|\1|p'"
+complete flpkg -s install -f
+for c in remove info files verify; do
+	complete flpkg -s "$c" -c "flpkg list 2>/dev/null | cut -d' ' -f1"
+done
+complete flpkg -s info -f
+complete flpkg -s files -f
+complete flpkg -s owns -f
+complete flpkg -s build -d
+complete flpkg -s repo -w 'add'
+complete flpkg -s key -w 'generate'
+unset c

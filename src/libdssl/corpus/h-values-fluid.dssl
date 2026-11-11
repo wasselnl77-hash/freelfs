@@ -1,0 +1,12 @@
+h1 { font-size: fluid 28 44 }
+.stack { gap: fluid 8 16 }
+.hero { font-size: fluid 16 24 400 800 }
+.e1 { font-size: fluid 16 24% }
+.e2 { font-size: fluid 16px 2rem }
+.e3 { font-size: fluid 16 24 800 400 }
+.e4 { font-size: fluid abc 2 }
+.r { font-size: fluid 1 2rem; padding: fluid 1rem 2rem; fluid: 12, 20 }
+.f { fluid: 10 }
+.g { fluid: 1px, 2 }
+.h { fluid: 1.2rem, 2.4rem, 320, 1440 }
+

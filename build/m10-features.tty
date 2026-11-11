@@ -1,0 +1,139 @@
+# Steps for FLFS_VM_TTY (build/m10-features.sh): login, then the M10 features one by one. @MEM@ and @S@
+# (the screenshot directory) are replaced. Every "shot" is looked at by a person; the "run" lines print what the
+# program can say for itself.
+wait 3
+key ret
+wait 14
+shot @S@/desktop.ppm
+run echo autostart-on=$(cat /tmp/m10-autostart 2>&1) autostart-off=$(test -e /tmp/m10-off && echo RAN || echo not-run)
+run ps -eo user,rss,args | grep -E "flpanel|flcomp|flupdate|dbus-daemon --session" | grep -v grep
+run cat /run/user/$(id -u tester)/session.log
+# --- workspaces: a window on workspace 1, switch to 2 (empty), the overview, back
+run m10app flfiles /usr/tester/m10
+wait 4
+shot @S@/ws1-files.ppm
+key meta_l-ctrl-right
+wait 2
+shot @S@/ws2-empty.ppm
+key meta_l-tab
+wait 2
+shot @S@/overview.ppm
+key esc
+wait 1
+key meta_l-ctrl-left
+wait 2
+shot @S@/ws1-back.ppm
+# --- Snappel: Print takes the whole screen into ~/pictures/screenshots
+key print
+wait 5
+shot @S@/print.ppm
+run ls -l /usr/tester/pictures/screenshots/
+# --- General Manager: Ctrl+Shift+Esc, Performance (Ctrl+2), Startup apps (Ctrl+3)
+key ctrl-shift-esc
+wait 5
+shot @S@/gm-processes.ppm
+run pgrep -a general-manager
+key ctrl-2
+wait 3
+shot @S@/gm-performance.ppm
+key ctrl-3
+wait 2
+shot @S@/gm-startup.ppm
+run pkill -x general-manager; sleep 1; echo gm-closed
+# --- accent colour: written to desktop.conf like the Settings swatch does, then the Settings page
+run m10sh "sed -i '/^accent=/d' ~/.config/freelfs/desktop.conf; echo accent=blue >> ~/.config/freelfs/desktop.conf; cat ~/.config/freelfs/desktop.conf"
+wait 3
+run m10app flsettings --page general
+wait 5
+shot @S@/accent-blue-settings.ppm
+run pkill -x flsettings; echo settings-closed
+# --- sounds: no audio device in this VM is fine; nothing may crash
+run m10sh 'for s in login notification error tick screenshot; do flsound --force $s; echo flsound-$s-rc=$?; done'
+run echo pipewire-sinks=$(m10sh 'wpctl status 2>&1 | grep -c "Sinks"'); dmesg | grep -ci "segfault"
+# --- fledit
+run m10app fledit /usr/tester/m10/script.sh
+wait 5
+shot @S@/fledit.ppm
+run pgrep -a fledit
+run pkill -x fledit; echo fledit-closed
+# --- Archives: extract here, then the window
+run m10sh 'cd ~/m10 && timeout 60 flarchive --extract-here project.zip; echo extract-rc=$?; ls -R project; cat project/readme.txt'
+run m10app flarchive /usr/tester/m10/project.zip
+wait 5
+shot @S@/archive.ppm
+run pkill -x flarchive; echo archive-closed
+# --- Images (and set as wallpaper), Documents, Music, Videos
+run m10app flview /usr/tester/m10/sample.png
+wait 4
+shot @S@/image.ppm
+key w
+wait 3
+shot @S@/image-wallpaper.ppm
+run m10sh 'grep wallpaper ~/.config/freelfs/desktop.conf; ls -l ~/.local/share/freelfs/wallpapers/'
+key q
+wait 3
+shot @S@/desktop-wallpaper.ppm
+run m10app flpdf /usr/tester/m10/sample.pdf
+wait 5
+shot @S@/pdf.ppm
+key esc
+wait 1
+run pgrep -a flpdf; echo
+run m10app flmusic /usr/tester/m10/sample.flac
+wait 6
+shot @S@/music.ppm
+run m10sh 'flmusic --ctl status'
+key audioplay
+wait 2
+run m10sh 'flmusic --ctl status'
+key audioplay
+wait 2
+run m10sh 'flmusic --ctl status'
+run pkill -x flmusic; echo music-closed
+run m10app flvideo /usr/tester/m10/sample.mp4
+wait 6
+shot @S@/video.ppm
+run ps -eo rss,comm | grep -E "flvideo" | head -3
+key q
+wait 2
+# --- Files: Enter opens by MIME type (mimeapps.list): picture, document, sound, text
+run m10app flfiles /usr/tester/m10
+wait 4
+type sample.png\n
+wait 4
+shot @S@/files-open-png.ppm
+run pgrep -a flview
+run pkill -x flview; echo
+run m10app flfiles /usr/tester/m10
+wait 3
+type sample.pdf\n
+wait 4
+run pgrep -a flpdf
+run pkill -x flpdf; echo
+type sample.m4a\n
+wait 4
+run pgrep -a flmusic
+run pkill -x flmusic; echo
+type notes.txt\n
+wait 4
+run pgrep -a fledit
+shot @S@/files-open-txt.ppm
+run pkill -x fledit; echo
+# --- Software Store (the VM has QEMU's user network; with or without Flathub the window must come up)
+run m10app flstore
+wait 15
+shot @S@/store.ppm
+run ps -eo rss,comm | grep -E "flstore"
+run pkill -x flstore; echo
+run m10app flstore --updates
+wait 10
+shot @S@/store-updates.ppm
+run pkill -x flstore; echo
+# --- portals (xdg-desktop-portal is bus-activated; its backend is flportal): the frontend answers, the settings portal
+# gives the accent colour written above
+run m10sh 'dbus-send --session --print-reply --dest=org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.DBus.Properties.Get string:org.freedesktop.portal.FileChooser string:version 2>&1 | tail -2'
+run m10sh 'dbus-send --session --print-reply --dest=org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings.Read string:org.freedesktop.appearance string:accent-color 2>&1 | tail -8; pgrep -a "flportal|xdg-"'
+# --- the real btrfs: snapshots
+run flsnap status; flsnap create --reason "m10 desktop test" && flsnap list; ls -l /.snapshots; btrfs subvolume list / | cat
+run dmesg | grep -ci "out of memory\|oom-kill"; free -m | sed -n 2p
+shot @S@/end.ppm

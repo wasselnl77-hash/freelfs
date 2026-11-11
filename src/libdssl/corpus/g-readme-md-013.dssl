@@ -1,0 +1,8 @@
+behavior focus-ring {
+  focus-visible {
+    outline: 2 solid color.accent
+    outline-offset: 2
+  }
+}
+
+input { use focus-ring }

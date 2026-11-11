@@ -1,0 +1,22 @@
+# Steps for FLFS_VM_TTY: from the login screen to a desktop with apps.
+wait 3
+shot /tmp/flfs-greeter.ppm
+# the account has no password: Enter logs in
+key ret
+wait 10
+shot /tmp/flfs-desktop.ppm
+run pgrep -a flcomp; pgrep -a pipewire | head -3; ls /run/user; free -m | head -2
+# Super opens the start menu; type to search, Enter starts the program
+key meta_l
+wait 1
+type files
+key ret
+wait 3
+shot /tmp/flfs-files.ppm
+key meta_l
+wait 1
+type plain
+key ret
+wait 3
+shot /tmp/flfs-edit.ppm
+run ps -eo rss,comm | grep -E "flcomp|flpanel|flfiles|fledit|pipewire|wireplumber|dbus-daemon"; free -m | head -2

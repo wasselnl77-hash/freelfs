@@ -1,0 +1,2 @@
+.a { hover { color: red } focus { color: blue } focus-visible { color: green } enabled { color: red } link { color: red } visited { color: red } indeterminate { color: red } first-of-type { color: red } }
+

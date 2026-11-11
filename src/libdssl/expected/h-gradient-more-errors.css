@@ -1,0 +1,83 @@
+@layer tokens, base, components, utilities, pin;
+
+@layer tokens {
+:where(:root) {
+  --dssl-color-ink: #16161d;
+  --dssl-color-paper: #faf7f2;
+  --dssl-color-card: #ffffff;
+  --dssl-color-muted: #6f6a7a;
+  --dssl-color-line: #e5ded2;
+  --dssl-color-accent: oklch(62% 0.19 35);
+  --dssl-color-accent-ink: #fff6ee;
+  --dssl-color-ok: #2e7d4f;
+  --dssl-color-err: #b3372e;
+  --dssl-space-1: 4px;
+  --dssl-space-2: 8px;
+  --dssl-space-3: 12px;
+  --dssl-space-4: 16px;
+  --dssl-space-5: 24px;
+  --dssl-space-6: 32px;
+  --dssl-space-7: 48px;
+  --dssl-space-8: 64px;
+  --dssl-radius-sm: 8px;
+  --dssl-radius-md: 14px;
+  --dssl-radius-lg: 22px;
+  --dssl-radius-full: 999px;
+  --dssl-shadow-sm: 0px 1px 2px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent), 0px 1px 3px color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  --dssl-shadow-md: 0px 2px 4px color-mix(in oklab, var(--dssl-color-ink) 10%, transparent), 0px 4px 12px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent);
+  --dssl-shadow-lg: 0px 4px 8px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent), 0px 12px 32px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent);
+  --dssl-shadow-xl: 0px 8px 16px color-mix(in oklab, var(--dssl-color-ink) 14%, transparent), 0px 24px 64px color-mix(in oklab, var(--dssl-color-ink) 16%, transparent);
+  --dssl-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dssl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+}
+
+@layer components {
+:where(.c) {
+  background-image: radial-gradient(circle farthest-side at 1px 2px, blue, transparent 60%), linear-gradient(red, red);
+}
+
+:where(.d) {
+  background-image: radial-gradient(12px 4px, red, blue);
+}
+
+:where(.e) {
+  background-image: linear-gradient(90deg, red 10px 20px, blue 30px);
+}
+
+:where(.f) {
+  background-image: linear-gradient(90deg in oklab longer hue, red, blue);
+}
+
+:where(.g) {
+  background-image: linear-gradient(90deg in srgb-linear, red, blue);
+}
+
+:where(.h) {
+  background-image: repeating-radial-gradient(circle, red 0 4px, blue 4px 8px);
+}
+
+:where(.i) {
+  background-image: linear-gradient(180deg, red, blue);
+}
+
+:where(.j) {
+  background-image: linear-gradient(45deg, rgb(1 2 3), hsl(4 5% 6%), color-mix(in oklab, #abc 50%, transparent));
+}
+
+:where(.k) {
+  background-image: radial-gradient(at center, var(--dssl-color-ink), color-mix(in oklab, white 10%, transparent), transparent);
+}
+
+:where(.l) {
+  background-image: linear-gradient(to top left, #f00, #00f), conic-gradient(from 10deg at 10px 10px, red, blue);
+  background-size: auto, 8px no-repeat;
+}
+
+:where(.m) {
+  background-image: linear-gradient(90deg, red, blue);
+  background-size: 8px 8px;
+  background-position: 1px 2px;
+  background-repeat: repeat-x;
+}
+}

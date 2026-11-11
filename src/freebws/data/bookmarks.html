@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bookmarks</title>
+<link rel="stylesheet" href="freebws://res/ui.css">
+<style>
+.folder { background: var(--raised); font-weight: 600; }
+.ind { padding-left: 34px; }
+.url { color: var(--dim); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btns { display: flex; gap: 6px; align-items: center; }
+.btns select { padding: 2px 20px 2px 6px; font-size: 12.5px; max-width: 150px; }
+.edit { display: flex; gap: 6px; flex: 1; }
+.edit input { flex: 1; }
+.tools { display: flex; gap: 8px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+.tools input { width: 260px; }
+#msg { color: var(--accent-hi); }
+</style></head>
+<body><div class="page">
+<div class="head"><h1>Bookmarks</h1><span class="sp"></span><span id="msg"></span><a href="freebws://settings">Settings</a></div>
+<div class="tools">
+<button id="newf">New folder</button>
+<input type="text" id="imp" placeholder="~/downloads/bookmarks.html" spellcheck="false">
+<button id="impb">Import from file</button>
+</div>
+<p class="dim" style="font-size:12.5px">Import reads the HTML file that Firefox or Chromium export (Bookmarks, Import and backup, Export to HTML). Items at the top level are on the bookmarks bar.</p>
+<div class="box" id="tree"></div>
+</div>
+<script src="freebws://res/ui.js"></script>
+<script>
+var L = [];
+function act(cmd, args) { return function () { fb(cmd, args).then(load); }; }
+function foldersOf(id) { /* folders an item can move to: not itself or inside itself */
+	var bad = {}; bad[id] = 1;
+	var ch = true;
+	while (ch) { ch = false; L.forEach(function (x) { if (x.folder && bad[x.parent] && !bad[x.id]) { bad[x.id] = 1; ch = true; } }); }
+	return L.filter(function (x) { return x.folder && !bad[x.id]; });
+}
+function row(b, depth) {
+	var r = el('div', { class: 'row' + (b.folder ? ' folder' : '') });
+	var info = el('div', { class: 'grow' + (depth ? ' ind' : '') });
+	info.style.paddingLeft = (depth * 22) + 'px';
+	if (b.folder) info.appendChild(document.createTextNode(b.title));
+	else {
+		info.appendChild(el('a', { href: b.url, text: b.title }));
+		info.appendChild(el('div', { class: 'url', text: b.url }));
+	}
+	var btns = el('div', { class: 'btns' });
+	var mv = el('select', { title: 'Move to' });
+	mv.appendChild(el('option', { value: '', text: 'Move to...' }));
+	mv.appendChild(el('option', { value: '0', text: 'Bookmarks bar' }));
+	foldersOf(b.id).forEach(function (f) { if (f.id !== b.parent) mv.appendChild(el('option', { value: f.id, text: f.title })); });
+	mv.addEventListener('change', function () { if (mv.value !== '') fb('bm.move', { id: b.id, parent: +mv.value }).then(load); });
+	btns.appendChild(mv);
+	btns.appendChild(el('button', { class: 'small', text: 'Edit', onclick: function () { edit(r, b); } }));
+	var del = el('button', { class: 'small danger', text: 'Delete' }), armed = false;
+	del.addEventListener('click', function () {
+		if (b.folder && !armed) {	/* a folder takes everything in it along: ask once */
+			armed = true;
+			del.textContent = 'Really delete?';
+			setTimeout(function () { armed = false; del.textContent = 'Delete'; }, 3000);
+			return;
+		}
+		fb('bm.del', { id: b.id }).then(load);
+	});
+	btns.appendChild(del);
+	r.appendChild(info);
+	r.appendChild(btns);
+	return r;
+}
+function edit(r, b) {
+	r.textContent = '';
+	var t = el('input', { type: 'text', value: b.title }), u = el('input', { type: 'text', value: b.url || '' });
+	var f = el('div', { class: 'edit' }, [t]);
+	if (!b.folder) f.appendChild(u);
+	var save = function () { fb('bm.edit', { id: b.id, title: t.value, url: u.value }).then(load); };
+	[t, u].forEach(function (i) { i.addEventListener('keydown', function (e) { if (e.key === 'Enter') save(); if (e.key === 'Escape') load(); }); });
+	r.appendChild(f);
+	r.appendChild(el('div', { class: 'btns' }, [el('button', { class: 'small accent', text: 'Save', onclick: save }), el('button', { class: 'small', text: 'Cancel', onclick: load })]));
+	t.focus();
+}
+function tree(parent, depth, out) {
+	L.filter(function (x) { return x.parent === parent; }).forEach(function (b) {
+		out.appendChild(row(b, depth));
+		if (b.folder) tree(b.id, depth + 1, out);
+	});
+}
+function render() {
+	var t = $('#tree');
+	t.textContent = '';
+	if (!L.length) { t.appendChild(el('div', { class: 'empty', text: 'No bookmarks yet. Press Ctrl+D on a page to add one.' })); return; }
+	tree(0, 0, t);
+}
+function load() { fb('bm.list').then(function (l) { L = l || []; render(); }); }
+var nf = null;
+$('#newf').addEventListener('click', function () {
+	if (nf) { nf.focus(); return; }
+	var i = el('input', { type: 'text', placeholder: 'Folder name', value: 'New folder' });
+	nf = i;
+	var done = function (ok) {
+		var v = i.value.trim();
+		i.remove(); ok_.remove(); nf = null;
+		if (ok && v) fb('bm.folder', { title: v, parent: 0 }).then(load);
+	};
+	var ok_ = el('button', { class: 'accent', text: 'Create', onclick: function () { done(true); } });
+	i.addEventListener('keydown', function (e) { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+	$('.tools').insertBefore(ok_, $('#newf').nextSibling);
+	$('.tools').insertBefore(i, ok_);
+	i.focus(); i.select();
+});
+$('#impb').addEventListener('click', function () {
+	var p = $('#imp').value.trim();
+	if (!p) { $('#msg').textContent = 'Type the path of the file first'; return; }
+	fb('bm.import', { path: p }).then(function (r) {
+		$('#msg').textContent = !r ? 'Failed' : r.count === -2 ? 'Cannot read that file' : r.count < 0 ? 'Not a bookmarks file' : r.count + ' bookmarks imported';
+		load();
+	});
+});
+load();
+</script></body></html>

@@ -1,0 +1,2 @@
+.card { opacity: 0; seen { opacity: 1; transform: translateY(0 -> 4) } }
+

@@ -1,0 +1,17 @@
+.a { text-stroke: 6 color.ink }
+.b { text-stroke: 2 #fff inside }
+.c { text-stroke: none }
+.d { text-stroke: red }
+.e { text-stroke: }
+.f { text-stroke: 3px }
+.g { outline-shape: 3 color.ink }
+.h { outline-shape: none }
+.i { outline-shape: wide }
+.j { outline-shape: 2.5 }
+.k { rotate: 5 }
+.l { rotate: 5deg }
+.m { rotate: x 30 }
+.n { rotate: 1 2 3 4 }
+.o { rotate: 0.1turn }
+.p { rotate: -.5 }
+

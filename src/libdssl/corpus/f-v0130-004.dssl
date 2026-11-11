@@ -1,0 +1,2 @@
+tokens { color { brand: #123456 } }
+.x { color: color.brand }

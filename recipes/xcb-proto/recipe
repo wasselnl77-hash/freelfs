@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xcb-proto
+version=1.17.0
+release=1
+summary="XML-XCB protocol descriptions"
+url=https://www.x.org/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=()
+makedepends=(python)
+source=(https://www.x.org/pub/individual/xcb/xcb-proto-1.17.0.tar.xz)
+sha256=(2c1bacd2110f4799f74de6ebb714b94cf6f80fb112316b1219480fd22562148c)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

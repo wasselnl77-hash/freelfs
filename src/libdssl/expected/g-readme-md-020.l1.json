@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":2,"prop":"slider","value":"track 6 color.line radius full, fill color.accent, thumb 24 color.paper, ring 3 color.accent, glow color.accent 14"}],"kind":"selector","line":1,"sel":"input[type=range]"}],"kind":"root"}}

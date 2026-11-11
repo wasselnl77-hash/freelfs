@@ -1,0 +1,2 @@
+tokens { color { accent: red } }
+@media (prefers-color-scheme: dark) { tokens { color { accent: pink } } }

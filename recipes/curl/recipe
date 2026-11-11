@@ -1,0 +1,21 @@
+# curl and libcurl: needed by Flatpak, OSTree and AppStream. OpenSSL as the TLS
+# backend (the one TLS library in the system), HTTP/2 through nghttp2, the
+# CA bundle from ca-certificates. No LDAP, SSH, IDN or docs.
+pkgname=curl
+version=8.23.0
+release=1
+summary="Command line tool and library for transferring data with URLs"
+url=https://curl.se/
+license=(curl)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc openssl zlib zstd brotli nghttp2 libpsl ca-certificates)
+makedepends=()
+source=(https://curl.se/download/curl-$version.tar.xz)
+sha256=(8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5)
+build_style=autotools
+configure_args=(--disable-static --with-openssl --with-nghttp2 --with-libpsl
+	--with-ca-bundle=/etc/ssl/certs/ca-certificates.crt --without-ca-path
+	--without-libidn2 --without-libssh2 --without-libssh --disable-ldap --disable-ldaps
+	--disable-manual --disable-docs --without-zsh-functions-dir --without-fish-functions-dir)
+check() { :; }

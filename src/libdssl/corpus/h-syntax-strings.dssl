@@ -1,0 +1,3 @@
+.a { content: "a\"b"; font-family: 'x\'y' }
+.b { content: "it's" }
+

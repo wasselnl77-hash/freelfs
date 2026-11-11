@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"grid-template-columns","value":"repeat(3, 1fr) repeat(auto-fit, 40) repeat(2.5, 4)"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

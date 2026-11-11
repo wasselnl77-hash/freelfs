@@ -1,0 +1,17 @@
+# Which Wi-Fi channels and power levels are allowed where; the kernel loads
+# it as firmware
+pkgname=wireless-regdb
+version=2026.09.03
+release=1
+summary="Wireless regulatory database"
+url=https://wireless.wiki.kernel.org/en/developers/regulatory/wireless-regdb
+license=(ISC)
+arch=(any)
+groups=(desktop)
+source=(https://cdn.kernel.org/pub/software/network/wireless-regdb/wireless-regdb-$version.tar.xz)
+sha256=(b22e0901227b820cd1c280abe681a15b773a5103a5e10dc442e94ebb34cbf58d)
+
+package() {
+	install -Dm644 regulatory.db "$pkgdir/usr/lib/firmware/regulatory.db"
+	install -Dm644 regulatory.db.p7s "$pkgdir/usr/lib/firmware/regulatory.db.p7s"
+}

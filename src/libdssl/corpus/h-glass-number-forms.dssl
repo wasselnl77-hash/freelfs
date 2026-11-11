@@ -1,0 +1,9 @@
+.a { glass: 0x10 }
+.b { glass: 1e1 saturate 0b11 }
+.c { glass: 0o7 tint red }
+.d { glass: 1_0 }
+.e { glass: Infinity }
+.f { glass: -0 }
+.g { tilt: 0x5 }
+.h { tilt: 1e1 lift 1.5 }
+

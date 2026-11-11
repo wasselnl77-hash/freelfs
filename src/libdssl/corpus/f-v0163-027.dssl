@@ -1,0 +1,2 @@
+tokens { radius { pill: 99 } }
+.a { radius: pill }

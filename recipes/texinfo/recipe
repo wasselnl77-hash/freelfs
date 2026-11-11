@@ -1,0 +1,17 @@
+pkgname=texinfo
+version=7.3
+release=1
+summary="GNU documentation system (makeinfo, info)"
+url=https://www.gnu.org/software/texinfo/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses perl)
+source=(https://ftpmirror.gnu.org/texinfo/texinfo-$version.tar.xz)
+sha256=(51f74eb0f51cfa9873b85264dfdd5d46e8957ec95b88f0fb762f63d9e164c72e)
+build_style=autotools
+
+package() {
+	make DESTDIR="$pkgdir" install
+	make TEXMF=/usr/share/texmf DESTDIR="$pkgdir" install-tex
+}

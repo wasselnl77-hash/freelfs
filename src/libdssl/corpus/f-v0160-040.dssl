@@ -1,0 +1,1 @@
+.a { aura-glow: #f00 30 around polygon(0px 0px, 10px 10px, 0px 10px) }

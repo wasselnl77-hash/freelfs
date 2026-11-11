@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":3,"prop":"display","value":"none"},{"kind":"decl","line":4,"prop":"column","value":"gap 2"}],"kind":"selector","line":2,"sel":".nav-links"},{"children":[{"kind":"decl","line":7,"prop":"background","value":"colr.accent"}],"kind":"selector","line":6,"sel":".bad"}],"kind":"root"}}

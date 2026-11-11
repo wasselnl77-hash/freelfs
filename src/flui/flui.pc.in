@@ -1,0 +1,11 @@
+prefix=@PREFIX@
+libdir=@LIBDIR@
+includedir=${prefix}/include
+
+Name: flui
+Description: FreeLFS desktop toolkit
+Version: @VERSION@
+Requires: wayland-client xkbcommon
+Requires.private: freetype2 harfbuzz fontconfig
+Libs: -L${libdir} -lflui
+Cflags: -I${includedir}

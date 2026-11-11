@@ -1,0 +1,24 @@
+pkgname=inetutils
+version=2.8
+release=1
+summary="Network programs: ping, ftp, telnet, hostname, ..."
+url=https://www.gnu.org/software/inetutils/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc readline ncurses libxcrypt)
+source=(https://ftpmirror.gnu.org/inetutils/inetutils-$version.tar.gz)
+sha256=(57b3cf4f77555992881e5ba2a09a63b05aa2c56342a60ed4305b5f45938390b5)
+build_style=autotools
+configure_args=(--bindir=/usr/bin --localstatedir=/var --disable-logger --disable-whois
+	--disable-rcp --disable-rexec --disable-rlogin --disable-rsh --disable-servers)
+
+prepare() {
+	sed -i 's/def HAVE_TERMCAP_TGETENT/ 1/' telnet/telnet.c
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir/usr/sbin"
+	mv "$pkgdir/usr/bin/ifconfig" "$pkgdir/usr/sbin/"
+}

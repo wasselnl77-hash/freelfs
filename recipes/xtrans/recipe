@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xtrans
+version=1.6.0
+release=1
+summary="X transport library (headers)"
+url=https://www.x.org/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=()
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/lib/xtrans-1.6.0.tar.xz)
+sha256=(faafea166bf2451a173d9d593352940ec6404145c5d1da5c213423ce4d359e92)
+build_style=autotools
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-docs --disable-specs --without-doxygen --without-xmlto --without-fop --without-xsltproc)
+check() { :; }

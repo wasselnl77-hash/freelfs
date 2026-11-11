@@ -1,0 +1,5 @@
+
+    .a { stretch: 1.2 }
+    .b { stretch: 1.4 vertical }
+    .c { stretch: 0.8 y }
+  

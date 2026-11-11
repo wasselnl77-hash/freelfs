@@ -1,0 +1,3 @@
+h1 { font-size: fluid 28 44 }
+.stack { gap: fluid 8 16 }
+.hero { font-size: fluid 16 24 400 800 }

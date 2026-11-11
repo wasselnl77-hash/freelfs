@@ -1,0 +1,205 @@
+#!/bin/sh
+# flgaming -- gaming set-up helper: checks the machine and prepares the per-user
+# Flatpak install for Steam (com.valvesoftware.Steam). Runs as the person who
+# will play, never as root, and changes only that person's own Flatpak
+# installation (flatpak --user).
+# SPDX-License-Identifier: MIT
+#
+#   flgaming check                what works and what does not (nothing is changed)
+#   flgaming steam-install        installs Steam from Flathub, then runs steam-prepare
+#   flgaming steam-prepare        makes sure the runtime of the installed Steam has its
+#                                 GL, 32-bit GL (GL32) and 32-bit compat (Compat.i386)
+#                                 extensions, and that the pads, /dev/uinput and
+#                                 hidraw are reachable from the sandbox
+#   flgaming steam-library PATH   lets the Steam sandbox use PATH (a second disk, e.g.
+#                                 /drives/games) for its game library
+#
+# Test hooks (not for normal use): FLGAMING_FLATPAK names another flatpak program,
+# FLGAMING_DEV another /dev, FLGAMING_PROC another /proc, FLGAMING_XSOCK_DIR another /tmp/.X11-unix.
+APP=com.valvesoftware.Steam
+FLATPAK=${FLGAMING_FLATPAK:-flatpak}
+DEV=${FLGAMING_DEV:-/dev}
+PROC=${FLGAMING_PROC:-/proc}
+XSOCK_DIR=${FLGAMING_XSOCK_DIR:-/tmp/.X11-unix}
+
+fails=0 warns=0
+ok() { printf 'ok    %s\n' "$*"; }
+warn() { printf 'WARN  %s\n' "$*"; warns=$((warns + 1)); }
+bad() { printf 'FAIL  %s\n' "$*"; fails=$((fails + 1)); }
+die() { printf 'flgaming: %s\n' "$*" >&2; exit 1; }
+
+[ "$(id -u)" != 0 ] || die "run this as the person who will play, not as root"
+
+# the branch of the runtime the installed (or the available) Steam wants, e.g. 25.08
+runtime_branch() {
+	meta=$($FLATPAK --user info -m $APP 2>/dev/null) ||
+		meta=$($FLATPAK --user remote-info --show-metadata flathub $APP 2>/dev/null) || return 1
+	printf '%s\n' "$meta" | sed -n 's|^runtime=org\.freedesktop\.Platform/[^/]*/||p' | head -n 1
+}
+
+have_ref() {	# NAME BRANCH: installed in the user installation?
+	$FLATPAK --user list --runtime --columns=application,branch 2>/dev/null |
+		awk -v n="$1" -v b="$2" '$1 == n && $2 == b { f = 1 } END { exit !f }'
+}
+
+check_dev() {	# NODE what
+	if [ ! -e "$DEV/$1" ]; then
+		bad "$DEV/$1 does not exist: $2"
+	elif [ -w "$DEV/$1" ]; then
+		ok "$DEV/$1 is writable"
+	else
+		bad "$DEV/$1 is not writable by you: are you in the group seat? (log in again after being added)"
+	fi
+}
+
+# The Steam client is an X11 program: flcomp exports DISPLAY and listens on the X socket from the
+# start, and starts Xwayland (rootless, with flcomp as its window manager) at the first X client.
+cmd_check_x() {
+	echo "== X11 (Xwayland)"
+	command -v Xwayland >/dev/null 2>&1 && ok "Xwayland is installed" ||
+		bad "Xwayland is not installed: X11 programs (Steam) cannot show a window"
+	command -v xkbcomp >/dev/null 2>&1 && ok "xkbcomp is installed (Xwayland needs it for the keyboard)" ||
+		bad "xkbcomp is missing: Xwayland cannot set up the keyboard"
+	if [ -z "$DISPLAY" ]; then
+		bad "DISPLAY is not set: start programs from the desktop session (flcomp sets it)"
+		return
+	fi
+	ok "DISPLAY is $DISPLAY"
+	n=${DISPLAY#:}
+	n=${n%%.*}
+	sock=$XSOCK_DIR/X$n
+	if [ -S "$sock" ]; then
+		[ -O "$sock" ] && ok "the X socket $sock is yours" || bad "the X socket $sock belongs to somebody else"
+		[ -w "$sock" ] && ok "and you can connect to it (Flatpak's --socket=x11 shares exactly this file)" ||
+			bad "you cannot write to $sock"
+	else
+		bad "no X socket $sock: is flcomp the compositor of this session? (a socket of another X server would not do)"
+	fi
+	if pgrep -u "$(id -u)" -x Xwayland >/dev/null 2>&1; then
+		ok "Xwayland is running now (it starts with the first X program, and ends 3 seconds after the last one)"
+	else
+		ok "Xwayland is not running: normal while no X program is open, it starts with the first one"
+	fi
+	log=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/xwayland.log
+	if [ -r "$log" ] && grep -q "Failed to initialize glamor" "$log"; then
+		warn "Xwayland draws in software (no glamor/DRI3): X programs work, but GL in X is slow and Vulkan games cannot present"
+	fi
+}
+
+cmd_check() {
+	echo "== the machine"
+	case " $(id -Gn) " in
+	*" seat "*) ok "you are in the group seat" ;;
+	*) bad "you are not in the group seat: pads, uinput and hidraw are closed to you" ;;
+	esac
+	for g in render video; do
+		case " $(id -Gn) " in
+		*" $g "*) ;;
+		*) warn "you are not in the group $g: no GPU access for games" ;;
+		esac
+	done
+	check_dev uinput "kernel without CONFIG_INPUT_UINPUT: Steam Input cannot make virtual controllers"
+	check_dev uhid "kernel without CONFIG_UHID"
+	if [ -e "$DEV/ntsync" ]; then
+		check_dev ntsync "kernel without CONFIG_NTSYNC"
+	else
+		warn "$DEV/ntsync is missing: Proton falls back to fsync (slower, fine)"
+	fi
+	n=$(cat "$PROC/sys/vm/max_map_count" 2>/dev/null || echo 0)
+	[ "$n" -ge 1048576 ] && ok "vm.max_map_count is $n" ||
+		bad "vm.max_map_count is $n (needs 1048576: /etc/sysctl.d, rc.sysinit applies it at boot)"
+	n=$(cat "$PROC/sys/user/max_user_namespaces" 2>/dev/null || echo 0)
+	[ "$n" -gt 0 ] && ok "user namespaces are on" || bad "user namespaces are off: Flatpak and Steam's sandbox cannot start"
+	if [ -r "$PROC/config.gz" ] && command -v zcat >/dev/null 2>&1; then
+		zcat "$PROC/config.gz" | grep -qx CONFIG_IA32_EMULATION=y &&
+			ok "32-bit programs can run (IA32_EMULATION)" || bad "kernel without IA32_EMULATION: Steam is 32-bit"
+	fi
+	if ls /usr/share/vulkan/icd.d/radeon_icd*.json /usr/share/vulkan/icd.d/intel_icd*.json >/dev/null 2>&1; then
+		ok "host Vulkan drivers: $(cd /usr/share/vulkan/icd.d && ls | sed 's/_icd.*//' | tr '\n' ' ')"
+	else
+		warn "no radv/anv ICD on the host (Flatpak games use the runtime's own Mesa, so this only matters for host programs)"
+	fi
+	[ -d "$DEV/dri" ] && ok "GPU nodes: $(ls "$DEV/dri" | tr '\n' ' ')" || bad "no $DEV/dri: no GPU driver loaded"
+	pads=$(grep -c '^H: Handlers=.*\bjs[0-9]' "$PROC/bus/input/devices" 2>/dev/null)
+	if [ "${pads:-0}" -gt 0 ]; then ok "$pads game controller(s) seen"; else warn "no game controller plugged in (nothing to check)"; fi
+	avail=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }')
+	[ "${avail:-0}" -ge 20 ] && ok "${avail} GB free in your home" || warn "only ${avail:-?} GB free in your home: games are large (see steam-library for a second disk)"
+
+	echo "== Flatpak"
+	command -v "$FLATPAK" >/dev/null 2>&1 || { bad "flatpak is not installed"; return; }
+	if $FLATPAK --user remotes --columns=name 2>/dev/null | grep -qx flathub; then
+		ok "the Flathub remote is set up for you"
+	else
+		bad "no Flathub remote: it is added at your first login that has a network (flatpak remote-add --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo)"
+	fi
+	cmd_check_x
+	if $FLATPAK --user info $APP >/dev/null 2>&1; then
+		ok "Steam is installed"
+		$FLATPAK --user info --show-permissions $APP 2>/dev/null | grep -q '^sockets=.*\bx11\b' &&
+			ok "Steam asks for the X11 socket (--socket=x11), which flcomp's Xwayland provides" ||
+			warn "Steam's permissions do not list the X11 socket (flatpak info --show-permissions $APP)"
+		b=$(runtime_branch)
+		if [ -n "$b" ]; then
+			for e in GL.default GL32.default Compat.i386; do
+				have_ref org.freedesktop.Platform.$e "$b" && ok "org.freedesktop.Platform.$e//$b" ||
+					bad "org.freedesktop.Platform.$e//$b is missing: flgaming steam-prepare"
+			done
+		fi
+	else
+		warn "Steam is not installed: flgaming steam-install"
+	fi
+	echo "$fails problem(s), $warns warning(s)"
+	[ "$fails" = 0 ]
+}
+
+cmd_prepare() {
+	command -v "$FLATPAK" >/dev/null 2>&1 || die "flatpak is not installed"
+	$FLATPAK --user info $APP >/dev/null 2>&1 || die "Steam is not installed (flgaming steam-install)"
+	b=$(runtime_branch)
+	[ -n "$b" ] || die "cannot tell which runtime Steam uses"
+	echo "Steam's runtime is org.freedesktop.Platform//$b"
+	# The GL extension of the GPU in use is chosen by Flatpak itself (default = Mesa); the
+	# 32-bit one is not always pulled in with the app. Without GL32 Steam starts, and
+	# every 32-bit game and Steam's own overlay fail with "libGL error".
+	for e in GL.default GL32.default Compat.i386; do
+		have_ref org.freedesktop.Platform.$e "$b" && continue
+		echo "installing org.freedesktop.Platform.$e//$b"
+		$FLATPAK --user install --noninteractive flathub org.freedesktop.Platform.$e//"$b" ||
+			die "cannot install org.freedesktop.Platform.$e//$b"
+	done
+	# Steam's manifest already has --device=all (pads, hidraw, uinput, GPU); say it
+	# once more in the user's own overrides so that a changed manifest cannot take
+	# the pads away.
+	$FLATPAK --user override $APP --device=all --share=ipc || die "cannot set the overrides"
+	echo "ready"
+}
+
+cmd_install() {
+	command -v "$FLATPAK" >/dev/null 2>&1 || die "flatpak is not installed"
+	$FLATPAK --user remotes --columns=name 2>/dev/null | grep -qx flathub ||
+		die "no Flathub remote yet (it is added at the first login with a network)"
+	$FLATPAK --user install --noninteractive flathub $APP || die "cannot install Steam"
+	cmd_prepare
+}
+
+cmd_library() {
+	[ -n "$1" ] || die "usage: flgaming steam-library PATH"
+	case $1 in
+	/usr | /usr/* | /sysflfs | /sysflfs/* | /etc | /etc/* | /proc | /proc/* | /sys | /sys/* | /dev | /dev/* | /boot | /boot/*)
+		# a home in /usr/NAME is fine, the rest of /usr and the system directories are
+		# not something Flatpak can export
+		case $1 in "$HOME" | "$HOME"/*) ;; *) die "$1 is a system directory: Flatpak cannot share it" ;; esac
+		;;
+	esac
+	[ -d "$1" ] || die "$1 is not a directory"
+	$FLATPAK --user override $APP --filesystem="$1" || die "cannot set the override"
+	echo "Steam may use $1. In Steam: Settings, Storage, add the drive, and pick $1."
+}
+
+case $1 in
+check) cmd_check ;;
+steam-install) cmd_install ;;
+steam-prepare) cmd_prepare ;;
+steam-library) cmd_library "$2" ;;
+*) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+esac

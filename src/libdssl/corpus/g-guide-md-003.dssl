@@ -1,0 +1,4 @@
+h1 { font-size: fluid 28 44 }          // 28px on a small phone, 44px on a big desktop
+.stack { gap: fluid 8 16 }             // works on any length property
+.hero { font-size: fluid 16 24 400 800 }   // your own viewport range
+.old { fluid: 16, 24 }                 // the comma form still works

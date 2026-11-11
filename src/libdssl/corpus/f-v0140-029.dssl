@@ -1,0 +1,1 @@
+@signal screen in () { .a { color: red } }

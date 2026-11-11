@@ -1,0 +1,22 @@
+pkgname=glib
+version=2.88.3
+release=1
+summary="Low-level core library: data structures, main loop, GObject, GIO"
+url=https://wiki.gnome.org/Projects/GLib
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libffi pcre2 zlib util-linux libelf python)
+makedepends=(python packaging gettext)
+source=(https://download.gnome.org/sources/glib/${version%.*}/glib-$version.tar.xz)
+sha256=(ab24d24e698dfa1e408b7bcdb508f4aafc906185a8b8ce72fdf79bbbdc9b383b)
+build_style=meson
+# No GObject Introspection (BLFS builds it in a second pass; not wanted now,
+# so no .gir/.typelib for glib either), no man pages (need docutils), no
+# tests (need desktop-file-utils), no sysprof/selinux/tracing. The optional
+# glib-skip_warnings patch is not applied.
+configure_args=(--wrap-mode=nofallback -D introspection=disabled -D tests=false
+	-D man-pages=disabled -D glib_debug=disabled -D sysprof=disabled
+	-D selinux=disabled -D dtrace=disabled -D systemtap=disabled)
+
+check() { :; } # tests are not built

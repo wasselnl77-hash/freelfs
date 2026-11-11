@@ -1,0 +1,32 @@
+# /etc/profile -- login shell setup for every user
+
+PATH=/sysflfs/local/bin:/sysflfs/bin
+[ "$(id -u)" -eq 0 ] && PATH=/sysflfs/local/sbin:/sysflfs/sbin:$PATH
+export PATH
+
+# The kernel console has no fonts for most of Unicode's scripts.
+for i in $(locale 2>/dev/null); do
+	unset "${i%=*}"
+done
+if [ "$TERM" = linux ]; then
+	export LANG=C.UTF-8
+else
+	export LANG=${LANG:-en_US.UTF-8}
+fi
+unset i
+
+export HISTSIZE=1000 HISTFILESIZE=2000 EDITOR=vim PAGER=less
+umask 022
+
+if [ -n "$BASH_VERSION" ]; then
+	if [ "$(id -u)" -eq 0 ]; then
+		PS1='\[\e[1;31m\]\h:\w#\[\e[0m\] '
+	else
+		PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\w\$ '
+	fi
+fi
+
+for i in /etc/profile.d/*.sh; do
+	[ -r "$i" ] && . "$i"
+done
+unset i

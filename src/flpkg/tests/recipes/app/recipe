@@ -1,0 +1,13 @@
+# Test package that needs demo 2 or newer.
+pkgname=app
+version=1.0
+release=1
+summary="flpkg test package with a dependency"
+arch=(any)
+depends=("demo>=2")
+sysgroups=("appgrp 555")
+sysusers=("appusr 555 555 /var/lib/app /usr/bin/false 'App Daemon'")
+package() {
+	mkdir -p "$pkgdir/usr/share/app"
+	echo app > "$pkgdir/usr/share/app/x"
+}

@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[],"css":"\n  a:hover,\n  a:focus { color: red; }\n  .grid { grid-template-areas: \"a b\"\n    \"c d\"; }\n","kind":"raw","line":1}],"kind":"root"}}

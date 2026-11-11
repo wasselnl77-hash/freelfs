@@ -1,0 +1,29 @@
+# The FreeLFS Wayland compositor, from src/flcomp in the FreeLFS tree.
+pkgname=flcomp
+version=0.1
+release=11
+summary="The FreeLFS Wayland compositor: CPU compositing, DRM/KMS, dmabuf clients, Xwayland window manager, no wlroots"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc zlib libpng wayland libdrm libinput seatd libxkbcommon xkeyboard-config udev dbus pipewire wireplumber mesa libxcb xwayland)
+makedepends=(wayland-protocols python zlib libpng mesa libxcb xorgproto)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flcomp" "$srcdir/flcomp"
+	cd "$srcdir/flcomp"
+	make clean
+	make flcomp
+}
+
+check() {
+	cd "$srcdir/flcomp"
+	make check
+}
+
+package() {
+	cd "$srcdir/flcomp"
+	make DESTDIR="$pkgdir" install
+}

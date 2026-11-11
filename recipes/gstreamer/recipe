@@ -1,0 +1,17 @@
+pkgname=gstreamer
+version=1.28.6
+release=1
+summary="GStreamer multimedia framework core"
+url=https://gstreamer.freedesktop.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib orc)
+makedepends=(meson ninja python bison flex)
+source=(https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-$version.tar.xz)
+sha256=(62b6b9f0ad3147a6dd6420ac64a91180b14e990695bddd353b96041611d052ca)
+build_style=meson
+configure_args=(-D introspection=disabled -D doc=disabled -D tests=disabled -D examples=disabled
+	-D benchmarks=disabled -D nls=disabled -D ptp-helper=disabled -D libunwind=disabled
+	-D libdw=disabled -D bash-completion=disabled -D dbghelp=disabled)
+check() { :; }

@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-browser-v090-012.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"block turns the aura on\""}],"tree":{"children":[{"children":[],"kind":"selector","line":1,"sel":"a hover"}],"kind":"root"}}

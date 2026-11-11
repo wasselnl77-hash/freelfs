@@ -1,0 +1,2 @@
+.t { border-style: dashed }
+.t { border: 2 solid #f00 }

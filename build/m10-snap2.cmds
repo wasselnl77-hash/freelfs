@@ -1,0 +1,7 @@
+# Boot 2 of build/m10-snapshots.sh: flboot "Start an earlier state" chose snapshot 1, read-only.
+echo "== cmdline"; cat /proc/cmdline | tr ' ' '\n' | grep -E "root|subvol"; grep -E " / | /usr | /.snapshots " /proc/mounts
+echo "== the state is the old one"; cat /root/m10-marker; ls /root; touch /root/should-fail 2>&1; echo touch-rc=$?
+echo "== flsnap"; flsnap status; flsnap list | head -5
+echo "== profile.d"; sh /etc/profile.d/flsnap-notice.sh 2>&1 | head -3
+echo "== what did the boot say"; grep -i -E "fail|read-only|error" /var/log/messages 2>/dev/null | head -10; dmesg | grep -i -E "btrfs|read-only" | head -8
+echo "== services"; for s in dbus seatd iwd syslog; do /etc/rc.d/init.d/$s status 2>&1 | head -1; done; pgrep -a flgreet | head -3; ip -4 -br addr | head -3

@@ -1,0 +1,1 @@
+.a { aura-particle: #f00 #0f0 #00f count 20 from outline palette spin 90 wind 20 orbit 45 around diamond }

@@ -1,0 +1,9 @@
+behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70 shape flame glowing behind
+}
+
+.torch { use fire }
+.orb   { aura-glow: color.accent 28 pulse 1600 }
+.spark { glow-particle: #fff 30 out }                  // glowing particles, 30 of them, heading outward
+.both  { aura-glow-particle: #7cf 24 count 40 up }     // a glow and glowing particles in one line

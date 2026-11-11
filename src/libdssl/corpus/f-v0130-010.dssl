@@ -1,0 +1,3 @@
+.t { border: 1 solid transparent }
+.t { border-color: color.ink/30 }
+.t:hover { color: red }

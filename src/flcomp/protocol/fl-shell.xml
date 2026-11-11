@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="fl_shell">
+  <copyright>SPDX-License-Identifier: MIT</copyright>
+
+  <interface name="fl_shell" version="5">
+    <description summary="FreeLFS desktop shell protocol">
+      Private protocol between flcomp and the desktop programs (flpanel,
+      flsettings). The panel owns the bottom panel and the start menu; the
+      compositor tells it about windows and the panel tells the compositor
+      what to do with them. Several clients may bind fl_shell; every event
+      goes to every binding. Only one client at a time can own the panel.
+    </description>
+
+    <enum name="error">
+      <entry name="role" value="0" summary="the surface already has another role"/>
+      <entry name="locked" value="1" summary="the screen is locked by another client already"/>
+    </enum>
+
+    <request name="destroy" type="destructor"/>
+
+    <request name="set_panel">
+      <description summary="make a surface the bottom panel">
+        The compositor places the surface at the bottom edge of the output,
+        left aligned, always above ordinary windows, and keeps the given
+        height free when it maximizes windows. The surface should be as wide
+        as the output (see wl_output.mode). It gets pointer input but never
+        keyboard focus.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="height" type="uint"/>
+    </request>
+
+    <request name="set_menu">
+      <description summary="make a surface the start menu popup">
+        The surface is shown while it has a buffer attached, directly above
+        the left edge of the panel. While it is shown it has keyboard focus.
+        A click anywhere except on the menu or the panel hides it and sends
+        menu_dismissed; it appears again at the next commit that attaches a
+        buffer.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+
+    <request name="activate">
+      <description summary="restore (if minimized), raise and focus a window"/>
+      <arg name="id" type="uint"/>
+    </request>
+
+    <request name="minimize">
+      <arg name="id" type="uint"/>
+    </request>
+
+    <request name="close">
+      <arg name="id" type="uint"/>
+    </request>
+
+    <request name="set_keyboard_layout">
+      <description summary="switch the keyboard layout">
+        name is an xkb layout name ("de", "us") or "layout:variant"
+        ("us:intl"). Not saved to disk. Answered by keyboard_layout.
+      </description>
+      <arg name="name" type="string"/>
+    </request>
+
+    <request name="logout">
+      <description summary="end the session">
+        flcomp exits with status 0 (the login shell then exits).
+      </description>
+    </request>
+
+    <event name="window_added">
+      <description summary="a window was mapped">
+        Always followed by one window_changed with the full state.
+      </description>
+      <arg name="id" type="uint"/>
+      <arg name="app_id" type="string"/>
+      <arg name="title" type="string"/>
+    </event>
+
+    <event name="window_changed">
+      <arg name="id" type="uint"/>
+      <arg name="title" type="string"/>
+      <arg name="focused" type="uint" summary="0 or 1"/>
+      <arg name="minimized" type="uint" summary="0 or 1"/>
+    </event>
+
+    <event name="window_removed">
+      <arg name="id" type="uint"/>
+    </event>
+
+    <event name="menu_dismissed"/>
+
+    <event name="menu_toggle">
+      <description summary="the Super key was tapped: open or close the menu"/>
+    </event>
+
+    <event name="keyboard_layout">
+      <description summary="current layout; sent on bind and after every change"/>
+      <arg name="name" type="string"/>
+    </event>
+
+    <request name="set_flyout" since="2">
+      <description summary="make a surface the tray flyout (volume slider)">
+        Like set_menu, but the surface is shown directly above the panel,
+        horizontally centred on x (output pixels) and kept inside the output.
+        While shown it has keyboard focus. A click anywhere except on the
+        flyout or the panel hides it and sends flyout_dismissed; it appears
+        again at the next commit that attaches a buffer. Sending the request
+        again with the same surface only moves it.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+    </request>
+
+    <event name="flyout_dismissed" since="2"/>
+
+    <event name="volume_key" since="2">
+      <description summary="a volume key was pressed (or is repeating)">
+        The compositor swallows XF86AudioRaiseVolume, XF86AudioLowerVolume
+        and XF86AudioMute and tells every binding of version 2 or later:
+        action 0 raise, 1 lower, 2 mute. Held raise and lower repeat.
+      </description>
+      <arg name="action" type="uint"/>
+    </event>
+    <request name="set_output" since="3">
+      <description summary="try a display mode and scale">
+        Settings' Display page. width and height 0 keep the current mode;
+        refresh is in Hz; scale is a percentage from 100 to 200 (the desktop is
+        drawn at 100/scale of the mode's size and enlarged for the screen).
+        The compositor applies it at once and answers with output_state whose
+        pending is 15: unless confirm_output arrives within 15 seconds (or the
+        client goes away) the previous mode and scale come back. A refused
+        mode or scale leaves everything as it was and sends output_failed.
+        The setting is not saved; Settings writes mode= and scale= to
+        desktop.conf after confirm_output.
+      </description>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh" type="uint"/>
+      <arg name="scale" type="uint"/>
+    </request>
+
+    <request name="confirm_output" since="3">
+      <description summary="keep the mode and scale that set_output applied"/>
+    </request>
+
+    <request name="revert_output" since="3">
+      <description summary="go back to the mode and scale from before set_output"/>
+    </request>
+
+    <request name="show_osd" since="3">
+      <description summary="show the on-screen indicator">
+        The compositor draws one small indicator (icon and bar) above the panel,
+        centred, for about a second and a half, then fades it out; a new call
+        replaces it. The panel sends it after it handled a volume key, so that
+        volume and brightness (which the compositor handles itself) share one
+        look. kind: 0 volume, 1 brightness, 2 microphone. percent 0-100.
+        flags: 1 muted.
+      </description>
+      <arg name="kind" type="uint"/>
+      <arg name="percent" type="uint"/>
+      <arg name="flags" type="uint"/>
+    </request>
+
+    <event name="output_mode" since="3">
+      <description summary="a mode of the display">
+        Sent for every mode the display offers, on bind and after every change,
+        always followed by one output_state. flags: 1 the mode in use, 2 the
+        display's preferred mode.
+      </description>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh" type="uint" summary="Hz"/>
+      <arg name="flags" type="uint"/>
+    </event>
+
+    <event name="output_state" since="3">
+      <description summary="scale and size now, and whether a change waits for confirmation"/>
+      <arg name="scale" type="uint" summary="percent"/>
+      <arg name="width" type="uint" summary="the desktop's size in logical pixels"/>
+      <arg name="height" type="uint"/>
+      <arg name="pending" type="uint" summary="seconds left to confirm, 0: nothing waits"/>
+    </event>
+
+    <event name="output_failed" since="3">
+      <description summary="set_output was refused; nothing changed"/>
+    </event>
+
+    <request name="set_notifications" since="4">
+      <description summary="make a surface the notification cards">
+        The surface is shown at the top right of the output, 16 pixels from the
+        right and top edges, above windows, the panel, the menu and the flyout
+        (but not above the lock screen). It gets pointer input only where its
+        pixels are not fully transparent, so the gaps between cards click
+        through to whatever is below; it never has keyboard focus. The client
+        sizes it to the stack of cards and resizes it as cards come and go;
+        attaching no buffer hides it.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+
+    <request name="lock" since="4">
+      <description summary="lock the screen and show this surface">
+        The compositor enters the locked state at once: nothing but the given
+        surface (placed at 0,0, meant to cover the output) is shown, it is the
+        only surface that gets pointer or keyboard input, and shortcuts do
+        nothing except the virtual terminal switches (Ctrl-Alt-F1 to F12) and
+        the media keys. Until the surface has a buffer the screen is a solid
+        colour. The lock stays when the client dies: the compositor then starts
+        the lock program again ($FLCOMP_LOCK, default fllock) and, if that does
+        not help, shows a solid colour with a hint to press Enter to restart it.
+        A client that sends lock while another client holds the lock gets the
+        locked error. Every binding of version 4 gets lock_state.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+
+    <request name="unlock" since="4">
+      <description summary="unlock the screen">
+        Only the client that sent lock (and whose surface is still the lock
+        surface) can unlock; from anyone else the request is ignored.
+      </description>
+    </request>
+
+    <event name="lock_state" since="4">
+      <description summary="the screen was locked or unlocked">
+        Sent to every binding of version 4 when the state changes, and on bind
+        while it is locked. 1 locked, 0 unlocked.
+      </description>
+      <arg name="locked" type="uint"/>
+    </event>
+
+    <!-- version 5: workspaces. Every event is sent only to bindings of version 5. -->
+
+    <request name="set_workspace" since="5">
+      <description summary="switch to a workspace">
+        index counts the grid row by row, from 0 (top left) to cols * rows - 1.
+        Out of range is ignored. Answered by workspaces.
+      </description>
+      <arg name="index" type="uint"/>
+    </request>
+
+    <request name="move_window" since="5">
+      <description summary="send a window to a workspace">
+        The window (and the dialogs that belong to it) leaves the current view when it
+        goes to another workspace. The screen stays where it is. Answered by
+        window_workspace.
+      </description>
+      <arg name="id" type="uint"/>
+      <arg name="index" type="uint"/>
+    </request>
+
+    <request name="toggle_overview" since="5">
+      <description summary="show or hide the workspace overview (Super+Tab)"/>
+    </request>
+
+    <event name="workspaces" since="5">
+      <description summary="the workspace grid and the one in view">
+        Sent on bind and whenever the grid (desktop.conf workspaces=COLSxROWS) or the
+        current workspace changes. The grid is cols wide and rows high; workspace
+        numbers run row by row from 0.
+      </description>
+      <arg name="cols" type="uint"/>
+      <arg name="rows" type="uint"/>
+      <arg name="current" type="uint"/>
+    </event>
+
+    <event name="window_workspace" since="5">
+      <description summary="the workspace a window is on">
+        Sent after window_added (and its window_changed) and whenever the window moves.
+      </description>
+      <arg name="id" type="uint"/>
+      <arg name="index" type="uint"/>
+    </event>
+  </interface>
+</protocol>

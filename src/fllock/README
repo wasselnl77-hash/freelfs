@@ -1,0 +1,47 @@
+fllock -- the FreeLFS lock screen
+=================================
+
+A big clock, the date, your name and a password field on a plain screen. Super+L, the
+panel's Lock button and closing the lid lock the screen.
+
+The lock itself is the compositor's, not this program's (flcomp, fl_shell lock; see
+src/flcomp/README "Lock screen"): while the screen is locked no other surface is drawn or
+gets pointer or keyboard input, and no shortcut works except Ctrl-Alt-F1..F12 and the
+media keys. fllock only asks for the lock, draws, checks the password and says unlock.
+If fllock crashes the screen stays locked (solid colour); flcomp starts it again and, if
+that does not help, shows "Screen locked. The lock program is not running. Press Enter to
+start it again."
+
+  fllock                 lock and wait for the password (Enter unlocks, Esc or Ctrl-U
+                         clears the field, Backspace deletes)
+  fllock --demo [--typed N] [--wrong|--busy|--stuck]
+                         no lock request, a fixed clock: for screenshots (FLUI_PPM=FILE)
+
+Password check: fllock-check (setuid root, group seat, mode 4750, set by the recipe's
+owner= line; like flpower and flpkg-seat) reads one line from stdin and compares it with
+the shadow entry of the real uid of whoever started it. fllock never runs as root and
+never sees /etc/shadow. Exit codes: 0 right (or an empty password, as the login screen
+allows), 1 wrong, 2 no password can unlock this account, 3 misuse. It takes no arguments and
+reads no environment when privileged, so it cannot be used to try other accounts'
+passwords; attempts take turns on /run/fllock-check.lock and a wrong one holds it for a
+second, so guessing through it is one try a second however many copies run; no core dump;
+the buffers are wiped. fllock sends the password through a pipe, wipes its own copy at
+once, logs nothing, and waits for the answer without blocking the window ("Checking...").
+There is no PAM on this system, so this is the same crypt() check flgreet-ui does.
+
+If the account cannot be unlocked by a password (locked hash, expired) the screen says so
+and how to get out: Ctrl-Alt-F2, log in, `pkill flcomp` ends the session.
+
+Look: flui's theme (dark and light), the card-less layout of the login screen's family:
+Plex Sans Light clock, an accent bar, sharp corners. Idle cost: one timer a minute.
+
+Tests (make check, make e2e, host side, no root):
+  tests/check.sh   fllock-check against a made-up shadow file (FLLOCK_SHADOW and
+                   FLLOCK_LOCKFILE are honoured only when not root): right, wrong, empty,
+                   locked, expired, other accounts' entries, over-long line, and the
+                   one-try-a-second turn taking
+  tests/e2e.sh     a headless flcomp, a window, Super+L, a wrong and a right password typed
+                   through the fake keyboard, unlock (E2E_OUT=DIR keeps the screenshots)
+
+Build: make; needs flui, wayland-client and libcrypt. PROTO= names fl-shell.xml (the recipe
+copies it from flcomp). Install: /usr/bin/fllock, /usr/libexec/fllock-check.

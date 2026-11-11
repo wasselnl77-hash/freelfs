@@ -1,0 +1,1 @@
+body{margin:0;font:16px/1.5 system-ui}.card{border:1px solid #ddd;border-radius:14px;transition:all .2s ease}.card:hover{transform:translateY(-4px)}@media (max-width:600px){.card{padding:12px}}

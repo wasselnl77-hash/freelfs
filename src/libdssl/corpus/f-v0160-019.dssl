@@ -1,0 +1,1 @@
+.a { direction: rtl; caption-side: bottom; max-block-size: 10; text-size-adjust: 100%; widows: 2; orphans: 3 }

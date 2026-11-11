@@ -1,0 +1,2 @@
+# Tab completion for make: the targets in the Makefile here
+complete make -c "sed -n 's/^\([A-Za-z0-9_.-][A-Za-z0-9_./-]*\):.*/\1/p' [Mm]akefile GNUmakefile 2>/dev/null | grep -v '^\.' | sort -u"

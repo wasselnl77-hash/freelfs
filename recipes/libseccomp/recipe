@@ -1,0 +1,15 @@
+pkgname=libseccomp
+version=2.6.1
+release=1
+summary="Interface to the Linux kernel's syscall filtering (seccomp)"
+url=https://github.com/seccomp/libseccomp
+license=(LGPL-2.1-only)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=()
+source=(https://github.com/seccomp/libseccomp/releases/download/v$version/libseccomp-$version.tar.gz)
+sha256=(501f66c667225d53791b97e1d7cf85ab764c297d04881f60f38f451c4b0ee1be)
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

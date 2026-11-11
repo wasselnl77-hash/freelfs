@@ -1,0 +1,1 @@
+@signal theme == dark { .a { color: #999; background: #aaa } }

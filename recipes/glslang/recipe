@@ -1,0 +1,15 @@
+# The GLSL shader compiler; Mesa's Vulkan drivers need glslangValidator
+pkgname=glslang
+version=16.5.0
+release=1
+summary="Compiler for GLSL and HLSL shaders to SPIR-V"
+url=https://github.com/KhronosGroup/glslang
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc spirv-tools)
+makedepends=(cmake ninja python spirv-headers)
+source=(https://github.com/KhronosGroup/glslang/archive/$version/glslang-$version.tar.gz)
+sha256=(01af17195fbeb59e39e31e9506de35bb39dfd35807ea0c9a1a99d7d1183ddd45)
+build_style=cmake
+configure_args=(-D ALLOW_EXTERNAL_SPIRV_TOOLS=ON -D BUILD_SHARED_LIBS=ON -D GLSLANG_TESTS=OFF)

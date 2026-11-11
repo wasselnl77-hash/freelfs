@@ -1,0 +1,18 @@
+pkgname=libxcrypt
+version=4.5.2
+release=1
+summary="Password hashing library (libcrypt)"
+url=https://github.com/besser82/libxcrypt
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://github.com/besser82/libxcrypt/releases/download/v$version/libxcrypt-$version.tar.xz)
+sha256=(71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071)
+build_style=autotools
+configure_args=(--enable-hashes=strong,glibc --enable-obsolete-api=no
+	--disable-static --disable-failure-tokens)
+
+prepare() {
+	sed -i '/strchr/s/const//' lib/crypt-{sm3,gost}-yescrypt.c
+}

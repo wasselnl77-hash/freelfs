@@ -1,0 +1,24 @@
+# Time zone data. /etc/localtime is set by the installer.
+pkgname=tzdata
+version=2026c
+release=1
+summary="Time zone and daylight saving time data"
+url=https://www.iana.org/time-zones
+license=(LicenseRef-public-domain)
+arch=(any)
+groups=(base)
+source=(https://www.iana.org/time-zones/repository/releases/tzdata$version.tar.gz)
+sha256=(e4a178a4477f3d0ea77cc31828ff72aa38feff8d61aa13e7e99e142e9d902be4)
+
+package() {
+	local zi=$pkgdir/usr/share/zoneinfo tz
+	install -d "$zi"/{posix,right}
+	for tz in etcetera southamerica northamerica europe africa antarctica \
+		asia australasia backward; do
+		zic -L /dev/null -d "$zi" "$tz"
+		zic -L /dev/null -d "$zi/posix" "$tz"
+		zic -L leapseconds -d "$zi/right" "$tz"
+	done
+	cp zone.tab zone1970.tab iso3166.tab "$zi"
+	zic -d "$zi" -p America/New_York
+}

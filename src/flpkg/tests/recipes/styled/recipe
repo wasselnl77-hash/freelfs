@@ -1,0 +1,10 @@
+# Test recipe: build_style supplies build(), check() and package().
+pkgname=styled
+version=1.0
+release=1
+summary="flpkg test: build_style=autotools"
+arch=(any)
+source=(styled-$version.tar.gz)
+sha256=(52d9c207af638a08023595a56baa3ce565c2e76c523b23cbcf96e36cc8f6c29d)
+build_style=autotools
+configure_args=(--with-greeting=moin)

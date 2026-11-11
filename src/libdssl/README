@@ -1,0 +1,262 @@
+libdssl -- native DSSL for FreeBWS, step 1: DSSL to CSS in C
+============================================================
+
+DSSL (huggingface.co/EHS-Studio/dssl, MIT) is a style language, an alternative to
+CSS. Today it runs as a JavaScript engine that writes inline styles. Version 0.16.3
+added native/spec: a written specification for implementations that do not need
+JavaScript. libdssl is a small C11 library (libc and libm only) plus a command line
+tool, dssl2css, that follows chapters 2 to 7 and 9 to 11 of that spec:
+
+    DSSL text --> parser (tree) --> resolver (rule objects) --+--> JSON of the resolved document
+                                                              +--> CSS (INT-6 lowering)
+                                                              +--> list of what needs the engine
+
+It is a proof of concept for a browser: FreeBWS can hand it a stylesheet and get CSS
+back, and it can ask whether a sheet is something CSS can express at all. What CSS
+cannot express (spec 11.4) is detected and listed, never half done: for such a sheet
+FreeBWS keeps using the JavaScript engine it already bundles.
+
+Based on: EHS-Studio/dssl, commit 0d7ad1f69d35d45f2be5fac16fb3b4e2b29350cf (v0.16.3,
+"v0.16.3 binaries"); the spec itself arrived in 9da4a9b. The reference behaviour is the
+engine's public/dssl/parser.js, resolver.js and static.js of that commit, where the spec
+leaves room (SPEC-NOTES.md lists every place where it does and where the two disagree).
+License: MIT, like DSSL. The word lists in vocab.c come from the DSSL repo's
+native/data/vocabulary.json (tools/genvocab.mjs).
+
+
+Status (measured on this tree)
+------------------------------
+
+    make check
+      level 1  (syntax tree + parser errors)     700 / 700 passed
+      level 2  (resolved document, canonical JSON) 636 / 636 passed, 64 skipped (aura, slider and
+                                                    texture-with-errors: the JS engine owns those values)
+      CSS lane (byte-equal to the engine's `dssl build` output, where the sheet lowers completely)
+                                                 552 / 552 passed, 23 skipped (textures are baked into
+                                                    images by the engine's lane; libdssl leaves them out)
+      multi-sheet (token and motion registries flow forward)   3 / 3 passed
+      golden (lowering of animate:, stack:, seen, fonts, raw, several sheets, feature list)  5 / 5
+      fuzz: every corpus input cut at random points and mutated, plus adversarial shapes: no crash
+    make asan        the same under AddressSanitizer and UBSan: clean
+    make valgrind    clean, no leaks (the library allocates from one arena per sheet and context)
+    make bench       parse + resolve of 100 kB of DSSL: 4.8 ms (best of 40, -O2, one core of this
+                     laptop); lowering to CSS another 0.8 ms; peak memory about 4 MB for 66 kB
+
+"Passed" means byte-identical canonical JSON (spec 10.3) against what the reference engine
+produces for the same input, including every error and warning with its line and wording.
+That is a strong claim, so read this before trusting it:
+
+  * The 0.16.3 checkout does not contain the conformance corpus that spec chapter 10 describes
+    (native/expected/, scripts/native-dump.mjs, native/corpus/EXCLUDED.md, native/tests/):
+    only the prose. The corpus here is therefore ours (corpus/, 703 inputs): the 9 stylesheets
+    the project ships, all 84 fenced ```dssl blocks of its guide, readme, usage notes and spec,
+    526 string literals out of its own test files that look like DSSL (fixtures), and 81 cases
+    written for this library, one or more per feature and per diagnostic message (tools/handcases.txt).
+  * The expected output (expected/) was produced by running the project's own engine files over
+    those inputs with tools/dump.mjs, in the canonical form of spec 10.3. Whatever the engine did
+    is "right", including its bugs; SPEC-NOTES.md lists the ones that matter. Where the engine
+    contradicts the spec, we follow the engine, because the rule objects are compared against it.
+  * Lint warnings are not produced (DIA-12 allows that); they are filtered from the expected files.
+  * 64 + 23 inputs are skipped, listed by name in the test output, with the reason. Nothing is
+    silently excluded, there is no allow-list of failures (expected/KNOWN-FAILURES may be used
+    for one; it does not exist because nothing fails).
+  * Coverage of the C code by conformance, golden and fuzz runs together is 95 to 100 percent of the
+    lines of each source file (gcov). What they do not reach is mostly out-of-memory handling.
+
+
+What is implemented
+-------------------
+
+Parser (spec 2, level 1): comments (// and /* */, quote- and url()-aware, line numbers kept),
+logical lines (parentheses, trailing comma or colon), chunks, header classification, one-line
+blocks, declarations (`use`, bare words, numeric token keys, token pairs on one line), raw { }
+and fonts { } capture (single and multi line), unknown at-rules skipped whole, error recovery
+with the same recovery as the reference.
+
+Resolver (spec 3 to 7, 9, 10, level 2):
+  values       bare numbers get px, ms for time properties; tokens become var(--dssl-...); alpha
+               (color.ink/20, #f00/50, white/12); keywords, bareIdents, functions (repeat,
+               url, counter...), escaped quotes; unknown identifiers with did-you-mean hints
+  tokens       blocks and nesting, numeric keys, conditional tokens, scoped (--color.accent),
+               registry rule, the registry that flows from sheet to sheet
+  cascade      layers (tokens, base, components, utilities, pin), nesting with & and selector
+               lists, states, order numbers and fragments, @media and @container sugar
+               (768, <= 480, 480..960, dark, light, reduced-motion, bare numbers in comparisons),
+               pseudo-elements as shadow rules (nested and written in the selector),
+               behaviors and use (cycles, duplicates), @signal conditions (parsed and recorded)
+  properties   size, row, column, grid, stack, place, center, align, circle, cover, sticky,
+               z, grow, shrink, basis, truncate, visually-hidden, font, fluid (and font-size:
+               fluid 16 24 on any length property), shadow, radius, transition, gradient and
+               gradient-text (all kinds, mesh, tiles, offsets, stops, midpoints, colour spaces),
+               text-stroke, outline-shape, rotate, glass, yield, and the records of animate,
+               stagger, overlap, bend, bend-y, bend-up, fold, bend-around, stretch,
+               gradient-flow and tilt
+  motions      motion blocks to frames (deform words composed into transform), linked to
+               animate:, shared between sheets
+  diagnostics  every message of the reference with its hint; errors carry line and column;
+               duplicates removed as in DIA-5; warnings (state-word typos, row/column word
+               clashes, display clashes, raw semicolons, background image twice, animation
+               longhands, unknown layers, radius tokens, animation names)
+CSS lowering (spec 11.3, INT-6): a port of the engine's static lane (toCSS): `@layer tokens,
+base, components, utilities, pin;`, :where() around every selector so order decides, pin as
+!important, @media and @container wrappers, @keyframes, raw verbatim, fonts as @import and
+@font-face, tokens as custom properties. Output is byte-equal to the engine's for every
+corpus sheet that lowers completely.
+
+Additions that the engine's static lane does not have (marked "soft" in the API):
+  animate:   a CSS animation in the same rule; non-essential motions only under
+             (prefers-reduced-motion: no-preference); `jitter` is not lowered (hard).
+  stack:     the rule gets display: grid and place-items as before, plus a child rule
+             `:where(sel > *) { grid-area: 1 / 1 }` (what the engine does with inline styles).
+  seen:      applied unconditionally, as the engine's lane does (but still reported: hard).
+  CAS-47     alignment words without a display (`center:` on a span): CSS cannot promote the box,
+             reported as soft "align-promotion" so a page can decide.
+
+
+What falls back to the JavaScript engine
+----------------------------------------
+
+dssl_needs_engine(sheet) returns a bit mask of the hard features; dssl_feature_at() lists each
+occurrence with line and column. A browser should use the JS engine for the whole page when any
+sheet of the page has a hard feature (see "Integration" for why not per sheet):
+
+    DSSL_FEAT_SIGNAL         @signal blocks (the page sets named values; needs a store)
+    DSSL_FEAT_SEEN           seen { } / :seen (first time in the viewport)
+    DSSL_FEAT_ANIMATE_JITTER animate: ... jitter N
+    DSSL_FEAT_STAGGER        stagger:
+    DSSL_FEAT_TEXTURE        texture: (the values are not computed; the JSON says "<engine>")
+    DSSL_FEAT_AURA           aura, aura-glow, aura-particle, glow-particle... (same)
+    DSSL_FEAT_DEFORM         bend, bend-y, bend-up, fold, stretch, bend-around (need box sizes)
+    DSSL_FEAT_TILT           tilt: (pointer driven)
+    DSSL_FEAT_SLIDER         slider: (values not computed, vendor parts not generated)
+    DSSL_FEAT_OVERLAP        overlap: (a hook after layout; not even specified yet)
+    DSSL_FEAT_GRADIENT_FLOW  gradient-flow: (loops background-position through the Web
+                             Animations API)
+  soft (lowered approximately, never block native use): DSSL_FEAT_ANIMATE, DSSL_FEAT_STACK,
+  DSSL_FEAT_ALIGN_PROMOTION.
+
+Everything else of the spec's "part that lowers to CSS" is native.
+
+Not done on purpose or not yet: the lint pass (contrast, focus outline, small targets; spec
+DIA-12 allows leaving it out), the paint half of texture/aura/slider (spec chapter 8 marks it
+Pending), @slider's base declarations and vendor shadow rules, Unicode white space other than
+ASCII (the engine's regexes treat NBSP, U+2028 and friends as white space, we do not),
+element matching and computed styles (level 3, that is what WebKit does with the CSS).
+
+
+Differences from the JavaScript engine (all deliberate)
+-------------------------------------------------------
+
+  * @keyframes keep vendor-prefixed property names (-webkit-text-fill-color). The engine's static
+    lane loses the leading dash when it turns camelCase back into kebab-case. The rule objects
+    (JSON) still use camelCase as the spec says.
+  * Property names that are members of JavaScript's Object.prototype (constructor, toString,
+    __proto__...) as property, behavior, motion or place names: the engine reads them from plain
+    objects (garbage declarations, or a TypeError that kills the sheet); here they are ordinary
+    unknown names.
+  * Limits: block nesting beyond 400 levels is skipped with an error; behavior expansion is
+    budgeted (6 million steps); memory per sheet is capped at 48 MB + 64 x the input size
+    (dssl_parse returns NULL beyond that); input over 32 MiB is refused.
+  * Invalid UTF-8 becomes U+FFFD; a leading byte order mark is dropped (as TextDecoder does).
+  * Diagnostics carry a column (the engine has none). The line is the spec's (SYN-2: the line
+    where the chunk started); the column is where the construct starts on its own physical line,
+    so for a selector list spread over several lines the two refer to different lines.
+  * The CSS lane's registry rule: the first sheet of a context gets every token; later sheets
+    only the tokens that are new to the context, so a later sheet cannot override an earlier
+    sheet's conditional value with an unconditional one (spec D-6, open in the spec).
+
+
+API (dssl.h)
+------------
+
+    dssl_ctx *ctx = dssl_ctx_new();                 /* one per document */
+    dssl_sheet *s = dssl_parse(text, len, url, ctx);/* in load order; tokens and motions flow on */
+    unsigned hard = dssl_needs_engine(s);           /* 0: the CSS below is complete */
+    char *css = dssl_to_css(s, 0);                  /* free() it; DSSL_CSS_BANNER adds a comment */
+    char *json = dssl_to_json(s);                   /* the spec's rule objects, canonical JSON */
+    dssl_diag d; for (i = 0; dssl_error_at(s, i, &d); i++) ...   /* file:line:col, message, hint */
+    dssl_feature f; for (i = 0; dssl_feature_at(s, i, &f); i++) ... /* what needs the engine, where */
+    dssl_free(s); dssl_ctx_free(ctx);
+
+dssl_parse(NULL ctx) works for a single sheet. A sheet must not be used after its context is
+freed. Nothing is global, so sheets of different pages can be parsed on different threads. Safe
+on any input: arbitrary bytes, truncated files, hostile nesting; on out of memory or past the
+limits dssl_parse returns NULL and nothing leaks.
+
+Command line:
+    dssl2css site.dssl > site.css           files are one cascade, in the order given
+    dssl2css --json a.dssl b.dssl           rule objects, one line per file
+    dssl2css --features page.dssl           what needs the engine, with line:col
+    dssl2css --check --strict-engine *.dssl exit 1 on errors, 3 when a sheet needs the engine
+    dssl2css --tree x.dssl                  syntax tree and parser errors as JSON (level 1)
+
+
+Integration into FreeBWS (implemented in src/freebws, see docs/M8-BROWSER.md)
+-----------------------------------------------------------------------------
+
+FreeBWS already serves the JS engine to pages that carry DSSL tags: a user script (end of
+document) looks for <link rel=stylesheet type=text/dssl>, <style type=text/dssl> and friends
+and imports freebws-dssl://engine/boot.js (docs/M8-BROWSER.md). The native path slots in front:
+
+1. Collect. The same user script, instead of importing the engine at once, gathers every DSSL
+   source of the page in document order: the text of <style type=text/dssl>, and for each
+   <link type=text/dssl href> the text, fetched in the page (fetch(), same rules the engine
+   follows today, so cross-origin and file:// behave as now). It posts them in one message:
+       window.webkit.messageHandlers.dssl.postMessage({sheets:[{url, text, nodeIndex}, ...]})
+   Native side: webkit_user_content_manager_register_script_message_handler(ucm, "dssl")
+   and the "script-message-received::dssl" signal. A custom URI scheme handler is the
+   alternative for <link>s (rewrite href to freebws-dsslcss://?u=...; native fetches with libsoup
+   and answers with text/css): no flash, no page-side fetch, but the scheme is subject to the
+   page's style-src CSP and the fetch bypasses the page's CORS decision, so it is the second choice.
+2. Decide. In the handler: one dssl_ctx per top-level page (drop it on navigation), dssl_parse()
+   every sheet in order. If any sheet has dssl_needs_engine() != 0, or the page ships its own
+   engine (script[src*=dssl]) or uses the DSSL JS API, answer {native:false} and the script
+   imports the engine exactly as it does today. The decision is per page, not per sheet:
+   the engine writes inline styles, which beat any stylesheet, while lowered CSS lives in
+   cascade layers; mixing the two would flip who wins between DSSL rules of different sheets.
+3. Apply. Otherwise native answers {native:true, css:["...", ...]} (dssl_to_css() per sheet) and
+   the script inserts one <style data-dssl-native> per source at the position of the original
+   tag, so load order is the order of the sheets. Inline <style> elements are subject to the page's
+   style-src; where that blocks it (strict CSP), the same CSS can go in through
+   webkit_user_content_manager_add_style_sheet() (not subject to CSP; to be tried: it must be
+   removed on navigation and its cascade position against the page's own sheets checked), or
+   the page falls back to the JS engine, which has the same CSP problem as today.
+4. Later changes. A MutationObserver for DSSL tags added after load re-collects the page and
+   repeats from step 2 (and takes the engine path if that is needed).
+5. Diagnostics. dssl_error_at()/dssl_warning_at() go to the WebKit console (webkit_..._console
+   message from the handler, or an inspector message) in the engine's format, and `dssl2css --check`
+   gives the same on the command line.
+
+Things to settle before it replaces the JS path (each is a line in SPEC-NOTES.md): where lowered
+DSSL layers sit relative to unlayered page CSS (every normal stylesheet beats a cascade layer,
+the JS engine's inline styles beat the page's CSS, so `yield:` and conflicts between DSSL and CSS
+change meaning); raw { } is emitted unlayered and therefore beats every DSSL rule except pin;
+page scripts that read computed styles before the sheet is applied.
+
+
+Rebuilding the corpus (needs node, runs the reference engine files; read them first)
+-------------------------------------------------------------------------------------
+
+    git clone https://huggingface.co/EHS-Studio/dssl REPO        # commit 0d7ad1f6...
+    node --permission --allow-fs-read=REPO --allow-fs-read=$PWD/tools --allow-fs-write=$PWD/corpus \
+         tools/mkcorpus.mjs REPO $PWD/corpus tools/handcases.txt
+    node --permission --allow-fs-read=REPO/public/dssl --allow-fs-read=$PWD/tools \
+         --allow-fs-read=$PWD/corpus --allow-fs-write=$PWD/expected \
+         tools/dump.mjs REPO/public/dssl $PWD/corpus $PWD/expected
+    node --permission --allow-fs-read=REPO/native/data/vocabulary.json --allow-fs-read=$PWD/tools \
+         --allow-fs-write=$PWD tools/genvocab.mjs REPO/native/data/vocabulary.json $PWD
+
+Files
+-----
+    dssl.h  public API            internal.h  types shared by the .c files
+    util.c  arena, strings, JS number formatting, did-you-mean
+    parse.c syntax (chapter 2)    value.c  values (3) and the token map
+    props.c semantic properties   gradient.c  gradient: and gradient-text:
+    resolve.c  resolver, motions, fonts, public API
+    emit_json.c  canonical JSON   emit_css.c  lowering
+    vocab.c/.h  generated word lists (the engine's order matters for did-you-mean ties)
+    main.c  dssl2css              tests/conform.c  conformance, fuzz and bench runner
+    tests/golden/  reviewed output for what the reference lane has no word for
+    corpus/ expected/  inputs and expected output (MIT, derived from the DSSL repo)
+    tools/  mkcorpus.mjs dump.mjs genvocab.mjs handcases.txt (not used by the build)
+    SPEC-NOTES.md  ambiguities and bugs found in the spec, for the DSSL developers

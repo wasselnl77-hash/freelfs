@@ -1,0 +1,7 @@
+fonts {
+  Fraunces: 500 700
+  Brand: from "/fonts/brand.woff2" 400
+}
+raw { .legacy { color: red; } }
+.a { font-family: Fraunces, serif }
+@container (min-width: 300) { .b { @media dark { color: red } } }

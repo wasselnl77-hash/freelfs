@@ -1,0 +1,6 @@
+motion blink  { 0%, 90%, 100% { opacity: 1 } 95% { opacity: .2 } }
+motion waddle { from { rotate: -4 } to { rotate: 4 } }
+motion glint  { from { opacity: .3 } to { opacity: 1 } }
+motion bob2   { from { translate: 0 0 } to { translate: 0 6 } }
+.duck { animate: blink 300 infinite, waddle 900 infinite alternate }
+.duck::after { content: ""; animate: glint 700 infinite, bob2 1200 infinite essential }   // also on pseudo-elements, and `dssl build` writes them

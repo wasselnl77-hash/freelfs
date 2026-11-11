@@ -1,0 +1,26 @@
+# flinitrd, from src/flinitrd in the FreeLFS tree: the init of the live ISO's
+# initramfs, a static program. Group "live": built in the build root,
+# packed into the ISO's initramfs by build/53-iso.sh, not in the images.
+pkgname=flinitrd
+version=0.1
+release=2
+summary="The init of the FreeLFS live initramfs"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(live)
+depends=()
+makedepends=(glibc)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flinitrd" "$srcdir/flinitrd"
+	cd "$srcdir/flinitrd"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flinitrd"
+	make DESTDIR="$pkgdir" install
+}

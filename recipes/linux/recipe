@@ -1,0 +1,69 @@
+# The LTS kernel: the architecture's defconfig plus config/kernel in the
+# FreeLFS tree (everything needed to reach the root file system built in;
+# FreeLFS boots without an initramfs). It goes to /boot, which is the EFI
+# system partition (FAT: no symlinks); flboot finds every vmlinuz-* there.
+pkgname=linux
+version=6.18.59
+release=6
+summary="The Linux kernel (LTS) and its modules"
+url=https://www.kernel.org/
+license=(GPL-2.0-only)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(kmod)
+options=(!strip)
+source=(https://www.kernel.org/pub/linux/kernel/v6.x/linux-$version.tar.xz)
+sha256=(53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963)
+
+# Reproducible builds: the kernel otherwise records when, by whom and on
+# which host it was built.
+export KBUILD_BUILD_TIMESTAMP="@$SOURCE_DATE_EPOCH" KBUILD_BUILD_USER=freelfs \
+	KBUILD_BUILD_HOST=freelfs KBUILD_BUILD_VERSION=1
+
+karch() {
+	case $CARCH in
+		x86_64) echo x86_64 ;;
+		aarch64) echo arm64 ;;
+	esac
+}
+
+build() {
+	local frag=$startdir/../../config/kernel/freelfs.config line sym bad=0
+	export ARCH=$(karch)
+	make mrproper
+	make defconfig
+	scripts/kconfig/merge_config.sh -m .config "$frag"
+	make olddefconfig
+	# olddefconfig silently drops a setting whose dependencies are off
+	while read -r line; do
+		case $line in
+			CONFIG_*=*) grep -qx -- "$line" .config || { echo "not applied: $line"; bad=1; } ;;
+			"# CONFIG_"*" is not set")
+				sym=${line#\# }
+				sym=${sym%% *}
+				! grep -q "^$sym=" .config || { echo "not applied: $line"; bad=1; }
+				;;
+		esac
+	done < "$frag"
+	[ "$bad" = 0 ]
+	make
+}
+
+package() {
+	export ARCH=$(karch)
+	local kver image
+	kver=$(make -s kernelrelease)
+	case $ARCH in
+		x86_64) image=arch/x86/boot/bzImage ;;
+		arm64) image=arch/arm64/boot/Image ;;
+	esac
+	install -Dm644 "$image" "$pkgdir/boot/vmlinuz-$kver"
+	install -Dm644 System.map "$pkgdir/boot/System.map-$kver"
+	install -Dm644 .config "$pkgdir/boot/config-$kver"
+	make INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 modules_install
+	# links into the build tree, and depmod's output (the depmod trigger
+	# writes it on the installed system)
+	cd "$pkgdir/usr/lib/modules/$kver"
+	rm -f build source modules.{alias,alias.bin,builtin.alias.bin,builtin.bin,dep,dep.bin} \
+		modules.{devname,softdep,symbols,symbols.bin,weakdep}
+}

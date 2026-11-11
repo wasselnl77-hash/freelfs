@@ -1,0 +1,23 @@
+pkgname=gawk
+version=5.4.1
+release=1
+summary="GNU awk"
+url=https://www.gnu.org/software/gawk/
+license=(GPL-3.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc readline mpfr gmp)
+provides=(awk)
+source=(https://ftpmirror.gnu.org/gawk/gawk-$version.tar.xz)
+sha256=(07f6f7342b7febe4313fc2c2542ad93d64fe20ad8717200109f105a826f5fd37)
+build_style=autotools
+
+prepare() {
+	sed -i 's/extras//' Makefile.in
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	ln -sf gawk.1 "$pkgdir/usr/share/man/man1/awk.1"
+	install -Dm644 doc/{awkforai.txt,*.{eps,pdf,jpg}} -t "$pkgdir/usr/share/doc/gawk-$version"
+}

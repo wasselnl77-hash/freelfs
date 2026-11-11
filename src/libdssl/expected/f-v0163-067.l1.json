@@ -1,0 +1,1 @@
+{"errors":[{"file":"f-v0163-067.dssl","hint":"declarations look like  prop: value","line":1,"message":"expected \":\" in \"gives one shadow rule per part\""}],"tree":{"children":[{"children":[{"children":[],"kind":"pseudo","line":1,"name":"before"}],"kind":"selector","line":1,"sel":".a, .b"}],"kind":"root"}}

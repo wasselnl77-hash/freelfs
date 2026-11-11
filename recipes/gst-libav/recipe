@@ -1,0 +1,15 @@
+pkgname=gst-libav
+version=1.28.6
+release=1
+summary="GStreamer plugin using FFmpeg decoders"
+url=https://gstreamer.freedesktop.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gstreamer gst-plugins-base ffmpeg)
+makedepends=(meson ninja python)
+source=(https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-$version.tar.xz)
+sha256=(71e6eafb4fff2a66d1bb0ba8d078224dfe7e3397307d8c0bba3dc23606e08f51)
+build_style=meson
+configure_args=(-D doc=disabled -D tests=disabled)
+check() { :; }

@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=pixman
+version=0.46.4
+release=1
+summary="Pixel manipulation library (Xwayland's software renderer)"
+url=https://pixman.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja)
+source=(https://www.cairographics.org/releases/pixman-0.46.4.tar.gz)
+sha256=(d09c44ebc3bd5bee7021c79f922fe8fb2fb57f7320f55e97ff9914d2346a591c)
+build_style=meson
+configure_args=(-D tests=disabled -D demos=disabled -D gtk=disabled -D libpng=disabled -D openmp=disabled)
+check() { :; }

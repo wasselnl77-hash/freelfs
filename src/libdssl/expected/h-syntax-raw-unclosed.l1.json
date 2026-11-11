@@ -1,0 +1,1 @@
+{"errors":[{"file":"h-syntax-raw-unclosed.dssl","hint":"every \"{\" needs a matching \"}\" - the CSS captured so far is discarded","line":4,"message":"the raw { } block was never closed with \"}\""}],"tree":{"children":[{"children":[],"css":"\n  .x { color: red; }\n\n\n","kind":"raw","line":1}],"kind":"root"}}

@@ -1,0 +1,11 @@
+behavior focus-ring {
+  focus-visible {
+    outline: 2 solid color.accent
+    outline-offset: 2
+    radius: 4
+  }
+}
+
+a      { use focus-ring }
+button { use focus-ring }
+input  { use focus-ring }

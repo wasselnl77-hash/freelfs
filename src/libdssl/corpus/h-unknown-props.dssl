@@ -1,0 +1,5 @@
+.a { colour: red; widht: 3; wibble: 1; constructorx: 1 }
+.b { -webkit-box-shadow: 0 0 red; -moz-appearance: none; -moz-bogus: 1 }
+.c { Color: RED }
+.d { background-colour: red }
+

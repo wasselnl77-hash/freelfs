@@ -1,0 +1,30 @@
+pkgname=cmake
+version=4.4.2
+release=1
+summary="Cross-platform build system generator"
+url=https://cmake.org/
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc gcc ncurses openssl)
+source=(https://cmake.org/files/v4.4/cmake-$version.tar.gz)
+sha256=(1db9e61e60b6e0874c86386340b910382f3c5e75b9fbfb44d122063129a2789d)
+
+prepare() {
+	# do not install into lib64
+	sed -i '/"lib64"/s/64//' Modules/GNUInstallDirs.cmake
+}
+
+# Bootstrapped with cmake's own bundled copies of curl, libarchive, libuv,
+# nghttp2, jsoncpp, rhash, ... (no --system-libs), and without the Qt GUI.
+# MAKEFLAGS (set by flpkg) gives the bootstrap its parallelism.
+build() {
+	./bootstrap --prefix=/usr \
+		--mandir=/share/man \
+		--docdir=/share/doc/cmake-$version
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}

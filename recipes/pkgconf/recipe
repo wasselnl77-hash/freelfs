@@ -1,0 +1,20 @@
+pkgname=pkgconf
+version=3.0.5
+release=1
+summary="Package compiler and linker metadata toolkit (pkg-config)"
+url=https://github.com/pkgconf/pkgconf
+license=(ISC)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+provides=(pkg-config)
+source=(https://distfiles.ariadne.space/pkgconf/pkgconf-$version.tar.xz)
+sha256=(3acd3a8a3cce65a8d620321855d92fb602e026cbe8e13ee36bdec58483b59ace)
+build_style=meson
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	mv "$pkgdir/usr/share/doc/pkgconf" "$pkgdir/usr/share/doc/pkgconf-$version"
+	ln -s pkgconf "$pkgdir/usr/bin/pkg-config"
+	ln -s pkgconf.1 "$pkgdir/usr/share/man/man1/pkg-config.1"
+}

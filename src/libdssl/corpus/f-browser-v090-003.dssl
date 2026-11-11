@@ -1,0 +1,2 @@
+.src { position: absolute; left: 300px; top: 300px; width: 80px; height: 80px; background: #345; aura-particle: #8cf count 40 life 600 speed 40 dir up from top }
+.hide { display: none } .off { aura: none }

@@ -1,0 +1,8 @@
+<!-- The FreeLFS mark: three stacked bars, tilted 6 degrees. MIT. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="#3f9b63">
+  <g transform="rotate(6 10 10)">
+    <rect x="3" y="3" width="14" height="3.4"/>
+    <rect x="3" y="8.3" width="10" height="3.4"/>
+    <rect x="3" y="13.6" width="6" height="3.4"/>
+  </g>
+</svg>

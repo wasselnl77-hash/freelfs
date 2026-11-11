@@ -1,0 +1,10 @@
+tokens { color { brand: #c2185b } }
+.card {
+  background: color.brand
+  padding: 16
+  row: gap 8 between center
+  radius: md
+  hover { background: color.brand/80 }
+  @media dark { background: #181310 }
+}
+

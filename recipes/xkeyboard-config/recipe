@@ -1,0 +1,16 @@
+pkgname=xkeyboard-config
+version=2.48
+release=1
+summary="Keyboard configuration database for XKB"
+url=https://www.freedesktop.org/wiki/Software/XKeyboardConfig/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=()
+makedepends=(gettext)
+source=(https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-$version.tar.xz)
+sha256=(b77041324f0109f77161ee43743fe04baa485866af8460d31e476ad3f7648fd5)
+build_style=meson
+
+# The tests need libxkbcommon (built after this) and pytest.
+check() { :; }

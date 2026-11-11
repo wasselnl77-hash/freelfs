@@ -1,0 +1,4 @@
+motion st { to { stretch: 1.5 } }
+motion st2 { 50% { stretch: 2 vertical; bend: 0 } }
+motion st3 { 50% { fold: 0 } to { bend-up: 0; transform: none } }
+

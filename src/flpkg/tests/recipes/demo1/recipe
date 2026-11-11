@@ -1,0 +1,15 @@
+# Test package "demo", version 1: files, a config file, an owner exception.
+pkgname=demo
+version=1.0
+release=1
+summary="flpkg test package"
+arch=(any)
+owner=("/usr/bin/demo 0 5 2755")
+package() {
+	mkdir -p "$pkgdir"/usr/share/demo "$pkgdir"/usr/bin "$pkgdir"/etc
+	echo v1 > "$pkgdir/usr/share/demo/a.txt"
+	echo old > "$pkgdir/usr/share/demo/old.txt"
+	printf '#!/bin/sh\necho demo 1\n' > "$pkgdir/usr/bin/demo"
+	chmod 755 "$pkgdir/usr/bin/demo"
+	echo setting=1 > "$pkgdir/etc/demo.conf"
+}

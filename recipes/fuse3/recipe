@@ -1,0 +1,22 @@
+# libfuse 3: user-space file systems. Flatpak's document portal and revokefs
+# need it. fusermount3 must be setuid root to let a person mount (owner= sets
+# it; the install script would chown and mknod, which a rootless build cannot).
+# /dev/fuse is made 0666 by the udev rule this installs.
+pkgname=fuse3
+version=3.18.3
+release=1
+summary="Interface for user-space file systems (libfuse 3) and fusermount3"
+url=https://github.com/libfuse/libfuse
+license=(LGPL-2.1-only GPL-2.0-only)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(meson ninja)
+owner=("/usr/bin/fusermount3 0 0 4755")
+worksrc=fuse-$version
+source=(https://github.com/libfuse/libfuse/releases/download/fuse-$version/fuse-$version.tar.gz)
+sha256=(bcd19582c5e30f7fe45dd86a5540e998590aa01903afc7ebcbeea6c8ac5421ee)
+build_style=meson
+configure_args=(-D useroot=false -D initscriptdir= -D udevrulesdir=/usr/lib/udev/rules.d
+	-D examples=false -D tests=false)
+check() { :; }

@@ -1,0 +1,11 @@
+lower-soft.dssl:6:6: animate (lowered approximately)
+lower-soft.dssl:7:6: animate (lowered approximately)
+lower-soft.dssl:7:6: animate (lowered approximately)
+lower-soft.dssl:8:10: stack (lowered approximately)
+lower-soft.dssl:9:21: seen
+lower-soft.dssl:10:1: seen
+lower-soft.dssl:11:26: animate (lowered approximately)
+lower-soft.dssl:12:19: animate (lowered approximately)
+lower-soft.dssl:13:8: animate-jitter
+lower-soft.dssl:14:12: animate (lowered approximately)
+lower-soft.dssl:15:8: signal

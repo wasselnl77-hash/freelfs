@@ -1,0 +1,13 @@
+pkgname=attr
+version=2.6.0
+release=1
+summary="Extended attribute support"
+url=https://savannah.nongnu.org/projects/attr
+license=(LGPL-2.1-or-later GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://download.savannah.gnu.org/releases/attr/attr-$version.tar.gz)
+sha256=(d42fa374513180bb48cb11a46696f488240e5124ff1e6ad88b0abff706985612)
+build_style=autotools
+configure_args=(--disable-static --sysconfdir=/etc --docdir=/usr/share/doc/attr-$version)

@@ -1,0 +1,1 @@
+window.postMessage({ type: 'selection', text: 'texture: wood scale 9 color #331100' }, '*')

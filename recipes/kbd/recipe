@@ -1,0 +1,27 @@
+pkgname=kbd
+version=2.10.0
+release=1
+summary="Keyboard maps, console fonts and tools"
+url=https://kbd-project.org/
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc)
+source=(https://www.kernel.org/pub/linux/utils/kbd/kbd-$version.tar.xz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/kbd-$version-backspace-1.patch)
+sha256=(6e5ca4f8d76ee9e3a8db700b667f13e12aac9933828a64e1aaad93d26be9b479
+        8be28dcb11420624a500f2ea4fe975f771174bffee50e54ec8cd295a2dec104e)
+build_style=autotools
+configure_args=(--disable-vlock)
+
+prepare() {
+	patch -Np1 -i "$srcdir/kbd-$version-backspace-1.patch"
+	sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
+	sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir/usr/share/doc"
+	cp -R docs/doc -T "$pkgdir/usr/share/doc/kbd-$version"
+}

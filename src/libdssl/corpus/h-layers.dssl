@@ -1,0 +1,8 @@
+.a { color: red }
+pin { .a { color: blue } }
+@layer base { .a { color: green } }
+@layer utilities { .a { padding: 4 } }
+@layer weird { .a { color: red } }
+@layer tokn { .a { color: red } }
+@layer tokens { .b { color: red } }
+

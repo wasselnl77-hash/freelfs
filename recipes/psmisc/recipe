@@ -1,0 +1,12 @@
+pkgname=psmisc
+version=23.7
+release=1
+summary="Tools using /proc: fuser, killall, pstree, ..."
+url=https://gitlab.com/psmisc/psmisc
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc ncurses)
+source=(https://sourceforge.net/projects/psmisc/files/psmisc/psmisc-$version.tar.xz)
+sha256=(58c55d9c1402474065adae669511c191de374b0871eec781239ab400b907c327)
+build_style=autotools

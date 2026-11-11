@@ -1,0 +1,24 @@
+# flsound, from src/flsound in the FreeLFS tree.
+pkgname=flsound
+version=0.1
+release=1
+summary="FreeLFS system sounds: login, notification, error, volume tick, screenshot (synthesized, played through PipeWire)"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc pipewire)
+makedepends=(pipewire)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsound" "$srcdir/flsound"
+	cd "$srcdir/flsound"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flsound"
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,1 @@
+.o { position: absolute; left: 150px; top: 150px; width: 100px; height: 100px; background: #222; aura-glow: #f00 40 essential intensity 1.6 }

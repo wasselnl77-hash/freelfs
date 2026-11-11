@@ -1,0 +1,2 @@
+motion w { from { opacity: 0 } to { opacity: 1 } }
+.x { animate: w 300 delay 100 jitter 200 iterations 3 essential }

@@ -1,0 +1,9 @@
+.nav {
+  row: gap space.4 between center   // flex, gap, justify, align in one line
+  height: 64
+}
+.sheet  { column: gap 2 }            // flex column, 8px gap
+.board  { grid: 3 gap 12 }           // 3 columns, 1fr each
+.modal  { stack: center }            // everything stacked and centered
+.icon   { center: both }             // alignment can never silently no-op:
+                                     // the engine promotes the box to a grid

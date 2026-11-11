@@ -1,0 +1,36 @@
+# Steps for FLFS_VM_TTY (build/m11-x11-gpu.sh gpu): login, FreeBWS on a virgl GPU, a real https site.
+wait 3
+key ret
+wait 14
+key print
+wait 4
+run echo printed-desktop
+run ls -l /dev/dri/; cat /sys/class/drm/card*/device/uevent | grep -i driver
+key meta_l
+wait 1
+type web
+key ret
+wait 30
+key print
+wait 4
+run echo printed-start
+key ctrl-l
+wait 1
+type https://example.com\n
+wait 30
+key print
+wait 4
+run echo printed-https
+run grep -iE "dmabuf|gbm|egl|gl:|render node|virgl|plane|shm fallback|watchdog" /run/user/$(id -u tester)/flcomp.log | head -n 30
+run grep -iE "dmabuf|egl|gpu|virgl|buffer" /usr/tester/.local/state/freelfs/log/freebws.log | head -n 20
+key ctrl-l
+wait 1
+type https://en.wikipedia.org/wiki/Linux\n
+wait 40
+key print
+wait 4
+run echo printed-wiki
+run pgrep -a "freebws|WPEWebProcess" | cut -c1-120; dmesg | grep -ci 'out of memory\|oom-kill'
+run grep -c . /run/user/$(id -u tester)/flcomp.log; tail -n 15 /run/user/$(id -u tester)/flcomp.log
+# virgl scanouts cannot be screendumped by QEMU: the pictures are Snappel's, sent over the serial console as base64
+run cd /usr/tester/pictures/screenshots && for f in *.png; do echo "BEGINPNG $f"; base64 "$f"; echo "ENDPNG"; done

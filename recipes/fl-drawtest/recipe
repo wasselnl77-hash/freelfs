@@ -1,0 +1,23 @@
+# The M6 check: EGL on KMS through seatd, from src/drawtest in the FreeLFS tree.
+pkgname=fl-drawtest
+version=0.1
+release=1
+summary="Draws a desktop sketch with EGL on KMS, to test graphics"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libdrm mesa seatd)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/drawtest" "$srcdir/drawtest"
+	cd "$srcdir/drawtest"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/drawtest"
+	make DESTDIR="$pkgdir" install
+}

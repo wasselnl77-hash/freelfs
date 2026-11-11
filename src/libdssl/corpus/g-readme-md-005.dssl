@@ -1,0 +1,6 @@
+.gallery {
+  gap: space.4
+  .tile { shadow: sm }                    // .gallery .tile
+  &.featured { border-color: color.accent } // .gallery.featured
+  > .tile:nth-child(2n) { translate: 0 -2 }
+}

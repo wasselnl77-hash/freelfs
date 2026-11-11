@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Packages
+Comment=Install and remove software, and Flathub apps
+Exec=flpackages
+Categories=System;PackageManager;
+X-FreeLFS-Glyph=▣
+NoDisplay=true

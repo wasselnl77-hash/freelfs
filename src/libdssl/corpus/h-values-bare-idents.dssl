@@ -1,0 +1,4 @@
+.a { font-family: JetBrains Mono, Roboto, "Fira Code", serif; counter-reset: step; --brand: foo bar; content: counter(step) }
+.b { content: counters(a, "."); width: env(safe-area-inset-top); margin: attr(data-x) }
+tokens { font { display: Fraunces, Georgia } }
+

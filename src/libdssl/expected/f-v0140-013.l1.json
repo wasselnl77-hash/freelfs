@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":1,"prop":"paint-order","value":"stroke fill"},{"kind":"decl","line":1,"prop":"background","value":"conic-gradient(from 0deg, red, blue)"}],"kind":"selector","line":1,"sel":".a"}],"kind":"root"}}

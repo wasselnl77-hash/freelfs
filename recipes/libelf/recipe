@@ -1,0 +1,27 @@
+# Only libelf from elfutils, which the kernel build and others need.
+pkgname=libelf
+version=0.195
+release=1
+summary="ELF object file access library (from elfutils)"
+url=https://sourceware.org/elfutils/
+license=(LGPL-3.0-or-later GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib bzip2 xz zstd)
+worksrc=elfutils-$version
+source=(https://sourceware.org/ftp/elfutils/$version/elfutils-$version.tar.bz2)
+sha256=(37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026)
+
+build() {
+	./configure --prefix=/usr \
+		--disable-debuginfod \
+		--enable-libdebuginfod=dummy
+	make -C lib
+	make -C libelf
+}
+
+package() {
+	make -C libelf DESTDIR="$pkgdir" install
+	install -Dm644 config/libelf.pc "$pkgdir/usr/lib/pkgconfig/libelf.pc"
+	rm -f "$pkgdir/usr/lib/libelf.a"
+}

@@ -1,0 +1,24 @@
+pkgname=libxkbcommon
+version=1.13.2
+release=1
+summary="XKB keymap compiler and support library (no X11)"
+url=https://xkbcommon.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc xkeyboard-config wayland)
+makedepends=(python bison wayland-protocols)
+source=(https://github.com/lfs-book/libxkbcommon/archive/v$version/libxkbcommon-$version.tar.gz
+        https://www.linuxfromscratch.org/patches/blfs/13.1/libxkbcommon-$version-upstream_fix-1.patch)
+sha256=(e5d5eff0ea09d82c44a96aec75c719b6969fdc602da82e6b1c9aa74cac5fd488
+        d978cac5875fed73b7223866a1138718afeba58c1390a412affdcf2cd7744a34)
+build_style=meson
+# X11 off as requested. libxkbregistry needs libxml2, which the base lacks.
+configure_args=(-D enable-x11=false -D enable-docs=false -D enable-xkbregistry=false)
+
+prepare() {
+	patch -Np1 -i "$srcdir/libxkbcommon-$version-upstream_fix-1.patch"
+}
+
+# The tests need Xvfb.
+check() { :; }

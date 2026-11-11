@@ -1,0 +1,23 @@
+pkgname=flvideo
+version=0.1
+release=2
+summary="FreeLFS video player: libmpv software rendering, VA-API, subtitles, resume"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc flui wayland mpv)
+makedepends=(flui mpv pkgconf)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flvideo" "$srcdir/flvideo"
+	cd "$srcdir/flvideo"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flvideo"
+	make DESTDIR="$pkgdir" install
+}

@@ -1,0 +1,2 @@
+.stage { position: absolute; left: 100px; top: 100px; width: 200px; height: 200px; overflow: hidden; background: #000 }
+.orb { position: absolute; left: 70px; top: 70px; width: 60px; height: 60px; background: #111; aura-glow: #ff0000 60 essential intensity 1 }

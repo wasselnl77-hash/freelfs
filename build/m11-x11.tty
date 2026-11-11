@@ -1,0 +1,15 @@
+# Steps for FLFS_VM_TTY (build/m11-x11-gpu.sh x11): login, an X11 client through Xwayland, a report.
+wait 3
+key ret
+wait 14
+shot @S@/desktop.ppm
+run m10app "DISPLAY=:0 xclient -t 'X11 test client' -n XTest -s 40"
+wait 8
+shot @S@/xclient.ppm
+run echo xwayland=$(pgrep -x Xwayland | head -n 1); ls /tmp/.X11-unix; cat /tmp/m10app.log; grep -i xwayland /run/user/$(id -u tester)/flcomp.log | head -n 5
+# the window's frame is drawn by flcomp; move it with the keyboard shortcut for a snap to the left half
+key meta_l-left
+wait 2
+shot @S@/xclient-snapped.ppm
+run m10sh "flreport -o /usr/tester"; ls -l /usr/tester/freelfs-report-*.tar.gz; tar tzf /usr/tester/freelfs-report-*.tar.gz | head -n 40; tar xzOf /usr/tester/freelfs-report-*.tar.gz --wildcards '*summary.txt' | head -n 20
+run tar tzf /usr/tester/freelfs-report-*.tar.gz | grep -c .

@@ -1,0 +1,9 @@
+# Test recipe: the sha256 does not match, so the build must stop.
+pkgname=bad-sha
+version=1
+release=1
+summary="flpkg test: checksum mismatch"
+arch=(any)
+source=(hello.c)
+sha256=(0000000000000000000000000000000000000000000000000000000000000000)
+package() { :; }

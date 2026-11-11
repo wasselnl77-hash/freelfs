@@ -1,0 +1,39 @@
+// hello.dssl - a tiny starter stylesheet
+// bare numbers are px, hover is a nested state, /14 at the end of a color is alpha
+
+body {
+  background: #f5f0e4
+  color: #26201a
+  padding: 40
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
+}
+
+h1 {
+  color: #7c2d2d
+}
+
+.card {
+  background: #fdfaf2
+  border: 1 solid #ddd2bc
+  radius: 6
+  padding: 24
+  box-shadow: 0 2 6 #26201a/14
+  transition: 200
+
+  hover {
+    box-shadow: 0 6 18 #26201a/16
+  }
+}
+
+button {
+  background: #7c2d2d
+  color: #f9efdd
+  padding: 10 18
+  radius: 6
+  border: 0
+  transition: 200
+
+  hover {
+    background: #5e1f1f
+  }
+}

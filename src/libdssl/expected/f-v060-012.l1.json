@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"children":[{"kind":"decl","line":2,"prop":"flame","value":"#ff5533"}],"kind":"selector","line":2,"sel":"color"}],"kind":"tokens","line":2},{"children":[{"kind":"decl","line":3,"prop":"gradient","value":"linear 135, color.flame -> color.ink/40 -> color.paper"}],"kind":"selector","line":3,"sel":".a"}],"kind":"root"}}

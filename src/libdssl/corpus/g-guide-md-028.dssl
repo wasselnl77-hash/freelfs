@@ -1,0 +1,6 @@
+.pane {
+  glass: 18 saturate 1.6            // blur what is behind it
+  tilt: 10 lift 1.04 glare          // follow the pointer
+  border: 1 solid white/35
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}

@@ -1,0 +1,16 @@
+# X11 support for Xwayland (docs/E2-GAMING.md, "Xwayland").
+pkgname=xcb-util-renderutil
+version=0.3.10
+release=1
+summary="Render extension helpers for XCB"
+url=https://www.x.org/
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc libxcb)
+makedepends=(xorgproto)
+source=(https://www.x.org/pub/individual/xcb/xcb-util-renderutil-0.3.10.tar.xz)
+sha256=(3e15d4f0e22d8ddbfbb9f5d77db43eacd7a304029bf25a6166cc63caa96d04ba)
+build_style=autotools
+configure_args=(--disable-static --disable-devel-docs --without-doxygen)
+check() { :; }

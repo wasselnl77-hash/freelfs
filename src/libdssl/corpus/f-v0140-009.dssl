@@ -1,0 +1,2 @@
+motion bob { from { translate: 0 0 } to { translate: 0 10px } }
+.coin { animate: bob 800 infinite alternate jitter 600 }

@@ -1,0 +1,5 @@
+.box { position: absolute; left: 20px; top: 20px; width: 160px; height: 90px; background: #345; radius: 12; transition: 100 }
+.box::before { content: "pre"; color: #fff }
+.tex { position: absolute; left: 20px; top: 150px; width: 160px; height: 60px; background-color: #8a5f33; texture: oak }
+input[type=range] { position: absolute; left: 20px; top: 240px; slider: track 6 #456, fill #f80, thumb 18 #fff }
+.fx { position: absolute; left: 220px; top: 30px; width: 100px; height: 60px; background: #222; aura-glow: #f80 20; tilt: 8 }

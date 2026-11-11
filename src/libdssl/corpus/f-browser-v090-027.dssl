@@ -1,0 +1,1 @@
+tokens { color { tint: #ff0044 } } #t { texture: noise color color.tint color2 #fff } #m { texture: grain animate 90 } .b { width: 80px; height: 60px }

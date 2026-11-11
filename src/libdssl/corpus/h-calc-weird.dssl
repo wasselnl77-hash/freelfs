@@ -1,0 +1,8 @@
+.a { width: calc(1 + 2; height: calc(  ; margin: max(1, calc(2 + 3)) min(4) }
+.b { width: calc(100% - (2 * 4)); padding: clamp(1, 2vw, 3) }
+.c { transform: translate(-50%, -50%) rotate(45) }
+.d { background: url(  "a b.png"  ) , url( c.png ) }
+.e { content: counter(a) " " attr(b); grid-area: 1 / 2 / 3 / 4 }
+.f { font-feature-settings: "tnum" 1; font-variation-settings: "wght" 300 }
+.g { aspect-ratio: 16 / 9; flex: 1 1 0; order: 2 }
+

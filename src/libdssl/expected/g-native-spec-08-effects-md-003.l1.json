@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":2,"prop":"glass","value":"18 saturate 1.6"},{"kind":"decl","line":3,"prop":"tilt","value":"10 lift 1.04 glare"}],"kind":"selector","line":1,"sel":".pane"}],"kind":"root"}}

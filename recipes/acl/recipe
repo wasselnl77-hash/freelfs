@@ -1,0 +1,13 @@
+pkgname=acl
+version=2.4.0
+release=1
+summary="Access control list support"
+url=https://savannah.nongnu.org/projects/acl
+license=(LGPL-2.1-or-later GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(attr)
+source=(https://download.savannah.gnu.org/releases/acl/acl-$version.tar.xz)
+sha256=(e661131456d2708a01c614a0f400e11d7d1bfaeb6f3e74b75bb980b72f0161a3)
+build_style=autotools
+configure_args=(--disable-static --docdir=/usr/share/doc/acl-$version)

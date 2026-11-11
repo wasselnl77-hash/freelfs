@@ -1,0 +1,15 @@
+pkgname=wayland-protocols
+version=1.49
+release=1
+summary="Additional Wayland protocol extensions (XML and generated data)"
+url=https://wayland.freedesktop.org/
+license=(MIT)
+arch=(any)
+groups=(desktop)
+depends=(wayland)
+source=(https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/$version/downloads/wayland-protocols-$version.tar.xz)
+sha256=(ec4c8f74942d6dff7ace8b4ce4764f0ef9ff618a935d974ea77edee2ad240b14)
+build_style=meson
+configure_args=(-D tests=false)
+
+check() { :; } # tests are not built

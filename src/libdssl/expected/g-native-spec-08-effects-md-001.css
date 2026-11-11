@@ -1,0 +1,50 @@
+@layer tokens, base, components, utilities, pin;
+
+@layer tokens {
+:where(:root) {
+  --dssl-color-ink: #16161d;
+  --dssl-color-paper: #faf7f2;
+  --dssl-color-card: #ffffff;
+  --dssl-color-muted: #6f6a7a;
+  --dssl-color-line: #e5ded2;
+  --dssl-color-accent: oklch(62% 0.19 35);
+  --dssl-color-accent-ink: #fff6ee;
+  --dssl-color-ok: #2e7d4f;
+  --dssl-color-err: #b3372e;
+  --dssl-space-1: 4px;
+  --dssl-space-2: 8px;
+  --dssl-space-3: 12px;
+  --dssl-space-4: 16px;
+  --dssl-space-5: 24px;
+  --dssl-space-6: 32px;
+  --dssl-space-7: 48px;
+  --dssl-space-8: 64px;
+  --dssl-radius-sm: 8px;
+  --dssl-radius-md: 14px;
+  --dssl-radius-lg: 22px;
+  --dssl-radius-full: 999px;
+  --dssl-shadow-sm: 0px 1px 2px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent), 0px 1px 3px color-mix(in oklab, var(--dssl-color-ink) 6%, transparent);
+  --dssl-shadow-md: 0px 2px 4px color-mix(in oklab, var(--dssl-color-ink) 10%, transparent), 0px 4px 12px color-mix(in oklab, var(--dssl-color-ink) 8%, transparent);
+  --dssl-shadow-lg: 0px 4px 8px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent), 0px 12px 32px color-mix(in oklab, var(--dssl-color-ink) 12%, transparent);
+  --dssl-shadow-xl: 0px 8px 16px color-mix(in oklab, var(--dssl-color-ink) 14%, transparent), 0px 24px 64px color-mix(in oklab, var(--dssl-color-ink) 16%, transparent);
+  --dssl-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dssl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+}
+
+@layer components {
+:where(.card) {
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27480%27%20height%3D%27480%27%3E%3Cfilter%20id%3D%27f%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%20color-interpolation-filters%3D%27sRGB%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.00625%200.25%27%20numOctaves%3D%273%27%20seed%3D%270%27%20stitchTiles%3D%27stitch%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271.8%200%200%200%20-0.4%201.8%200%200%200%20-0.4%201.8%200%200%200%20-0.4%200%200%200%200%201%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%270.31%200%200%200%200.478%200.31%200%200%200%200.294%200.243%200%200%200%200.141%200%200%200%200%201%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20filter%3D%27url(%23f)%27%2F%3E%3C%2Fsvg%3E") 0 0 / 480px 480px repeat, #c9a66b;
+  background-blend-mode: multiply, normal;
+}
+
+:where(.sheet) {
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27128%27%20height%3D%27128%27%3E%3Cfilter%20id%3D%27f%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%20color-interpolation-filters%3D%27sRGB%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.90909%200.90909%27%20numOctaves%3D%272%27%20seed%3D%270%27%20stitchTiles%3D%27stitch%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271.7%200%200%200%20-0.35%201.7%200%200%200%20-0.35%201.7%200%200%200%20-0.35%200%200%200%200%201%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271%200%200%200%200%201%200%200%200%200%201%200%200%200%200%200%200%200%200%200.6%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20filter%3D%27url(%23f)%27%2F%3E%3C%2Fsvg%3E") 0 0 / 128px 128px repeat, linear-gradient(135deg, #ff7a00, #7a1fff);
+  background-blend-mode: overlay, normal;
+}
+
+:where(.poster) {
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27128%27%20height%3D%27128%27%3E%3Cfilter%20id%3D%27f%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%20color-interpolation-filters%3D%27sRGB%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.66667%200.66667%27%20numOctaves%3D%274%27%20seed%3D%270%27%20stitchTiles%3D%27stitch%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271.2%200%200%200%20-0.1%201.2%200%200%200%20-0.1%201.2%200%200%200%20-0.1%200%200%200%200%201%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271%200%200%200%200%201%200%200%200%200%201%200%200%200%200%200%200%200%200%200.3%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20filter%3D%27url(%23f)%27%2F%3E%3C%2Fsvg%3E") 0 0 / 128px 128px repeat, url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27360%27%20height%3D%27360%27%3E%3Cfilter%20id%3D%27f%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%20color-interpolation-filters%3D%27sRGB%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.00833%200.00833%27%20numOctaves%3D%273%27%20seed%3D%277%27%20stitchTiles%3D%27stitch%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271.3%200%200%200%20-0.15%201.3%200%200%200%20-0.15%201.3%200%200%200%20-0.15%200%200%200%200%201%27%2F%3E%3CfeColorMatrix%20type%3D%27matrix%27%20values%3D%271%200%200%200%200%201%200%200%200%200%201%200%200%200%200%200%200%200%200%200.25%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20filter%3D%27url(%23f)%27%2F%3E%3C%2Fsvg%3E") 0 0 / 360px 360px repeat, repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0, rgba(0, 0, 0, 0.1) 2px, transparent 2.6px, transparent 4px) 0 0 / auto repeat, #e9e2d0;
+  background-blend-mode: overlay, soft-light, normal, normal;
+}
+}

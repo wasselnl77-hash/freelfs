@@ -1,0 +1,4 @@
+raw { @font-face {
+  font-family: X;
+  src: local(Arial);
+} }

@@ -1,0 +1,37 @@
+pkgname=expect
+version=5.45.4
+release=1
+summary="Automates interactive programs"
+url=https://core.tcl-lang.org/expect/
+license=(LicenseRef-public-domain)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc tcl)
+worksrc=expect$version
+source=(https://prdownloads.sourceforge.net/expect/expect$version.tar.gz
+        https://www.linuxfromscratch.org/patches/lfs/13.1/expect-$version-gcc15-1.patch)
+sha256=(49a7da83b0bdd9f46d04a04deec19c7767bb9a323e40c4781f89caf760b92c34
+        ab5fc0af9e2e0f80d7623c1a3a3dbeb1da3d8c9134276792199df401f9eb2cec)
+
+prepare() {
+	patch -Np1 -i "$srcdir/expect-$version-gcc15-1.patch"
+}
+
+build() {
+	./configure --prefix=/usr \
+		--with-tcl=/usr/lib \
+		--enable-shared \
+		--disable-rpath \
+		--mandir=/usr/share/man \
+		--with-tclinclude=/usr/include
+	make
+}
+
+check() {
+	make test
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+	ln -sf "expect$version/libexpect$version.so" "$pkgdir/usr/lib"
+}

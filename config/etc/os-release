@@ -1,0 +1,5 @@
+NAME="FreeLFS"
+ID=freelfs
+PRETTY_NAME="FreeLFS 0.1-dev"
+VERSION_ID=0.1-dev
+ANSI_COLOR="1;34"

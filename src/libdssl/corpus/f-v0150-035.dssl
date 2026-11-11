@@ -1,0 +1,2 @@
+motion slide { from { translate: 0 0 } to { translate: 200 0 } }
+.go { animate: slide 1000 linear infinite }

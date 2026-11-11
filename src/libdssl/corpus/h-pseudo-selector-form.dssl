@@ -1,0 +1,10 @@
+.card::before { content: ""; position: absolute }
+.card::after, .card::before { color: red }
+.a, .b::after { color: red }
+.c::befor { color: red }
+.d::slotted(x) { color: red }
+.e:seen::after { color: red }
+.f::after { bend: 5; stagger: 3; content: }
+.g::-webkit-slider-thumb:hover { color: red }
+.h::part(x) { color: red }
+

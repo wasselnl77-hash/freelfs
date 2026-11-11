@@ -1,0 +1,25 @@
+# mksquashfs, for the live ISO (build/53-iso.sh). Group "live": built and
+# installed into the build root, not into the images.
+pkgname=squashfs-tools
+version=4.7.5
+release=1
+summary="Tools to create and extract squashfs file systems"
+url=https://github.com/plougher/squashfs-tools
+license=(GPL-2.0-or-later)
+arch=(x86_64 aarch64)
+groups=(live)
+depends=(glibc zlib xz lzo lz4 zstd attr)
+source=(https://github.com/plougher/squashfs-tools/archive/refs/tags/$version/squashfs-tools-$version.tar.gz)
+sha256=(547b7b7f4d2e44bf91b6fc554664850c69563701deab9fd9cd7e21f694c88ea6)
+
+build() {
+	make -C squashfs-tools COMP_DEFAULT=zstd
+}
+
+package() {
+	# (the Makefile's install target also makes man pages, which needs tools
+	# the build root's PATH does not have)
+	install -Dm755 -t "$pkgdir/usr/bin" squashfs-tools/mksquashfs squashfs-tools/unsquashfs
+	ln -s mksquashfs "$pkgdir/usr/bin/sqfstar"
+	ln -s unsquashfs "$pkgdir/usr/bin/sqfscat"
+}

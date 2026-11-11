@@ -1,0 +1,802 @@
+=== empty-ish
+// nothing but a comment
+
+=== spec-sample-11-3
+tokens { color { brand: #c2185b } }
+.card {
+  background: color.brand
+  padding: 16
+  row: gap 8 between center
+  radius: md
+  hover { background: color.brand/80 }
+  @media dark { background: #181310 }
+}
+
+=== syntax-comments-url
+.a { background: url(http://x.com/a.png) /* c */ ; color: red } // tail
+.b { content: "// not a comment /* nor this */" }
+.c { background: URL( 'x//y' ) }
+/* unterminated block comment
+.d { color: red }
+
+=== syntax-multiline
+.card,
+.panel {
+  background: linear-gradient(
+    to bottom, red, blue
+  )
+  color:
+    color.ink
+}
+
+=== syntax-oneliners
+.card { background: red; hover { background: blue } padding: 4 }
+.a { color: red }.b { color: blue }
+.x{y{color:red}}
+
+=== syntax-unbalanced
+.a { color: red
+.b { color: blue }
+}
+}
+
+=== syntax-unclosed
+.a { color: red
+.b {
+
+=== syntax-header-missing
+{ color: red }
+.a { ; { color: red } }
+
+=== syntax-bad-decls
+.a {
+  color red
+  : blue
+  9: 3
+  Bad_Prop: 1
+  --ok.dotted: 1
+  -x: 1
+  truncate
+  visually-hidden
+}
+
+=== syntax-numeric-token-keys
+tokens { space { 9: 96 10: 120 } pill: 999 card: 22 }
+.a { padding: space.9; margin: pill }
+
+=== syntax-token-pairs
+tokens { k { a: 1 b: "x y: z" c: calc(1 + 2) d: 3 } }
+
+=== syntax-raw
+raw {
+  @font-face {
+    font-family: X
+    src: url(x.woff2)
+  }
+  .x { color: red; }
+}
+@css { .y { color: blue } }
+.a { raw { .b { } } }
+
+=== syntax-raw-unclosed
+raw {
+  .x { color: red; }
+
+=== syntax-fonts
+fonts {
+  Fraunces: 500 700 800
+  "Hanken Grotesk": 400 700 italic
+  Inter: 100..900 display optional
+  Brand: from "/fonts/brand.woff2" 400
+  Bad: wat
+  nocolon
+}
+
+=== syntax-bogus-at-rules
+@supports (display: grid) { .a { color: red } }
+@media(width>1) { .b { color: red } }
+@container (min-width: 300) { .c { padding: 4 } }
+@keyframes x { from { opacity: 0 } }
+.d { color: red }
+@import url(x.css);
+
+=== syntax-at-bogus-unclosed
+@supports (a: b) { .a { color: red }
+
+=== syntax-state-words
+.a { hover { color: red } focus { color: blue } focus-visible { color: green } enabled { color: red } link { color: red } visited { color: red } indeterminate { color: red } first-of-type { color: red } }
+
+=== syntax-strings
+.a { content: "a\"b"; font-family: 'x\'y' }
+.b { content: "it's" }
+
+=== values-numbers
+.a {
+  padding: 0
+  margin: 0 auto
+  opacity: 0.5
+  line-height: 1.5
+  transition-delay: 200
+  width: calc(100% - 24)
+  top: -4
+  left: +4
+  right: .5
+  bottom: 10PX
+  z-index: 3
+  flex: 1 1 0
+  background: oklch(62% 0.19 35)
+  grid-template-columns: repeat(4, 1fr)
+  grid-template-rows: repeat(auto-fill, minmax(100, 1fr))
+  transform: scale(1.2) rotate(5deg) translate(3, 4)
+  filter: blur(4) brightness(1.2) drop-shadow(0 2 4 black)
+  margin-top: max(4, 2vw)
+  animation: spin 1 infinite
+}
+
+=== values-alpha
+tokens { color { x: #123456 } }
+.a {
+  color: color.x/50
+  background: #ff0000/50
+  border-color: white/12
+  outline-color: currentcolor/ 30 %
+  fill: color.accent / 5
+}
+
+=== values-unknown
+.a { color: colour; width: calcc(4); background: url(a b.png); margin: foo.bar }
+.b { color: color.ink2.bogus; padding: space.99 }
+
+=== values-important
+.a { color: red !important; width: 3 ! IMPORTANT; content: "!important"; margin: 1 ! x important }
+
+=== values-fluid
+h1 { font-size: fluid 28 44 }
+.stack { gap: fluid 8 16 }
+.hero { font-size: fluid 16 24 400 800 }
+.e1 { font-size: fluid 16 24% }
+.e2 { font-size: fluid 16px 2rem }
+.e3 { font-size: fluid 16 24 800 400 }
+.e4 { font-size: fluid abc 2 }
+.r { font-size: fluid 1 2rem; padding: fluid 1rem 2rem; fluid: 12, 20 }
+.f { fluid: 10 }
+.g { fluid: 1px, 2 }
+.h { fluid: 1.2rem, 2.4rem, 320, 1440 }
+
+=== values-bare-idents
+.a { font-family: JetBrains Mono, Roboto, "Fira Code", serif; counter-reset: step; --brand: foo bar; content: counter(step) }
+.b { content: counters(a, "."); width: env(safe-area-inset-top); margin: attr(data-x) }
+tokens { font { display: Fraunces, Georgia } }
+
+=== values-repeat
+.a { grid-template-columns: repeat(3, 1fr) repeat(auto-fit, 40) repeat(2.5, 4) }
+
+=== values-unclosed-fn
+.a { width: calc(1 + 2; height: calc(  }
+.b { content: "x" url( }
+
+=== tokens-basic
+tokens {
+  color { ink: #111; accent: oklch(62% 0.19 35) }
+  space { 1: 4  2: 8  9: 96 }
+  radius { md: 14 }
+  shadow { md: 0 2 4 color.ink/10, 0 4 12 color.ink/8 }
+}
+.a { color: color.ink; padding: space.9; box-shadow: shadow.md }
+
+=== tokens-conditional
+tokens { color { bg: white } }
+@media dark { tokens { color { bg: black } } }
+.a { background: color.bg }
+
+=== tokens-bad
+.a { tokens { x: 1 } }
+tokens { hover { a: 1 } color { bad: nonsense } }
+tokens { color { x: } }
+
+=== tokens-nested-tokens
+tokens { tokens { a: 1 } x { tokens { b: 2 } } }
+.k { width: tokens.a; height: x.tokens.b }
+
+=== tokens-scoped
+.danger { --color.accent: color.err; --brand: red; --x: 1 2 3 }
+
+=== tokens-shortcuts
+.a { shadow: md }
+.b { shadow: none }
+.c { shadow: pop }
+.d { shadow: 0 2 4 red }
+tokens { shadow { pop: 0 1 1 black } radius { pill: 99 } }
+.e { radius: pill md 4 }
+.f { radius: xl }
+.g { radius: sm lg full }
+
+=== layers
+.a { color: red }
+pin { .a { color: blue } }
+@layer base { .a { color: green } }
+@layer utilities { .a { padding: 4 } }
+@layer weird { .a { color: red } }
+@layer tokn { .a { color: red } }
+@layer tokens { .b { color: red } }
+
+=== nesting
+.card {
+  background: color.card
+  hover { background: color.paper }
+  @media dark { background: color.ink }
+  &.on { background: color.accent }
+  .title { font-weight: 700 }
+  > .child { margin: 0 }
+  + .sib { margin: 1 }
+}
+
+=== nesting-lists
+.a, .b { .c { color: red } hover { color: blue } ::before { content: "" } }
+.a { .c, .d { color: red } }
+.a, .b { &.x, .y & { color: red } }
+:is(.x, .y) { .z { color: red } }
+
+=== nesting-fragments
+.a {
+  color: red
+  hover { color: blue }
+  padding: 4
+  @media 768 { margin: 1 }
+  gap: 2
+}
+
+=== nesting-state-typo
+.menu { li { color: red } hove { color: red } focs { color: red } td { color: red } foo { color: red } }
+
+=== nesting-states-deep
+.a { hover { focus { color: red } } }
+.a, .b { hover { color: red } }
+hover { color: red }
+seen { opacity: 1 }
+
+=== seen
+.card { opacity: 0; seen { opacity: 1; transform: translateY(0 -> 4) } }
+
+=== media-sugar
+.a {
+  @media 768 { padding: 24 }
+  @media <= 480 { padding: 12 }
+  @media 480..960 { gap: 4 }
+  @media dark { gap: 1 }
+  @media Light { gap: 2 }
+  @media reduced-motion { gap: 3 }
+  @media (width >= 768) { gap: 4 }
+  @media (width >= 1.5px) { gap: 4 }
+  @media (400 <= width <= 800) { gap: 5 }
+  @media (min-width: 40em) and (max-width: 90) { gap: 6 }
+  @media >= 700 { gap: 7 }
+  @media print { gap: 8 }
+  @media 1.5..2.5 { gap: 9 }
+}
+
+=== media-empty
+.a { @media { color: red } }
+@media  { .b { color: red } }
+.c { @container { color: red } @container (min-width: 300) { color: blue } @container card (width > 20) { color: green } }
+
+=== media-top-level
+@media 600 { .a { color: red } tokens { color { x: red } } }
+@container (min-width: 100) { .b { color: red } }
+@media dark { @media 800 { .c { color: red } } }
+
+=== signals
+.a {
+  @signal theme == dark { color: red }
+  @signal screen in (a, b) { color: blue }
+  @signal on { color: green }
+  @signal x != "q q" { color: red }
+  @signal s not in (a,'b', "c") { color: red }
+  @signal bad !! { color: red }
+  @signal e in ( ) { color: red }
+  @signal n == 'x' { color: red }
+}
+@signal ok { .b { color: red } }
+
+=== pseudo-nested
+.btn {
+  ::after {
+    content: ""
+    opacity: 0
+    hover { opacity: 1 }
+  }
+  ::before { content: }
+  ::wat { color: red }
+  ::-webkit-scrollbar { width: 4 }
+  ::selection { color: red; bend: 3 }
+  ::after { seen { color: red } .x { color: red } }
+}
+::selection { color: red }
+.a, .b { ::before { content: "x"; hover { color: red } } }
+
+=== pseudo-selector-form
+.card::before { content: ""; position: absolute }
+.card::after, .card::before { color: red }
+.a, .b::after { color: red }
+.c::befor { color: red }
+.d::slotted(x) { color: red }
+.e:seen::after { color: red }
+.f::after { bend: 5; stagger: 3; content: }
+.g::-webkit-slider-thumb:hover { color: red }
+.h::part(x) { color: red }
+
+=== pseudo-mixed
+[data-x="::a"] { color: red }
+.x:is(::before) { color: red }
+
+=== declarations-outside
+color: red
+.a { color: blue }
+@media dark { color: red }
+@layer base { padding: 1 }
+
+=== behaviors
+behavior focus-ring {
+  outline: 2 solid color.accent
+  outline-offset: 2
+}
+behavior card-base {
+  use focus-ring
+  radius: md
+  hover { background: color.paper }
+}
+.btn { use focus-ring }
+.card { use card-base; color: red }
+.x { use nothere }
+.y { use nothre }
+behavior focus-ring { color: red }
+behavior a { use b }
+behavior b { use a }
+.z { use a }
+.late { use defined-later }
+behavior defined-later { padding: 3 }
+.q { .nested { behavior inner { color: red } } }
+
+=== behavior-top-level
+.a { behavior x { color: red } motion y { from { opacity: 0 } } }
+
+=== motions
+motion rise-in {
+  from { opacity: 0; translate: 0 18 }
+  to   { opacity: 1; translate: 0 0 }
+}
+motion pulse {
+  essential
+  0%   { opacity: 1 }
+  50%  { opacity: 0.6 }
+  100% { opacity: 1 }
+}
+motion multi { 0%, 100% { color: red } at 40% { color: blue } 30 { color: green } }
+motion bad { color: red; 120% { color: red } wat { color: red } from { --x: 1; background-color: red; -webkit-text-fill-color: blue } }
+motion e1 { essential: true }
+motion e2 { essential: false }
+motion deform { from { bend: 0 } to { bend: 20; fold: 10; stretch: 1.5 vertical; transform: rotate(3) } }
+motion deform2 { to { bend-up: 12; bend-y: 3 } }
+motion empty { }
+.a { animate: rise-in 400 }
+
+=== animate
+motion rise-in { from { opacity: 0 } to { opacity: 1 } }
+motion bob { from { top: 0 } to { top: 4 } }
+.a { animate: rise-in }
+.b { animate: rise-in 600 snap delay 100 }
+.c { animate: bob 1200 infinite alternate delay 100 jitter 600 essential }
+.d { animate: bob 300 iterations 3 forwards, rise-in 200 2s }
+.e { animate: none }
+.f { animate: nothere 400 }
+.g { animate: rise-in wat }
+.h { animate: rise-in delay }
+.i { animate: rise-in 1s 2s reverse backwards }
+.j { animate: bob 5s smoth }
+.k { animate: rise-in 2.5s }
+.l { animate: rise-in iterations x }
+.m { animation: rise-in 400 }
+.n { animation: nothing 400 }
+.o { animation-name: spin }
+.p { animation-delay: 100; animation-duration: 3 }
+.q { animation: rise-in 1s; animation-delay: 100 }
+.r { animate: rise-in 3; animation-iteration-count: 2 }
+.s { ::before { animate: rise-in 400 } }
+
+=== animate-undefined-motion-typo
+motion fade { from { opacity: 0 } }
+.a { animate: fadee 400 }
+.b { animate: zzzzzzzz 400 }
+
+=== stagger-overlap
+.a { stagger: 60 }
+.b { stagger: 120ms }
+.c { stagger: 1s }
+.d { stagger: none }
+.e { stagger: soon }
+.f { overlap: allow }
+.g { overlap: none }
+.h { overlap: deny }
+.i { overlap: AUTO }
+.j { overlap: maybe }
+
+=== deform
+.a { bend: 20; bend-y: -12; bend-up: 5deg; fold: 3 }
+.b { bend: lots }
+.c { bend-around: 90 }
+.d { bend-around: 171 }
+.e { bend-around: -170 }
+.f { stretch: 1.2 }
+.g { stretch: 1.4 vertical }
+.h { stretch: 2 Y }
+.i { stretch: 0 }
+.j { stretch: .5 x }
+.k { stretch: big }
+.l { bend: 0.5; fold: -.5; bend-y: 1deg }
+
+=== semantic-layout
+.toolbar { row: gap 8 between center }
+.board   { grid: 3 gap 12 }
+.pane    { stack: center }
+.hero    { center: both }
+.r1 { row: wrap reverse inline gap 4 start }
+.r2 { column: center center }
+.r3 { row: between around }
+.r4 { row: center start end }
+.r5 { row: gap }
+.r6 { row: wibble stretch baseline }
+.r7 { row: start start }
+.r8 { row: center center center }
+.r9 { column: stretch baseline center }
+.r10 { row: end between stretch }
+.r11 { row: nowrap }
+.r12 { row: gap 4 gap 8 }
+.r13 { row: }
+.g1 { grid: auto-fill 200 gap 4 rows 3 }
+.g2 { grid: 200px 1fr }
+.g3 { grid: }
+.g4 { grid: auto-fit }
+.g5 { grid: rows 40 gap }
+.g6 { grid: 1fr 2fr 3 rows 3rem }
+.s1 { stack: wat }
+.s2 { stack: }
+.p1 { place: start }
+.p2 { place: zzzz }
+.c1 { center: x }
+.c2 { center: Y }
+.c3 { center: z }
+.c4 { center: }
+.a1 { align: stretch }
+.a2 { align: strech }
+.i1 { size: 40 }
+.i2 { size: 40 20 }
+.i3 { size: }
+.i4 { circle: 32 }
+.i5 { z: 3; grow; shrink: 0; basis: 20 }
+.i6 { cover; sticky }
+.i7 { cover: fixed; sticky: 10 }
+.i8 { truncate; visually-hidden }
+
+=== semantic-display-clash
+.a { display: none; column: gap 2 }
+.b { display: flex; row: gap 2 }
+.c { display: block; display: flex; grid: 3 }
+.d { row: gap 1; display: none }
+.e { display: grid; stack: center }
+
+=== semantic-font
+.a { font: 16/1.5 color.ink }
+.b { font: 14 red }
+.c { font: bold 16 }
+.d { font: 700 16px }
+.e { font: 16, Arial }
+.f { font: "Arial" }
+.g { font: }
+.h { font: 20/ }
+.i { font: 2rem/1.2 color.muted }
+.j { font: italic }
+
+=== semantic-text-stroke
+.a { text-stroke: 6 color.ink }
+.b { text-stroke: 2 #fff inside }
+.c { text-stroke: none }
+.d { text-stroke: red }
+.e { text-stroke: }
+.f { text-stroke: 3px }
+.g { outline-shape: 3 color.ink }
+.h { outline-shape: none }
+.i { outline-shape: wide }
+.j { outline-shape: 2.5 }
+.k { rotate: 5 }
+.l { rotate: 5deg }
+.m { rotate: x 30 }
+.n { rotate: 1 2 3 4 }
+.o { rotate: 0.1turn }
+.p { rotate: -.5 }
+
+=== semantic-transition
+.a { transition: 200 snap }
+.b { transition: 150 snap background-color, 300 transform }
+.c { transition: none }
+.d { transition: color .2s ease }
+.e { transition: 200ms }
+.f { transition: fast }
+.g { transition: 200 snap colour }
+.h { transition: 2s cubic-bezier(0.1, 0.2, 0.3, 1) opacity }
+.i { transition: 0.2s steps(4) }
+.j { transition: 200 bend }
+.k { transition: 1s, 2s }
+.l { transition: background .2s snap, 300 }
+.m { transition: }
+.n { transition: opacity 1s snap }
+.o { transition: .5s ease-in-out margin-left padding }
+.p { transition: 300 all }
+
+=== semantic-yield
+.a { yield: padding-top padding-bottom }
+.b { yield: padding, margin }
+.c { yield: none }
+.d { yield: }
+.e { yield: padding-tpo }
+.f { yield: row }
+.g { yield: colour }
+
+=== semantic-glass-tilt
+.a { glass: 12 saturate 1.8 tint white/10 }
+.b { glass: none }
+.c { glass: }
+.d { glass: bright 1.1 tint none }
+.e { glass: wat }
+.f { glass: -3 }
+.g { glass: tint }
+.h { glass: saturate }
+.i { glass: color.ink/20 }
+.j { glass: #fff }
+.k { glass: white }
+.l { glass: 8 tint nonsense }
+.m { tilt: 10 }
+.n { tilt: none }
+.o { tilt: }
+.p { tilt: 12 lift 1.05 perspective 700 speed 0.2 invert glare }
+.q { tilt: 99 }
+.r { tilt: lift 0 }
+.s { tilt: perspective 50 }
+.t { tilt: speed 5 }
+.u { tilt: wat }
+.v { tilt: lift }
+
+=== effects-engine-only
+.a { texture: paper }
+.b { aura: glow red 10 }
+.c { aura-glow: none }
+.d { slider: track 6 }
+
+=== gradient-basic
+.a { gradient: linear 135, color.accent -> color.ok }
+.b { gradient: radial circle at 30% 20%, color.card -> color.ink }
+.c { gradient: conic from 45, color.accent, color.line, color.card, color.accent }
+.d { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.e { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.f { gradient: linear 90, #ff7a1a 0 30%, #3949ab 30% 100% }
+.g { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+.h { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }
+.i { gradient: linear to bottom right, red, blue }
+.j { gradient: linear #f00 -> #00f }
+.k { gradient: linear 90, a -> 30% -> b }
+.l { gradient: linear 180, red -> blue tile 24 12 offset 4 4 no-repeat }
+.m { gradient: radial-gradient(circle, red, blue) + url(a.png) repeat-x }
+.n { gradient-text: linear to right, color.accent, color.ink }
+.o { gradient-flow: 7s alternate }
+.p { gradient-flow: none }
+.q { gradient-flow: fast }
+.r { gradient-flow: 3000 snap alternate-reverse }
+.s { gradient-flow: 3s wat }
+.t { gradient-flow: }
+
+=== gradient-errors
+.a { gradient: sideways 1, red -> blue }
+.b { gradient: linear 90, red }
+.c { gradient: linear foo, red -> blue }
+.d { gradient: radial wat, red -> blue }
+.e { gradient: conic around, red, blue }
+.f { gradient: linear 90, 30% -> red -> blue }
+.g { gradient: linear 90, red -> 30% }
+.h { gradient: linear 90, redd -> blue }
+.i { gradient: mesh red }
+.j { gradient: mesh red, blue }
+.k { gradient: mesh #fff, red at 1 }
+.l { gradient: linear 90, 20 -> blue }
+.m { gradient: linear 90, red 10 -> blue 20 }
+.n { gradient: linear 135 }
+.o { gradient: }
+.p { gradient: linear 90, red, blue; background-image: url(x.png) }
+.q { gradient: linear 90, red, blue; background: url(x.png) }
+.r { gradient: linear 90, red, blue; background-image: none }
+.s { gradient: radial circle farthest-side at 10px 10px, red, blue }
+.t { gradient: conic at 50% 50%, red, blue }
+.u { gradient: conic from 10deg at center, red, blue }
+.v { gradient: linear -45deg, red, blue }
+.w { gradient: linear 90 in hsl longer hue, red, blue }
+.x { gradient: linear in srgb, red, blue }
+
+=== unknown-props
+.a { colour: red; widht: 3; wibble: 1; constructorx: 1 }
+.b { -webkit-box-shadow: 0 0 red; -moz-appearance: none; -moz-bogus: 1 }
+.c { Color: RED }
+.d { background-colour: red }
+
+=== raw-semicolons
+raw {
+  .a {
+    color: red
+    padding: 4px
+  }
+  .b { color: blue; }
+  .c {
+    margin: 1px;
+    width: 2px
+  }
+  /* c: d */
+  .e {
+    height: 3px,
+  }
+}
+
+=== raw-in-nesting
+.a { raw { .b { color: red } } }
+@media dark { raw { .c { color: red } } }
+fonts { X: 400 }
+.d { fonts { Y: 400 } }
+
+=== font-links
+fonts {
+  Fraunces: 500 700 800
+  Inter: 100..900 display optional
+  "Hanken Grotesk": 400 700 italic
+  Fraunces: 900
+  Roboto
+  Zeta: 1100
+  Eta: 400..300
+  Theta: display wat
+  Iota: from
+  Kappa: from "a.ttf" 400 700
+  Lambda: from "l.otf?x=1" 600 italic display block
+  Mu: from "m.woff" 100..900
+  Nu: 400 // comment
+  Xi: 400 /* c */ ;
+}
+
+=== multi:token-flow
+tokens { color { brand: #c2185b } space { 9: 96 } }
+.a { color: color.brand; padding: space.9 }
+--- sheet
+tokens { color { brand: #3949ab; extra: red } }
+.b { color: color.brand; background: color.extra }
+@media dark { tokens { color { brand: #fff } } }
+--- sheet
+.c { color: color.brand; margin: space.9 }
+.d { color: color.nothere }
+
+=== multi:motion-flow
+motion rise { from { opacity: 0 } to { opacity: 1 } }
+.a { animate: rise 400 }
+--- sheet
+motion rise { from { opacity: 0.5 } to { opacity: 1 } }
+motion fall { from { top: 0 } to { top: 9 } }
+.b { animate: rise 300 }
+.c { animate: fall 200 }
+--- sheet
+.d { animate: fall 100 }
+.e { animate: rise 100 }
+.f { animation: fall 1s }
+
+=== multi:order-flow
+.a { color: red }
+.b { color: blue }
+--- sheet
+.a { color: green }
+pin { .b { color: pink } }
+
+=== motion-stretch-horizontal
+motion st { to { stretch: 1.5 } }
+motion st2 { 50% { stretch: 2 vertical; bend: 0 } }
+motion st3 { 50% { fold: 0 } to { bend-up: 0; transform: none } }
+
+=== row-written-twice
+.a { row: between between }
+.b { column: stretch stretch }
+.c { row: around around }
+.d { row: center start }
+.e { row: start center }
+
+=== fluid-bad-bounds
+.a { font-size: fluid 16 24 400rem 800 }
+.b { font-size: fluid 16 24 2000 }
+.c { font-size: fluid 16 24 400 }
+.d { font-size: fluid 16 }
+.e { font-size: fluid }
+.f { fluid: }
+
+=== gradient-more-errors
+.a { gradient: mesh red at 1 2, blue at 3 4 }
+.b { gradient: conic around, red, blue }
+.c { gradient: mesh red, blue at 1 2 }
+.d { gradient: radial 12px 4px, red -> blue }
+.e { gradient: linear 90, red 10 20, blue 30 }
+.f { gradient: linear 90 in oklab longer hue, red, blue }
+.g { gradient: linear 90 in srgb-linear, red, blue }
+.h { gradient: repeating radial circle, red 0 4, blue 4 8 }
+.i { gradient: linear , red -> blue }
+.j { gradient: linear 45, rgb(1 2 3) -> hsl(4 5% 6%) -> #abc/50 }
+.k { gradient: radial at center, color.ink -> white/10 -> transparent }
+.l { gradient: linear to top left, #f00 -> #00f + conic from 10deg at 10px 10px, red, blue tile 8 no-repeat }
+.m { gradient: linear 90, red, blue tile 8 offset 1 2 repeat-x }
+
+=== glass-number-forms
+.a { glass: 0x10 }
+.b { glass: 1e1 saturate 0b11 }
+.c { glass: 0o7 tint red }
+.d { glass: 1_0 }
+.e { glass: Infinity }
+.f { glass: -0 }
+.g { tilt: 0x5 }
+.h { tilt: 1e1 lift 1.5 }
+
+=== raw-remainder
+raw {
+.a { color: red; }
+} .b { color: blue }
+.c { color: green }
+
+=== raw-comments-fonts-comments
+fonts { /* c */ X: 400 /* d */
+  Y: 500 // tail
+  Z: 600 ; }
+raw { /* x */ .a { color: red } /* y */
+  /* multi
+     line */ .b { color: blue }
+}
+
+=== weird-idents
+.a { margin: ---x -- a; width: 5.px; height: 1.2.3em; top: -.5; left: +.5; right: 1e3; bottom: 0xff }
+.b { content: "é€😀"; font-family: Ünï, "Ünï" }
+.c { --x.y.z: 1; --a-b.c: 2 }
+
+=== unicode-truncation
+.a { 😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀 }
+.b { ééééééééééééééééééééééééééééééééééééééééééééééééééé: 1 }
+.c { raw-ish
+}
+raw {
+  .a { color: red }
+  aé: ééééééééééééééééééééééééééééééééééééééééééééééééééé
+}
+
+=== crlf-sheet
+tokens { color { x: red } }
+.a {
+  color: color.x
+  background: url(
+    "a.png"
+  )
+}
+raw {
+  .b { color: blue; }
+}
+
+=== bom-sheet
+.a { color: red }
+.b { colour: red }
+
+=== calc-weird
+.a { width: calc(1 + 2; height: calc(  ; margin: max(1, calc(2 + 3)) min(4) }
+.b { width: calc(100% - (2 * 4)); padding: clamp(1, 2vw, 3) }
+.c { transform: translate(-50%, -50%) rotate(45) }
+.d { background: url(  "a b.png"  ) , url( c.png ) }
+.e { content: counter(a) " " attr(b); grid-area: 1 / 2 / 3 / 4 }
+.f { font-feature-settings: "tnum" 1; font-variation-settings: "wght" 300 }
+.g { aspect-ratio: 16 / 9; flex: 1 1 0; order: 2 }
+
+=== alpha-spacing
+tokens { color { a: red } }
+.x { border: 1 solid color.a/50 dashed; outline: 2px white/ 20% solid; box-shadow: 0 0 4 #000/30, 0 0 8 #fff/ 40 }

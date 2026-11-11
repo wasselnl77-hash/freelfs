@@ -1,0 +1,5 @@
+.table  { background-color: #c9a574; texture: oak planks 120 }           // laid as boards 120px tall
+.panel  { texture: walnut figure 0.9 warp 0.7 }                          // more arching, more wobble
+.shelf  { texture: pine knots 3 scale 18 }                               // three knots per tile
+.post   { texture: oak angle 90 }                                        // grain running up and down
+.custom { texture: rings scale 8 color #3a2410 color2 #b98a52 seed 21 }  // your own species

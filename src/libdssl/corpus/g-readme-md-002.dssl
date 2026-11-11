@@ -1,0 +1,9 @@
+.nav {
+  position: sticky
+  top: 0
+  row: gap space.4 between
+  height: 64
+  background: color.paper/92
+  backdrop-filter: blur(10)
+  transition: 200
+}

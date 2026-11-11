@@ -1,0 +1,8 @@
+.card {
+  background: color.card
+  radius: md
+  padding: space.5
+  shadow: sm
+
+  hover { shadow: lg }
+}

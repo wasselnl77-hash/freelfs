@@ -1,0 +1,15 @@
+pkgname=pcre2
+version=10.47
+release=1
+summary="Perl-compatible regular expressions"
+url=https://pcre2project.github.io/pcre2/
+license=(BSD-3-Clause)
+arch=(x86_64 aarch64)
+groups=(base)
+depends=(glibc zlib bzip2 readline)
+source=(https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$version/pcre2-$version.tar.bz2)
+sha256=(47fe8c99461250d42f89e6e8fdaeba9da057855d06eb7fc08d9ca03fd08d7bc7)
+build_style=autotools
+configure_args=(--docdir=/usr/share/doc/pcre2-$version --enable-unicode --enable-jit
+	--enable-pcre2-16 --enable-pcre2-32 --enable-pcre2grep-libz
+	--enable-pcre2grep-libbz2 --enable-pcre2test-libreadline --disable-static)

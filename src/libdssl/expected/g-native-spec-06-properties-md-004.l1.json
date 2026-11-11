@@ -1,0 +1,1 @@
+{"errors":[],"tree":{"children":[{"children":[{"kind":"decl","line":2,"prop":"outline","value":"2 solid color.accent"},{"kind":"decl","line":3,"prop":"outline-offset","value":"2"}],"kind":"behavior","line":1,"name":"focus-ring"},{"children":[{"kind":"decl","line":6,"prop":"use","value":"focus-ring"}],"kind":"selector","line":6,"sel":".btn"}],"kind":"root"}}

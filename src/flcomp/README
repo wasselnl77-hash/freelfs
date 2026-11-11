@@ -1,0 +1,297 @@
+flcomp -- the FreeLFS Wayland compositor
+========================================
+
+flcomp is the display server of the FreeLFS desktop. It talks to the
+kernel directly (DRM/KMS dumb buffers, libseat for device access, libinput
+for mice and keyboards) and composites on the CPU, so it needs no GPU
+driver and about 20 MB of RAM at 1080p. No wlroots. GPU clients (the browser)
+send dmabuf buffers, which are read into the same CPU copy (see "dmabuf").
+
+Starting
+  flcomp               the session: starts flpanel (restarted if it dies,
+                       up to 5 times) and runs until Ctrl-Alt-Backspace or
+                       "Log out" in the panel; exit status 0 then
+  flcomp --firstboot   runs flsetup alone and exits with its status
+  /etc/profile.d/desktop.sh starts flcomp for non-root users on tty1, with
+  stderr in $XDG_RUNTIME_DIR/flcomp.log. It does not exec: when flcomp ends
+  with a non-zero status (a crash signal is 128 + number) it runs flcrash, the
+  "Something went wrong" screen; Enter there starts flcomp again, Esc leaves to
+  a shell. Needs seatd running and your user in its group.
+
+Keys
+  Super (tapped)       tells the panel to toggle the start menu
+  XF86AudioRaiseVolume, LowerVolume, Mute
+                       swallowed and sent to the panel (fl_shell volume_key); without a
+                       panel flcomp runs wpctl itself; raise and lower repeat while held
+  XF86MonBrightnessUp, Down
+                       backlight in 5 % steps, at least 5 % (media.c), brightness= in
+                       desktop.conf; XF86AudioMicMute toggles the microphone
+                       Every one of them shows the on-screen indicator (osd.c)
+  Alt-Tab, Alt-Shift-Tab
+                       cycle windows forwards and backwards (hold Alt); a row of window
+                       pictures (switcher.c) shows the choice, the picked one in accent
+  Super+Left, Super+Right   snap the window to the left or right half (the other key undoes it)
+  Super+Up             maximize;  Super+Down  restore, or minimize
+  Super+E              flfiles;  Super+T or Ctrl-Alt-T  flterm
+  Super+L              locks the screen at once and starts fllock (if /usr/bin/fllock exists), see "Lock screen"
+  Print                the whole screen: Snappel (snappel --full: saved to ~/pictures/screenshots, with a
+                       notification) when it is installed, else flcomp saves it itself to
+                       ~/pictures/screenshot-YYYY-MM-DD-HHMMSS.png (shot.c, libpng) and shows the indicator
+  Shift+Print          snappel --region;  Super+Shift+S  the Snappel window ($FLCOMP_SNAPPEL names another program)
+  Super+Ctrl+arrows    switch workspace (along the grid, no wrap)
+  Super+Shift+arrows   move the focused window (and its dialogs) to the next workspace; the view follows
+  Super+Tab            the workspace overview (see "Workspaces"); Tab, arrows, 1-9, Enter, Esc inside
+  Ctrl-Shift-Esc       General Manager (the task manager: processes, performance, startup apps)
+  XF86AudioPlay/Stop/Next/Prev   `flmusic --ctl play-pause|stop|next|previous` (MPRIS; volume, mute,
+                       brightness and microphone keys are described in media.c)
+  Ctrl-Alt-Backspace   quit the session
+  Ctrl-Alt-F1..F12     switch virtual terminal
+  make check-keys      headless test of all of the above
+  make check-ws        headless test of workspaces, the overview, fl_shell 5, fl_screencopy and the Snappel keys
+
+Windows draw their own title bars. flcomp handles stacking, click to focus,
+move and resize (xdg_toplevel.move/resize), maximize, fullscreen, minimize,
+popups, clipboard (wl_data_device). Drag and drop, touch and server-side
+decorations are not implemented.
+
+dmabuf (dmabuf.c, gl.c): zwp_linux_dmabuf_v1 version 3, single-plane ARGB8888,
+XRGB8888, ABGR8888, XBGR8888. A dmabuf is read when the client commits and
+released at once, like a wl_shm buffer; compositing stays on the CPU. Linear
+buffers are mmap'ed and copied (this is all there is on llvmpipe, a KMS-only
+device or without a GPU: only the LINEAR modifier is announced). On a real
+GPU the first client that binds the global makes flcomp start EGL on the DRM
+device through GBM; then every modifier the GPU can sample is announced and a
+tiled or compressed buffer is imported as an EGLImage, drawn by GLES2 into a
+linear texture and read back into the surface copy. A session of shm clients
+never loads EGL. FLCOMP_NO_GL=1 turns the GPU path off. wl_drm (old EGL
+clients without dmabuf) and a GPU compositing path are not implemented.
+
+Keyboard layout comes from /etc/keyboard.conf (LAYOUT=de, optional VARIANT=
+and OPTIONS=, default us) and can be changed at run time with
+fl_shell.set_keyboard_layout (not saved).
+
+Globals: wl_compositor 4, wl_subcompositor 1, wl_shm, wl_output 3, wl_seat 5, xwayland_shell_v1 1 (Xwayland only),
+wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 4.
+
+desktop.conf (config.c, ~/.config/freelfs/desktop.conf, $FLUI_CONF; watched with
+inotify, changes apply at once, except display mode and scale)
+  pointer_speed=-100..100   pointer_accel=adaptive|flat   left_handed=0|1
+  mouse_natural=0|1   touchpad_natural=0|1   tap_click=0|1   typing_disable=0|1
+      libinput settings on every device, present and hot-plugged; a touchpad is a
+      pointer with tap fingers, the other pointers are mice
+  key_repeat_delay=ms (600)   key_repeat_rate=per second (25)   numlock=0|1
+      wl_keyboard.repeat_info to every client; Num Lock is switched on (and the
+      keyboard LEDs follow the xkb state) when the setting turns on
+  night_light=0|1   night_warmth=0..100
+      colour tables applied while copying to the screen (green and blue go down)
+  brightness=percent   written to the backlight's sysfs file at start
+  mode=1920x1080@60   scale=100..200   read at start
+  power_saver=0|1   frame cap and dimmed backlight (see "Power saving")
+  performance=auto|on|off   see "Performance mode" (default auto)
+  lock_on_lid=0|1   closing the lid locks the screen (default 1, see "Lock screen")
+Display (output.c, drm.c): the screen has a mode; the desktop is laid out at
+mode / scale (at least 640 x 400) and enlarged by the backend when it copies to
+the screen: pixel doubling at 200 %, bilinear in between (a little soft). The
+pointer's motion is scaled to match. wl_output reports the desktop's size.
+fl_shell set_output(w, h, hz, scale) tries a new mode and scale: the old one
+comes back after 15 seconds unless confirm_output arrives (or the asking client
+dies); revert_output goes back at once. The panel is restarted (it sizes itself
+once at start), maximized windows are refitted, windows off screen come back.
+Events output_mode (every mode, flag 1 current, 2 preferred) and output_state.
+
+fl_shell (protocol/fl-shell.xml, installed to /usr/share/flcomp)
+  requests: set_panel(surface, height), set_menu(surface), activate(id),
+            minimize(id), close(id), set_keyboard_layout(name), logout,
+            destroy; since 2: set_flyout(surface, x); since 3: set_output(w, h,
+            hz, scale), confirm_output, revert_output, show_osd(kind, percent, flags);
+            since 4: set_notifications(surface), lock(surface), unlock
+  events:   window_added(id, app_id, title), window_changed(id, title,
+            focused, minimized), window_removed(id), menu_dismissed,
+            menu_toggle, keyboard_layout(name); since 2: flyout_dismissed,
+            volume_key(action: 0 raise, 1 lower, 2 mute); since 3: output_mode(w,
+            h, hz, flags), output_state(scale, w, h, pending), output_failed; since 4:
+            lock_state(locked)
+The panel surface is placed at the bottom edge and should be as wide as the
+output (wl_output.mode). The menu is shown above the left edge of the panel
+while it has a buffer; a click outside menu and panel hides it and sends
+menu_dismissed (attach a buffer again to show it). A click on the panel
+itself never dismisses it, the panel decides. The flyout (set_flyout) works the
+same way for a small popup directly above the panel, centred on x and kept on
+screen; it sends flyout_dismissed.
+
+Notifications (fl_shell 4 set_notifications): the panel's card surface goes to the top
+right of the screen, 16 px from the edges, above windows, panel, menu and flyout. It is
+transparent: a pixel with alpha 0 takes no pointer input, so the gaps between the cards
+click through. It never has keyboard focus and is not shown while the screen is locked.
+
+Workspaces (xdg.c, overview.c; fl_shell 5; desktop.conf workspaces=COLSxROWS, default 2x2, 1..8 each)
+  A grid of virtual desktops, openSUSE/KDE style. A window is on exactly one (window.ws); only the
+  windows of the workspace in view are drawn, picked, focused, in Alt-Tab and in list_windows. New
+  windows open where you are, dialogs on their parent's workspace. Switching focuses the newest
+  window of the new workspace; activating a window from the panel goes to its workspace. Changing
+  workspaces=... applies live: windows on removed workspaces move to the last one.
+  Overview (Super+Tab or fl_shell toggle_overview): every workspace as a tile in the grid's shape with
+  its windows as pictures, drawn over the work area and under the panel; click a tile to go there, a
+  window to go there and focus it, a click beside the tiles or Esc puts it away.
+  fl_shell version 5 (older bindings work unchanged): events workspaces(cols, rows, current) and
+  window_workspace(id, index); requests set_workspace, move_window, toggle_overview. The panel's
+  pager (src/flpanel) uses them.
+
+Screenshots (screencopy.c; protocol/fl-screencopy.xml, global fl_screencopy_manager 1)
+  capture_output, capture_region, capture_window and list_windows give a client the desktop as flcomp
+  draws it (no pointer, Alt-Tab row or indicator, and without the asking process's own windows, found
+  by pid), or one window alone from its own pixels, into a wl_shm buffer (frame: buffer, copy, ready or
+  failed). Everything fails while the screen is locked. Snappel (src/snappel) is the client.
+
+Lock screen (lock.c; fl_shell 4 lock/unlock, Super+L, the lid)
+  The lock is the compositor's, not the lock program's. While locked nothing but the lock
+  client's surface is drawn (0,0, meant to cover the output), picked or given the keyboard;
+  there is no panel, no window, no notification, no menu, no Alt-Tab, no Print and no
+  Ctrl-Alt-Backspace, and key bindings do nothing except Ctrl-Alt-F1..F12 (virtual
+  terminals) and the media keys (volume, brightness). The cursor is still drawn.
+  fl_shell lock(surface) locks (it works whether Super+L did it first or the client starts on
+  its own, as from the panel's Lock button) and only that client's unlock ends it. A second
+  lock request from another client while one holds it is the "locked" protocol error.
+  Every version-4 binding gets lock_state(1) and lock_state(0).
+  If the lock client dies the screen stays locked and shows a solid colour. flcomp starts
+  the lock program again after 300 ms (FLCOMP_LOCK=CMD, default fllock; up to three quick
+  deaths in a row, 5 s or less each); if nothing shows the lock within about two seconds
+  a hint appears (text from the built-in font of lockfont.h, which tools/genlockfont.c
+  makes from IBM Plex Sans, because flcomp has no fonts and must not depend on the
+  program that failed): "Screen locked. The lock program is not running. Press Enter to
+  start it again." Enter starts it again; Ctrl-Alt-F2 opens a console.
+  Super+L only locks where there is a lock program (/usr/bin/fllock, or FLCOMP_LOCK).
+  The lid switch (libinput) locks the same way, unless lock_on_lid=0 in desktop.conf.
+  There is no suspend path in the system yet (flpower knows off and restart); whatever
+  later suspends the machine should run fllock first, or just let the lid do it.
+
+Power saving (power.c, media.c, render.c; desktop.conf power_saver=1)
+  The panel's battery flyout writes the setting. flcomp then draws at most 30 frames a
+  second (repaints are spaced 33 ms apart) and sets the backlight to 70 % of what it was
+  (desktop.conf brightness= is not touched, so a restart dims from the real value again);
+  turning it off puts the old value back, unless the brightness was changed by hand
+  meanwhile. The CPU governor is flpower's part (flpanel).
+
+Performance mode (perf.c; desktop.conf performance=auto|on|off)
+  auto (default): on while the window on top is fullscreen; on: always (the panel's battery
+  flyout has the switch); off: never. While it is on there is no frame cap (it overrides
+  power saving's 30 frames a second), and when the fullscreen window is opaque, covers the
+  whole output and nothing is drawn over it (no menu, flyout, popup, notification card,
+  overview, lock screen), only that window is drawn: no wallpaper fill, no windows below it,
+  no panel. The Alt-Tab row, the volume indicator and the pointer still appear over it, and
+  a notification or a popup brings the normal drawing back for as long as it is there. The
+  log (flcomp.log) says when it switches. This is a saving of work on the CPU path, not a
+  KMS scanout plane: a game's dmabuf is still read into the shadow buffer (see
+  docs/E2-GAMING.md for what real direct scanout would take).
+
+X11 programs (xwm.c, xwsel.c, xwdeco.c; recipes xwayland and the X libraries)
+  flcomp is also the window manager of Xwayland, so Steam and old X11 programs run. flcomp
+  listens on /tmp/.X11-unix/X<N> (first free N, mode 0700: only this user, there is no X
+  authority file) from the start and exports DISPLAY=:N to every program of the session.
+  Xwayland is NOT running until the first X client connects: the listening socket is handed to
+  it (-listenfd), it runs rootless (-rootless), connects to flcomp over a socketpair as an
+  ordinary Wayland client (the only client that may bind xwayland_shell_v1, which is hidden from
+  everyone else), and gets flcomp as its window manager over a second socketpair (-wm). Three
+  seconds after the last X window is gone (and XRes says no X client without a window is left)
+  flcomp ends it; the next X client starts it again. Idle desktop: no Xwayland, no X memory.
+  FLCOMP_NO_XWAYLAND=1 switches it all off; FLCOMP_XWAYLAND=/path names another binary (and
+  switches X on in headless runs, which have none otherwise); FLCOMP_XDEBUG=1 logs what the
+  window manager sees; Xwayland's own messages (and xkbcomp's) go to $XDG_RUNTIME_DIR/xwayland.log.
+  Windows: X windows are matched to their wl_surface by WL_SURFACE_SERIAL and
+  xwayland_surface_v1.set_serial. A managed X window is an ordinary struct window (xwm.c makes it
+  when its surface has a buffer), so workspaces, Alt-Tab, the overview, snap and maximize,
+  Super+arrows, the panel's list (app id = WM_CLASS class, lower case; title = _NET_WM_NAME or
+  WM_NAME, live), General Manager and performance mode treat it like any other. Override-redirect
+  windows and menus, tooltips, dock and notification types are "unmanaged": drawn above the
+  managed windows where the client put them, no frame, no panel entry, no focus. Transient
+  windows (WM_TRANSIENT_FOR) are centred over their parent, not in the panel. Position and
+  stacking are kept in step with the X server before every repaint (the server picks the window
+  under the pointer by its own stack and computes root coordinates from its own geometry);
+  windows on another workspace or minimized are kept at the bottom of the X stack.
+  EWMH/ICCCM: _NET_WM_STATE (fullscreen, maximized, hidden, focused, skip taskbar) both ways,
+  _NET_ACTIVE_WINDOW, _NET_CLOSE_WINDOW, WM_DELETE_WINDOW (else the client is killed),
+  WM_TAKE_FOCUS and the input hint, _NET_WM_MOVERESIZE (a client's own title bar can move and
+  resize the window), WM_NORMAL_HINTS (minimum, maximum, resize increments), _NET_FRAME_EXTENTS,
+  _NET_WM_WINDOW_TYPE, _MOTIF_WM_HINTS (no decoration: Steam draws its own), WM_STATE,
+  _NET_CLIENT_LIST, _NET_CURRENT_DESKTOP, _NET_WM_DESKTOP. A window larger than the screen is
+  asked to fit.
+  Frames: an X window that has no title bar of its own gets one from flcomp (xwdeco.c): title in
+  the built-in Plex font, minimize, maximize, close, a 3 px border and 4 px of grip outside it
+  for resizing, a double click on the title maximizes. Fullscreen and maximized windows lose the
+  sides; undecorated and menu windows get none. Plain palette colours, accent line when focused.
+  Clipboard (xwsel.c): CLIPBOARD is bridged both ways (text as UTF8_STRING/STRING/TEXT <->
+  text/plain, any target named like a mime type, INCR for large data, 64 MB at most). PRIMARY
+  (select, middle click) stays among the X clients, there is no Wayland primary selection to
+  connect it to. No drag and drop between X and Wayland (flcomp has none).
+  Not done: X cursor images (flcomp draws its own arrow for every client), RandR resolution
+  emulation for games that switch modes (needs wp_viewporter), glamor/DRI3 acceleration inside
+  Xwayland (needs zwp_linux_dmabuf_v1 version 4 with feedback; until then Xwayland draws in
+  software and says "falling back to sw" in xwayland.log; see docs/E2-GAMING.md), a system tray,
+  XSettings (DPI, themes), several X screens.
+
+Testing
+  make check-x         headless, needs Xwayland (run it in the build chroot): lazy start and stop, frames,
+                       titles, focus, move, resize, maximize, fullscreen, menus, dialogs, workspaces,
+                       Alt-Tab, the overview and the clipboard both ways with tests/xclient (xcb); X_OUT=DIR
+                       keeps PPM screenshots (tests/ppm2png.py makes PNG of them)
+  make check-perf      headless: performance mode (a fullscreen shmclient -F; part of make check)
+  make check-lock      headless: the lock screen (Super+L, input, crash and restart, the hint,
+                       unlock by the owner only, the lid), the notification surface and power saving
+  make check           headless: FLCOMP_HEADLESS=WxH runs with no display and
+                       no input devices, tests/shmclient is the test client,
+                       FLCOMP_TEST_FIFO feeds fake pointer and key events.
+  FLCOMP_SCREENSHOT=F  write a PPM of the screen to F on SIGUSR1 (also real).
+  FLCOMP_PANEL=CMD     panel program, empty for none.
+  FLCOMP_SETUP=CMD     program for --firstboot (default flsetup; the login screen
+                       runs flgreet-ui this way).
+  FLCOMP_SESSION=CMD   session services, default /usr/lib/flcomp/session, empty
+                       for none.
+  FLCOMP_TEST_FIFO lines: move X Y, button CODE 0|1, key CODE 0|1, axis STEPS, lid 0|1.
+  FLCOMP_LOCK=CMD     lock program for Super+L, the lid and restarts (default fllock).
+  tests/apps.py        headless tests of flfiles, fledit, flgreet-ui and flpackages (run it
+                       in the build chroot; writes PNG screenshots).
+  FLCOMP_KEYBOARD_CONF=FILE  instead of /etc/keyboard.conf.
+  FLCOMP_BACKLIGHT=DIR       backlight directory for brightness= at start (tests).
+  Headless has a made-up list of modes, so set_output can be tried without a display.
+  SIGUSR2             exit with status 3 (flcrash-test uses it to test the crash screen).
+
+Session
+  After the panel, flcomp starts /usr/lib/flcomp/session as the user. It runs
+  dbus-daemon --session at $XDG_RUNTIME_DIR/bus (flcomp puts that address in
+  DBUS_SESSION_BUS_ADDRESS for every client), pipewire, wireplumber and
+  pipewire-pulse, each only if installed, and logs to
+  $XDG_RUNTIME_DIR/session.log. XDG_RUNTIME_DIR is /run/user/UID, made by the
+  login screen; /etc/profile.d/desktop.sh exports it. flcomp stops the script
+  with SIGTERM when it exits and the script stops its daemons.
+  If flatpak is installed it also adds the Flathub remote for the person once
+  (flatpak --user, retried quietly while offline; stamp file
+  ~/.local/share/freelfs/flathub-added).
+  It also starts flupdate-notify (the update notifier), flsnap-notice (says so when the system runs
+  from an earlier snapshot; exits at once otherwise) and the XDG autostart entries: every .desktop
+  file in ~/.config/autostart and /etc/xdg/autostart (XDG_CONFIG_DIRS), the user's file of the same
+  name winning; Hidden=true, X-GNOME-Autostart-enabled=false, X-FreeLFS-Override=true (General
+  Manager's Startup tab), OnlyShowIn/NotShowIn and a missing TryExec switch an entry off.
+
+Source map
+  main.c       startup, wl_output, children, signals
+  drm.c        DRM/KMS, libseat, libinput, headless backend
+  render.c     damage lists, compositing, frame callbacks, screenshot
+  surface.c    wl_surface, regions, subsurfaces, hit testing
+  xdg.c        xdg_shell and window management
+  seat.c       pointer, keyboard, key bindings, layouts, repeat, Num Lock, clipboard, cursor
+  config.c     desktop.conf
+  output.c     modes, scale, the confirm timer
+  lock.c       the lock screen (state, restart of the lock program, the hint)
+  lockfont.h   the hint's glyphs (made by tools/genlockfont.c, checked in)
+  power.c      power saving: frame cap and backlight
+  perf.c       performance mode: no frame cap, fullscreen window drawn alone
+  xwm.c        Xwayland: the X socket, starting and ending it, xwayland_shell_v1, the X window manager
+  xwsel.c      the clipboard between X and Wayland
+  xwdeco.c     the frame around X windows (title bar, buttons, grip): drawing and hit testing
+  xwm.h, xwm-int.h   what the rest of flcomp calls, and what the three share
+  media.c      volume, brightness and microphone keys
+  osd.c        the on-screen indicator
+  theme.c      accent= and wallpaper= from desktop.conf (own inotify watch): accent colour of the
+               indicator, Alt-Tab frame and lock caret; wallpaper=accent|NAME|user:NAME, swapped live
+  sound.c      system sounds: runs flsound (login, tick, screenshot, error); sounds=0 silences it
+  flshell.c    fl_shell

@@ -1,0 +1,6 @@
+# Boot 3 of build/m10-snapshots.sh: the default entry again, after the rollback.
+echo "== cmdline"; cat /proc/cmdline | tr ' ' '\n' | grep -E "root|subvol"; grep -E " / | /usr | /.snapshots " /proc/mounts
+echo "== the state is the old one"; cat /root/m10-marker; ls /root; touch /root/can-write && echo writable
+echo "== flsnap"; flsnap status; flsnap list
+btrfs subvolume get-default /; btrfs subvolume list / | cat
+echo "== the state we left is a snapshot too"; for n in $(flsnap list --machine | cut -f1); do flsnap show $n | head -3; done

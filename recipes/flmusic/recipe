@@ -1,0 +1,23 @@
+pkgname=flmusic
+version=0.1
+release=2
+summary="FreeLFS music player: tag library, queue, GStreamer playback, MPRIS"
+license=(MIT)
+arch=(x86_64 aarch64)
+groups=(desktop)
+depends=(glibc glib gstreamer gst-plugins-base gst-plugins-good gst-libav dbus flui wayland)
+makedepends=(flui gstreamer gst-plugins-base dbus pkgconf)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flmusic" "$srcdir/flmusic"
+	cd "$srcdir/flmusic"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flmusic"
+	make DESTDIR="$pkgdir" install
+}

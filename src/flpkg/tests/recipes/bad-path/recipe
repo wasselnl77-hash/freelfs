@@ -1,0 +1,9 @@
+# Test recipe: installs into /usr/local, which packages must not use.
+pkgname=bad-path
+version=1
+release=1
+summary="flpkg test: forbidden path"
+arch=(any)
+source=(hello.c)
+sha256=(08be7667b14aebe8b114151754dd1d7fb9e18df9832b6476752163ebbeadb292)
+package() { install -Dm644 hello.c "$pkgdir/usr/local/share/hello.c"; }
