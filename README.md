@@ -1,5 +1,22 @@
 # FreeLFS
 
+> **Pre-alpha. Do not use this for anything real.**
+>
+> FreeLFS is an experiment in progress. It has been tested almost only in
+> virtual machines (QEMU) and on one real laptop, where it showed serious bugs.
+> - **Things will break.** Expect crashes, missing features and incompatible
+>   changes without notice.
+> - **Nothing is stable yet:** not the package format, not the repo, not the
+>   config files.
+> - **No security support:** there are no security updates yet and no CVE
+>   handling. The browser is not sandboxed yet.
+> - **The installer erases the disk you pick.** Only try it on a spare machine
+>   or in a VM.
+> - Don't rely on it to keep your data safe.
+>
+> Try the live ISO in a VM or on a spare machine if you are curious. Bug
+> reports are welcome.
+
 An independent Linux distribution built from scratch, with no parent distro.
 It has its own package manager, bootloader, shell, Wayland compositor and
 desktop, all in C: a clean traditional desktop in the spirit of Linux Mint's
