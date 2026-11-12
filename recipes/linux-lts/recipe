@@ -1,0 +1,74 @@
+# The 6.18 LTS kernel as a fallback next to the newest stable one (package linux): the same config
+# (config/kernel/freelfs.config) with the local version -freelfs-lts, so its files are
+# /boot/vmlinuz-6.18.N-freelfs-lts and /usr/lib/modules/6.18.N-freelfs-lts and nothing clashes with
+# the linux package. flboot lists it after the others as "FreeLFS (LTS kernel ...)". Not in the
+# live ISO (the El Torito boot image must stay under 32 MB, and 53-iso.sh wants one kernel) and
+# not in the default image: flpkg install linux-lts.
+pkgname=linux-lts
+version=6.18.63
+release=2
+summary="The Linux 6.18 LTS kernel and its modules (fallback next to the newest kernel)"
+url=https://www.kernel.org/
+license=(GPL-2.0-only)
+arch=(x86_64)
+groups=(lts)
+depends=(kmod)
+options=(!strip)
+worksrc=linux-$version
+source=(https://www.kernel.org/pub/linux/kernel/v6.x/linux-$version.tar.xz)
+sha256=(81764a545072d160748beff4d9de2e7d95aa9f16e8261110288f067a2cc61d71)
+
+# Reproducible builds: the kernel otherwise records when, by whom and on
+# which host it was built.
+export KBUILD_BUILD_TIMESTAMP="@$SOURCE_DATE_EPOCH" KBUILD_BUILD_USER=freelfs \
+	KBUILD_BUILD_HOST=freelfs KBUILD_BUILD_VERSION=1
+
+karch() {
+	case $CARCH in
+		x86_64) echo x86_64 ;;
+		aarch64) echo arm64 ;;
+	esac
+}
+
+build() {
+	local frag=$srcdir/freelfs-lts.config line sym bad=0
+	sed 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-freelfs-lts"/' \
+		"$startdir/../../config/kernel/freelfs.config" > "$frag"
+	export ARCH=$(karch)
+	make mrproper
+	make defconfig
+	scripts/kconfig/merge_config.sh -m .config "$frag"
+	make olddefconfig
+	# olddefconfig silently drops a setting whose dependencies are off
+	while read -r line; do
+		case $line in
+			CONFIG_*=*) grep -qx -- "$line" .config || { echo "not applied: $line"; bad=1; } ;;
+			"# CONFIG_"*" is not set")
+				sym=${line#\# }
+				sym=${sym%% *}
+				! grep -q "^$sym=" .config || { echo "not applied: $line"; bad=1; }
+				;;
+		esac
+	done < "$frag"
+	[ "$bad" = 0 ]
+	make
+}
+
+package() {
+	export ARCH=$(karch)
+	local kver image
+	kver=$(make -s kernelrelease)
+	case $ARCH in
+		x86_64) image=arch/x86/boot/bzImage ;;
+		arm64) image=arch/arm64/boot/Image ;;
+	esac
+	install -Dm644 "$image" "$pkgdir/boot/vmlinuz-$kver"
+	install -Dm644 System.map "$pkgdir/boot/System.map-$kver"
+	install -Dm644 .config "$pkgdir/boot/config-$kver"
+	make INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 modules_install
+	# links into the build tree, and depmod's output (the depmod trigger
+	# writes it on the installed system)
+	cd "$pkgdir/usr/lib/modules/$kver"
+	rm -f build source modules.{alias,alias.bin,builtin.alias.bin,builtin.bin,dep,dep.bin} \
+		modules.{devname,softdep,symbols,symbols.bin,weakdep}
+}

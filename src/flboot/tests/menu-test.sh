@@ -68,6 +68,19 @@ check "... and its title is #8 with date and reason" 'grep -q "^title: #8  2026-
 out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 e)
 check "a normal entry keeps rootflags=subvol=@" 'grep -q "rootflags=subvol=@ quiet" <<< "$out"'
 
+# the LTS kernel (package linux-lts: vmlinuz-VERSION-freelfs-lts) is a secondary entry, whatever its
+# version number; the default and the snapshots use the newest of the others
+esp2=$work/esp2
+mkdir -p "$esp2/flboot"
+: > "$esp2/vmlinuz-7.3.4-freelfs"; : > "$esp2/vmlinuz-6.18.63-freelfs-lts"; : > "$esp2/vmlinuz-7.2.15-freelfs"
+cp "$esp/flboot/flboot.conf" "$esp/flboot/snapshots" "$esp2/flboot/"
+out=$(FLBOOT_TEXT=1 hm "$esp2" 800x600 e)
+check "LTS: the default is the newest normal kernel" 'grep -q "^title: FreeLFS (kernel 7.3.4-freelfs)$" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp2" 800x600 d d e)
+check "LTS: the older normal kernel comes second, the LTS kernel third" 'grep -q "^title: FreeLFS (LTS kernel 6.18.63-freelfs-lts)$" <<< "$out" && grep -q "chosen: 2" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp2" 800x600 d e)
+check "LTS: second entry is the older normal kernel" 'grep -q "^title: FreeLFS (older kernel 7.2.15-freelfs)$" <<< "$out"'
+
 if [ -n "$shots" ]; then
 	mkdir -p "$shots"
 	P=$shots/snap-boot

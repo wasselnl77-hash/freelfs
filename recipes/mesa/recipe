@@ -1,39 +1,42 @@
-# OpenGL, OpenGL ES, EGL, GBM and Vulkan. Wayland and X11 (release 2: the X11 platform,
+# OpenGL, OpenGL ES, EGL, GBM, Vulkan and VA-API. Wayland and X11 (release 2: the X11 platform,
 # DRI3/Present and GLX, because Xwayland's GLX links libGL and X11 programs on the host
-# need it; the compositor itself is still Wayland only). Drivers: radeonsi and radv (AMD), llvmpipe and lavapipe
-# (software, also used in QEMU), softpipe, virgl (QEMU with 3D), zink (GL on
-# Vulkan). Intel's iris and anv need libclc and SPIRV-LLVM-Translator:
-# later, when an Intel machine needs them.
-#
-# E2 (gaming) check: radv (vulkan-drivers=amd) and lavapipe (swrast) are in; anv
-# (Intel Vulkan) and iris are not, and are NOT switched on here because the build
-# would fail without these packages, which do not exist yet:
-#   1. llvm: add -D LLVM_ENABLE_PROJECTS=clang and LLVM_TARGETS_TO_BUILD with SPIRV
-#      is not needed, but clang (with libLLVM and libclang-cpp) is
-#   2. spirv-llvm-translator (same major version as llvm, installs LLVMSPIRVLib.pc)
-#   3. libclc (built against that clang and the translator)
-#   then here: gallium-drivers += iris, vulkan-drivers += intel, and
-#   -D mesa-clc=system -D intel-clc=system (makedepends: the three above).
-# Games from Flathub are not affected: Flatpak runs them on the Mesa of its own
-# runtime (org.freedesktop.Platform.GL.default, which has anv and iris); only
-# Vulkan programs on the host itself need the host's Mesa.
+# need it; the compositor itself is still Wayland only).
+# Release 3 (hardware support round, nothing of it built or run yet): drivers for Intel and AMD.
+#   OpenGL:  radeonsi (AMD GCN and RDNA), iris (Intel Broadwell/Gen8 and newer, Xe), crocus
+#            (Intel Gen4 to Haswell), llvmpipe and softpipe (software, QEMU), virgl (QEMU 3D),
+#            zink (GL on Vulkan)
+#   Vulkan:  radv (AMD), anv (Intel Gen9 and newer; Gen8 runs best on iris), hasvk (Intel Ivy
+#            Bridge to Broadwell), lavapipe (software)
+#   VA-API:  radeonsi_drv_video.so (gallium-va, all codecs Mesa has: H.264/HEVC/AV1/VP9 decode,
+#            H.264/HEVC/AV1 encode; the patent-encumbered ones too, video-codecs=all) for AMD;
+#            Intel's iHD driver is the separate package intel-media-driver
+# The Intel drivers compile their built-in OpenCL C kernels at build time (mesa_clc, built in
+# this tree): that needs clang (package llvm, release 2), spirv-llvm-translator and libclc, which
+# is why those three are makedepends. If this fails to build on the first attempt, the quick way
+# back to an AMD-only Mesa is: gallium-drivers=radeonsi,llvmpipe,softpipe,virgl,zink,
+# vulkan-drivers=amd,swrast and drop the three makedepends (that was release 2).
+# Games from Flathub run on the Mesa of their own Flatpak runtime; only Vulkan programs on the
+# host itself use this Mesa.
 pkgname=mesa
 version=26.1.7
-release=2
+release=3
 summary="OpenGL, EGL, GBM and Vulkan drivers"
 url=https://mesa3d.org/
 license=(MIT)
 arch=(x86_64)
 groups=(desktop)
-depends=(glibc gcc libdrm wayland llvm expat zlib zstd libelf vulkan-loader spirv-tools libxcb libX11 libXext libXfixes libXdamage libXxf86vm libXrandr libxshmfence)
-makedepends=(meson ninja python mako pyyaml wayland-protocols glslang vulkan-headers bison flex xorgproto)
+depends=(glibc gcc libdrm libva wayland llvm expat zlib zstd libelf vulkan-loader spirv-tools libxcb libX11 libXext libXfixes libXdamage libXxf86vm libXrandr libxshmfence)
+makedepends=(meson ninja python mako pyyaml wayland-protocols glslang vulkan-headers bison flex xorgproto libva spirv-llvm-translator libclc pkgconf)
 source=(https://mesa.freedesktop.org/archive/mesa-$version.tar.xz)
 sha256=(25e0a669e6638c3563e7be32a0a09f1888317e6eed0d047dc41d49dc8de26c7d)
 build_style=meson
 configure_args=(
 	-D platforms=wayland,x11
-	-D gallium-drivers=radeonsi,llvmpipe,softpipe,virgl,zink
-	-D vulkan-drivers=amd,swrast
+	-D gallium-drivers=radeonsi,iris,crocus,llvmpipe,softpipe,virgl,zink
+	-D vulkan-drivers=amd,intel,intel_hasvk,swrast
+	-D intel-rt=disabled
+	-D gallium-va=enabled
+	-D video-codecs=all
 	-D vulkan-layers=
 	-D glx=dri
 	-D egl=enabled

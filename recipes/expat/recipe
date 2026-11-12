@@ -1,5 +1,5 @@
 pkgname=expat
-version=2.8.3
+version=2.10.0
 release=1
 summary="XML parser library"
 url=https://libexpat.github.io/
@@ -7,8 +7,8 @@ license=(MIT)
 arch=(x86_64)
 groups=(base)
 depends=(glibc)
-source=(https://github.com/libexpat/libexpat/releases/download/R_2_8_3/expat-$version.tar.xz)
-sha256=(f6256df90c906773d344da084402b7d3e4f22ed41b1a59c989098a83d3ea0c85)
+source=(https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-$version.tar.xz)
+sha256=(c624ba2998fc65df1163a49641ff3f9ab73138b11641d92c86bee0fb01b1bc7f)
 build_style=autotools
 configure_args=(--disable-static --docdir=/usr/share/doc/expat-$version)
 

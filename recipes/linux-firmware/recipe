@@ -1,10 +1,11 @@
 # Firmware the kernel's drivers load from /lib/firmware. Not all of
 # linux-firmware (over 1 GB): GPUs (AMD, Intel), Wi-Fi and Bluetooth
-# (Realtek, Intel), Realtek Ethernet. More families get added as hardware
-# needs them.
+# (Realtek, Intel, MediaTek), Realtek Ethernet, AMD microcode, Cirrus amplifiers.
+# Intel's audio (SOF) firmware is the package sof-firmware, Intel microcode intel-ucode.
+# Release 2: Intel and MediaTek added, iwlwifi pruned to the newest files.
 pkgname=linux-firmware
 version=20261019
-release=1
+release=2
 summary="Firmware for GPUs, Wi-Fi, Bluetooth and Ethernet chips"
 url=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
 license=(custom)
@@ -15,15 +16,40 @@ source=(https://cdn.kernel.org/pub/linux/kernel/firmware/linux-firmware-$version
 sha256=(a10d1ab5baf2c74ba92e8c7cf313e691696c26bddfa6df00db795e48d70cd4ca)
 
 package() {
-	local fw=$pkgdir/usr/lib/firmware d
+	local fw=$pkgdir/usr/lib/firmware d k
 	install -d "$fw"
-	for d in amdgpu radeon i915 xe rtw88 rtw89 rtl_nic rtl_bt intel; do
+	# GPUs (AMD amdgpu and radeon; Intel i915 GuC/HuC/DMC and xe), Wi-Fi and Bluetooth (Realtek,
+	# Intel, MediaTek), Realtek Ethernet, Cirrus Logic amplifier firmware (laptop speakers on
+	# HDA and SOF), AMD microcode (amd-ucode)
+	for d in amdgpu radeon i915 xe rtw88 rtw89 rtl_nic rtl_bt intel mediatek cirrus amd-ucode; do
 		[ -d "$d" ] && cp -a "$d" "$fw/"
 	done
 	# Intel Wi-Fi is in intel/iwlwifi now; older releases had it at the top
 	for d in iwlwifi-*; do
 		[ -e "$d" ] && cp -a "$d" "$fw/"
 	done
+
+	# --- pruning (the tree would be about 700 MB; this keeps it near 330 MB) ---
+	# intel/: not used here are the camera (ipu), vsc, Ethernet server (ice), NPU (vpu), QAT and
+	# the AVS/catpt/SST audio DSPs (the kernel config has no driver for them). Kept: ibt-* Bluetooth,
+	# ish (sensor hub), iwlwifi.
+	(cd "$fw/intel" && rm -rf ipu vsc ice vpu qat avs catpt dsp_fw_* fw_sst*)
+	# iwlwifi: the driver asks for its highest API number first and walks down, so only the
+	# newest files of each chip family matter; the newest three per family and per naming style
+	# (-NN for iwlmvm, -cNNN for iwlmld) stay. The newest file of each family is the highest API
+	# of both linux 7.x and linux-lts 6.18 (checked), the .pnvm files all stay.
+	(cd "$fw/intel/iwlwifi" && ls ./*.ucode | sed 's|^\./||' |
+		awk '{f=$0; g=f; sub(/-c?[0-9]+\.ucode$/,"",g); t=(f ~ /-c[0-9]+\.ucode$/)?"c":"n"; print g "|" t "|" f}' |
+		sort -t'|' -k1,1 -k2,2 -k3,3Vr |
+		awk -F'|' '{k=$1 "|" $2} cnt[k]++>=3 {print $3}' | xargs -r rm -f)
+	# mediatek/: keep Wi-Fi and Bluetooth of the MT79xx PCIe/USB chips (mt7921, mt7922, mt7925,
+	# mt7927) and the old USB sticks; drop router SoCs (mt798x, mt7996) and Chromebook SoCs (mt8*)
+	(cd "$fw/mediatek" && rm -rf mt8* mt7996 mt798* mt7988* 2> /dev/null; true)
+	# AMD microcode: signature files are not needed
+	rm -f "$fw"/amd-ucode/*.asc
+
+	# Intel microcode (intel-ucode) is not in linux-firmware any more: see the intel-ucode recipe.
+
 	install -Dm644 WHENCE "$pkgdir/usr/share/licenses/linux-firmware/WHENCE"
 	cp -a LICENCE.* LICENSE.* "$pkgdir/usr/share/licenses/linux-firmware/" 2> /dev/null || true
 }

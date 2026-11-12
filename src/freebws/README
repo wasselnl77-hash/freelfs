@@ -117,8 +117,8 @@ Features
 Not there yet: find in page, history, zoom, private window.
 
 Web process sandbox (docs/SECURITY.md)
-  wpewebkit is built with ENABLE_BUBBLEWRAP_SANDBOX (recipe release 2): WebKit starts every web process
-  in bubblewrap: own user, pid, ipc and uts namespaces, a seccomp filter, private /tmp and runtime
+  wpewebkit is built with ENABLE_BUBBLEWRAP_SANDBOX (since the 2.52.5-2 build; now 2.54.2): WebKit starts every web process
+  in bubblewrap: own user, mount, pid and uts namespaces (not ipc: WebKit shares it for WPE), a seccomp filter, private /tmp and runtime
   dir, / not visible (only /usr, /etc, /lib*, /dev/dri and /dev/udmabuf for the GPU, fonts,
   GStreamer data, and the paths added with webkit_web_context_add_path_to_sandbox: here
   /usr/share/freebws and $FREEBWS_SANDBOX_RO); the session bus only through xdg-dbus-proxy. The
@@ -134,3 +134,7 @@ Web process sandbox (docs/SECURITY.md)
   Config key "sandbox" or FREEBWS_SANDBOX=auto|on|off. `freebws --sandbox-check` prints the verdict
   (exit 0: usable). A page that crashes the web process at once on a machine where the sandbox is on
   is a sandbox problem to look for in the log first (FREEBWS_SANDBOX=off to compare).
+  The probe binds what WebKit binds (/usr/lib, /usr/bin, /lib, /lib64, /bin one by one, never /usr as a
+  whole) plus the directory of its own real executable: on FreeLFS /usr is the homes directory and
+  /usr/bin is a link to ../sysflfs/bin, so /proc/self/exe is /sysflfs/bin/freebws (release 10 did not bind
+  that and reported "bwrap: execvp /sysflfs/bin/freebws: No such file or directory").

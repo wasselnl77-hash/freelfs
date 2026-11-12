@@ -1,0 +1,29 @@
+# OpenCL C library in SPIR-V form (libclc.spv for spirv-mesa3d- and spirv64-mesa3d-): built
+# only for Mesa's shader compiler (mesa_clc), which turns the Intel drivers' built-in OpenCL C
+# kernels into NIR when Mesa is built. Nothing uses it at run time. Taken from the LLVM
+# source tree, built with the clang of recipe llvm and llvm-spirv.
+pkgname=libclc
+version=22.1.8
+release=1
+worksrc=llvm-project-$version.src
+summary="OpenCL C library for Mesa's build-time shader compiler"
+url=https://libclc.llvm.org/
+license=(Apache-2.0-WITH-LLVM-exception)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(cmake ninja python llvm spirv-llvm-translator)
+source=(https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz)
+sha256=(922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a9965888)
+
+build() {
+	cmake -S libclc -B build -G Ninja -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_BUILD_TYPE=Release \
+		-D LIBCLC_TARGETS_TO_BUILD="spirv-mesa3d-;spirv64-mesa3d-"
+	ninja -C build ${NINJAJOBS:+-j$NINJAJOBS}
+}
+
+check() { :; }
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+}

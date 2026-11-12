@@ -14,7 +14,7 @@ ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269  bzip2-1.0.8.ta
 7c8b7f9fc8609141fdea9cece85249d308624391ff61dedaf528fcb337727dfd  diffutils-3.12.tar.xz  https://ftpmirror.gnu.org/diffutils/diffutils-3.12.tar.xz
 2cec05f39c20ee621f14926195664e66e6017190ac8e4bbdb16d86082e43c5da  e2fsprogs-1.47.4.tar.gz  https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.4/e2fsprogs-1.47.4.tar.gz
 37629fdf7f1f3dc2818e138fca2b8094177d6c2d0f701d3bb650a561218dc026  elfutils-0.195.tar.bz2  https://sourceware.org/ftp/elfutils/0.195/elfutils-0.195.tar.bz2
-f6256df90c906773d344da084402b7d3e4f22ed41b1a59c989098a83d3ea0c85  expat-2.8.3.tar.xz  https://github.com/libexpat/libexpat/releases/download/R_2_8_3/expat-2.8.3.tar.xz
+c624ba2998fc65df1163a49641ff3f9ab73138b11641d92c86bee0fb01b1bc7f  expat-2.10.0.tar.xz  https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz
 49a7da83b0bdd9f46d04a04deec19c7767bb9a323e40c4781f89caf760b92c34  expect5.45.4.tar.gz  https://prdownloads.sourceforge.net/expect/expect5.45.4.tar.gz
 ed14656883b23a364b4057c05595d93252da9bc473d30106519519d0da141283  file-5.48.tar.gz  https://astron.com/pub/file/file-5.48.tar.gz
 bfd19cb06cc71f3352d567e90284d8cdac02ac89774bbeadf0b533b0c11432fd  findutils-4.11.0.tar.xz  https://ftpmirror.gnu.org/findutils/findutils-4.11.0.tar.xz
@@ -29,7 +29,7 @@ a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898  gmp-6.3.0.tar.
 fd87e0aba7e43ae054837afd6cd4db03a3f2693deb3619085e6ed9d8d9604ad8  gperf-3.3.tar.gz  https://ftpmirror.gnu.org/gperf/gperf-3.3.tar.gz
 2649b27c0e90e632eadcd757be06c6e9a4f48d941de51e7c0f83ff76408a07b9  grep-3.12.tar.xz  https://ftpmirror.gnu.org/grep/grep-3.12.tar.xz
 74e2819795b6aff431aeac983d63a9c8968eeaba2a2eba7df8ba4c7b41e7cfd8  groff-1.24.1.tar.gz  https://ftpmirror.gnu.org/groff/groff-1.24.1.tar.gz
-01a7b881bd220bfdf615f97b8718f80bdfd3f6add385b993dcf6efd14e8c0ac6  gzip-1.14.tar.xz  https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz
+9aa0cc780dec156b8282844833b342ab7cb08c25d2cd9a1869cdd0df31deff48  gzip-1.15.tar.xz  https://ftpmirror.gnu.org/gzip/gzip-1.15.tar.xz
 29270860664e324107537f32ea476a333ca52d71b59c74bc06ecc3b0fa9cf490  iana-etc-20260805.tar.gz  https://github.com/Mic92/iana-etc/releases/download/20260805/iana-etc-20260805.tar.gz
 57b3cf4f77555992881e5ba2a09a63b05aa2c56342a60ed4305b5f45938390b5  inetutils-2.8.tar.gz  https://ftpmirror.gnu.org/inetutils/inetutils-2.8.tar.gz
 fd9fa1b95809417157ca83dd72957e3261bdbce896353cb936f80af0b33a4b5c  iproute2-7.1.0.tar.xz  https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-7.1.0.tar.xz
@@ -42,7 +42,8 @@ fd9fa1b95809417157ca83dd72957e3261bdbce896353cb936f80af0b33a4b5c  iproute2-7.1.0
 1b1203ca152ccd63983c3f2112f7fe6fa5afd453218ede5153d1b31e11bb8405  libpipeline-1.5.8.tar.gz  https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.8.tar.gz
 2ef1067c16c97db930fd740cc9bc3d3ba9a583804ae5ac42cc3e8719e49e191e  libtool-2.6.2.tar.xz  https://ftpmirror.gnu.org/libtool/libtool-2.6.2.tar.xz
 71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071  libxcrypt-4.5.2.tar.xz  https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
-53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963  linux-6.18.59.tar.xz  https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.18.59.tar.xz
+b11b6df8295e8e991ff040b71aaa4994a8b55caa23b6b092907f195b5840fd1f  linux-7.3.4.tar.xz  https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.3.4.tar.xz
+81764a545072d160748beff4d9de2e7d95aa9f16e8261110288f067a2cc61d71  linux-6.18.63.tar.xz  https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.18.63.tar.xz
 537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b  lz4-1.10.0.tar.gz  https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz
 f25c6ab51548a73a75558742fb031e0625d6485fe5f9155949d6486a2408ab66  m4-1.4.21.tar.xz  https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz
 dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3  make-4.4.1.tar.gz  https://ftpmirror.gnu.org/make/make-4.4.1.tar.gz
@@ -55,10 +56,10 @@ c934fadc8b59748c68227a34f6581d2ddf8282b73cdcd52546c8cd88b74b24d1  man-pages-6.18
 b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01  mpfr-4.2.2.tar.xz  https://ftpmirror.gnu.org/mpfr/mpfr-4.2.2.tar.xz
 355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11  ncurses-6.6.tar.gz  https://invisible-mirror.net/archives/ncurses/ncurses-6.6.tar.gz
 974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17  ninja-1.13.2.tar.gz  https://github.com/ninja-build/ninja/archive/v1.13.2/ninja-1.13.2.tar.gz
-2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09  openssl-4.0.1.tar.gz  https://github.com/openssl/openssl/releases/download/openssl-4.0.1/openssl-4.0.1.tar.gz
+325b5c806167c13b40b1ffeadfe0248197c00eccc4cf123ec1e28d2d2fd216d9  openssl-4.0.3.tar.gz  https://github.com/openssl/openssl/releases/download/openssl-4.0.3/openssl-4.0.3.tar.gz
 94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79  packaging-26.3.tar.gz  https://files.pythonhosted.org/packages/source/p/packaging/packaging-26.3.tar.gz
-f87cee69eec2b4fcbf60a396b030ad6aa3415f192aa5f7ee84cad5e11f7f5ae3  patch-2.8.tar.xz  https://ftpmirror.gnu.org/patch/patch-2.8.tar.xz
-47fe8c99461250d42f89e6e8fdaeba9da057855d06eb7fc08d9ca03fd08d7bc7  pcre2-10.47.tar.bz2  https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2
+3240c7959c5347c8ed347e3c4201c0337bf4240d5cf09d68889e58eeaba30e17  patch-2.8.1.tar.xz  https://ftpmirror.gnu.org/patch/patch-2.8.1.tar.xz
+53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384  pcre2-10.49.tar.bz2  https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.bz2
 505cf43912e9480495c344c70260452e32aa2a73c546a026b3f100053b23ce91  perl-5.44.0.tar.xz  https://www.cpan.org/src/5.0/perl-5.44.0.tar.xz
 3acd3a8a3cce65a8d620321855d92fb602e026cbe8e13ee36bdec58483b59ace  pkgconf-3.0.5.tar.xz  https://distfiles.ariadne.space/pkgconf/pkgconf-3.0.5.tar.xz
 9d2021f47a4501c667862c9942a92d1953694b21d11bcd1702e83eb594e3d67d  procps-ng-4.0.7.tar.xz  https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.7.tar.xz
@@ -68,7 +69,7 @@ fe5383204467828cd495ee8d1d3c037a7eba1389c22bc6a041f627976f9061cc  readline-8.3.t
 b8e72182b2ec96a3574e2998c47b7aaa64cc20ce000d8e9ac313cc07cecf28c7  sed-4.10.tar.xz  https://ftpmirror.gnu.org/sed/sed-4.10.tar.xz
 f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73  setuptools-84.0.0.tar.gz  https://pypi.org/packages/source/s/setuptools/setuptools-84.0.0.tar.gz
 b89f432b75ae55a2d852b446d0365484795fdf533ab97d550e325fa15594a224  shadow-4.20.2.tar.xz  https://github.com/shadow-maint/shadow/releases/download/4.20.2/shadow-4.20.2.tar.xz
-0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c  sqlite-autoconf-3530400.tar.gz  https://sqlite.org/2026/sqlite-autoconf-3530400.tar.gz
+926ef8d3eab93fbf6e06011901273eec076b25594a4e1cdadd50c987f4f6d64e  sqlite-autoconf-3540100.tar.gz  https://sqlite.org/2026/sqlite-autoconf-3540100.tar.gz
 bc410ca64551a11fac6518b418fb6b8afbd888a70af2c5eb353334a706727bca  sysklogd-2.7.2.tar.gz  https://github.com/troglobit/sysklogd/releases/download/v2.7.2/sysklogd-2.7.2.tar.gz
 ed1059ff964f5df35b6056434cc17cc83f86dc913f10489948a0b19b6081c5ec  systemd-261.2.tar.gz  https://github.com/systemd/systemd/archive/v261.2/systemd-261.2.tar.gz
 c90874b8c054a35991fb8c4d30c443ed1e9b1815ff6165c7b483f558be4e4b53  sysvinit-3.14.tar.xz  https://github.com/slicer69/sysvinit/releases/download/3.14/sysvinit-3.14.tar.xz
@@ -120,7 +121,7 @@ f740db7f488255944ffd4428416ee3390a96742856916433df468c281436480e  alsa-lib-1.2.1
 cf3d1c07e089a83c4ece2c20f05dd6a8aab7fcd108768c38811386880575492b  alsa-ucm-conf-1.2.16.1.tar.bz2  https://www.alsa-project.org/files/pub/lib/alsa-ucm-conf-1.2.16.1.tar.bz2
 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae  lua-5.4.8.tar.gz  https://www.lua.org/ftp/lua-5.4.8.tar.gz
 44324a802822f0a35d095aaad2f5f58fa7b1821ae87ae44dbcfc8a23fcd2e67e  lua-5.4.8-shared_library-1.patch  https://www.linuxfromscratch.org/patches/blfs/13.1/lua-5.4.8-shared_library-1.patch
-ab24d24e698dfa1e408b7bcdb508f4aafc906185a8b8ce72fdf79bbbdc9b383b  glib-2.88.3.tar.xz  https://download.gnome.org/sources/glib/2.88/glib-2.88.3.tar.xz
+93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396  glib-2.90.1.tar.xz  https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz
 efbaedf80450e5b08bb3196a4ca7ea17850d4a71ec1a8ae321e8937a7c95779e  pipewire-1.6.8.tar.bz2  https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.8/pipewire-1.6.8.tar.bz2
 fb192f5d884155aedd6f01438e94cc12b263f482f0f39e5706c1e2cff9ad0c6d  wireplumber-0.5.15.tar.bz2  https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.15/wireplumber-0.5.15.tar.bz2
 d89a5e45c7180170e19be828f9e944a768c593758094fc57a358d0e7c4cb1a49  iwd-3.12.tar.xz  https://www.kernel.org/pub/linux/network/wireless/iwd-3.12.tar.xz
@@ -144,7 +145,7 @@ a977b03dc3686d9fdca600458b1578f9cac2b875609bd5ec21f5ada55f20ec50  libisoburn-1.5
 7ce33c2492221a0436f96a8500215e9f3e3dcb5fd26a757cd415e7a843babd5e  libgcrypt-1.12.2.tar.bz2  https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.12.2.tar.bz2
 1d8a444a223cc5464240777346e125de51d8e6abf0b8bac742ac84609167dc87  libtasn1-4.21.0.tar.gz  https://ftpmirror.gnu.org/libtasn1/libtasn1-4.21.0.tar.gz
 3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0  icu4c-78.3-sources.tgz  https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78.3-sources.tgz
-78262a6e7ac170d6528ebfe2efccdf220191a5af6a6cd61ea4a9a9a5042c7a07  libxml2-2.15.3.tar.xz  https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz
+98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821  libxml2-2.15.4.tar.xz  https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.4.tar.xz
 9acfe68419c4d06a45c550321b3212762d92f41465062ca4ea19e632ee5d216e  libxslt-1.1.45.tar.xz  https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.45.tar.xz
 87336eba53b4acfe917424ab5d500d2b0054d9f5148d35c2273ccf2cfb712f0d  nasm-3.02.tar.xz  https://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.xz
 6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e  libjpeg-turbo-3.2.0.tar.gz  https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0.tar.gz
@@ -152,9 +153,8 @@ e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564  libwebp-1.6.0.
 072cda4b59dd098bba8c2363a6247299db1fa89411dc221c8b81b8ee8192e623  libepoxy-1.5.10.tar.xz  https://download.gnome.org/sources/libepoxy/1.5/libepoxy-1.5.10.tar.xz
 93941f85a1e7bd593fa94f299233cb5dfc91cd144fd9a78a6ceb75001c5b03be  libpsl-0.23.3.tar.gz  https://github.com/rockdaboot/libpsl/releases/download/0.23.3/libpsl-0.23.3.tar.gz
 e05cb1388eaca3830aded4ccf20044b6e1ac1a61411dcca11b0437c4285c8bc2  nghttp2-1.70.0.tar.xz  https://github.com/nghttp2/nghttp2/releases/download/v1.70.0/nghttp2-1.70.0.tar.xz
-816c96e8e8f193b40151dad7e8ff37b1221d019dbcb9c35cd3fadbfe6477dfec  brotli-1.2.0.tar.gz  https://github.com/google/brotli/archive/v1.2.0/brotli-1.2.0.tar.gz
-51ed0ae06f9d5a40f401ff459e2e5f652f9a510b7730e1359ee66d14d4872740  libsoup-3.6.6.tar.xz  https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.6.tar.xz
-fbb882736209700137e49d6a8d161ffe3b20345da79a9353d9b61fd0cc6ea9bb  libsoup-3.6.6-upstream_fixes-1.patch  https://www.linuxfromscratch.org/patches/blfs/13.1/libsoup-3.6.6-upstream_fixes-1.patch
+98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f  brotli-1.2.1.tar.gz  https://github.com/google/brotli/archive/v1.2.1/brotli-1.2.1.tar.gz
+5013dcef9136f6f861e6529fca578af50c1f52a39219027fb5aff652d1371a04  libsoup-3.8.1.tar.xz  https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.1.tar.xz
 b80e2874157cd55071f1b6710fa0b911d5ac5de106a9ee2a4c9c7bee61782f8e  glib-networking-2.80.1.tar.xz  https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz
 bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8  lcms2-2.19.1.tar.gz  https://github.com/mm2/Little-CMS/releases/download/lcms2.19.1/lcms2-2.19.1.tar.gz
 add272bb09e6384a4833ffca4896350fdb16e0ca22df68c0384773c67a175594  woff2-1.0.2.tar.gz  https://github.com/google/woff2/archive/v1.0.2/woff2-1.0.2.tar.gz
@@ -170,7 +170,7 @@ b0c620a4b18b6ee931b4c43bbf1760d308666dc37f730a7e7f1ad327e59ce2df  gst-plugins-go
 cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635  ffmpeg-9.0.1.tar.xz  https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz
 c880fa8d607b2aa6eadde7d6d6302b1396ebc38368fe2332fa20e193c7ee1420  libwpe-1.16.3.tar.xz  https://wpewebkit.org/releases/libwpe-1.16.3.tar.xz
 544ae14012f8e7e426b8cb522eb0aaaac831ad7c35601d1cf31d37670e0ebb3b  wpebackend-fdo-1.16.1.tar.xz  https://wpewebkit.org/releases/wpebackend-fdo-1.16.1.tar.xz
-bcfc6c91db7659dcf24f6ff79ad27ac1eae1bc61dca0dbfee154706926740b3b  wpewebkit-2.52.5.tar.xz  https://wpewebkit.org/releases/wpewebkit-2.52.5.tar.xz
+f3284e19e47fcb5ac8c63c2e1c113dbd65b2423eb8a545f5b345707829004f56  wpewebkit-2.54.2.tar.xz  https://wpewebkit.org/releases/wpewebkit-2.54.2.tar.xz
 a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd  certifi-2026.10.23.tar.gz  https://files.pythonhosted.org/packages/source/c/certifi/certifi-2026.10.23.tar.gz
 8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5  curl-8.23.0.tar.xz  https://curl.se/download/curl-8.23.0.tar.xz
 501f66c667225d53791b97e1d7cf85ab764c297d04881f60f38f451c4b0ee1be  libseccomp-2.6.1.tar.gz  https://github.com/seccomp/libseccomp/releases/download/v2.6.1/libseccomp-2.6.1.tar.gz
@@ -236,3 +236,8 @@ d09c44ebc3bd5bee7021c79f922fe8fb2fb57f7320f55e97ff9914d2346a591c  pixman-0.46.4.
 ccad8ee5dadb1271fd4727ad14d9bd77a64e505608766c4e98267d9aede40d3d  xcb-util-image-0.4.1.tar.xz  https://www.x.org/pub/individual/xcb/xcb-util-image-0.4.1.tar.xz
 7311b4bcda22cfc19cb99680eb1c35cfc1ea885981310639f0429fe2948c122e  xwayland-24.1.15.tar.xz  https://www.x.org/pub/individual/xserver/xwayland-24.1.15.tar.xz
 96af414c73ce1d5449ad04be7f9f27fa8330f844b6dda843ef22e3e1befb3ee3  libXxf86vm-1.1.6.tar.xz  https://www.x.org/pub/individual/lib/libXxf86vm-1.1.6.tar.xz
+5f7bc30b2b5c1e6b0da55a33fc44e2b7f56ae9b06952edcde614f51ef6b943e1  sof-bin-2026.09.2.tar.gz  https://github.com/thesofproject/sof-bin/releases/download/v2026.09.2/sof-bin-2026.09.2.tar.gz
+989a5cd345808babee491da69ed80ae5741697bc87743a71d0ba611f3fd6afa5  microcode-20261110.tar.gz  https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files/archive/refs/tags/microcode-20261110.tar.gz
+94d0038ef92bb65b86d08f004197c56f8d81f82f9ac7a25c202a88afd653a30b  gmmlib-22.10.2.tar.gz  https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.2.tar.gz
+93e82dc3c3682feab12b8c861be8762730349d09d8c20f7dd78c0f533049e24a  intel-media-driver-26.4.2.tar.gz  https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.4.2.tar.gz
+895bca0285fd4118800912a54527c0ae0d0c6e62591e807c3c96c6b342c4c5e2  spirv-llvm-translator-22.1.8.tar.gz  https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v22.1.8.tar.gz

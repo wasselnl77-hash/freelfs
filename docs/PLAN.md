@@ -16,7 +16,8 @@ in the spirit of Linux Mint's Cinnamon.
 | Core userland | GNU tools (coreutils, grep, sed, findutils, ...) |
 | Init | sysvinit + our own rc boot scripts |
 | Seat/session | seatd |
-| Kernel | Linux LTS (6.18.x as of Oct 2026; move to the next LTS when it is declared) |
+| Release model | **Rolling.** There are no numbered releases to jump between: the repository follows fixed upstream releases (the newest stable release of each series that fixes the known problems; FreeLFS backports nothing). The safety net is the btrfs snapshot flpkg takes before every transaction plus flboot's "Start an earlier state"; the fallback kernel is the LTS one (below). See docs/SECURITY.md, "Rolling release" |
+| Kernel | The **newest stable kernel from kernel.org** (7.3.x as of Nov 2026; package `linux`, the config is `config/kernel/freelfs.config` carried forward with `olddefconfig`). The newest **6.18 LTS** is the package `linux-lts` (same config, `-freelfs-lts` in its version; optional, not in the live ISO), listed by flboot as "FreeLFS (LTS kernel ...)" when installed |
 | Package baseline | LFS 13.1 package versions (see "Baseline" below) |
 | Bootloader | **Our own** UEFI bootloader (`flboot`), x86_64 (kept portable) |
 | Root filesystem | btrfs |
@@ -93,7 +94,7 @@ are systemd-only. FreeLFS therefore follows:
 - **LFS 12.4 (sysv)** as the reference for the sysvinit-specific parts: building
   udev on its own from the systemd source, sysklogd and sysvinit. Our rc
   scripts are our own.
-- The LTS kernel instead of LFS's mainline kernel.
+- The newest stable kernel (rolling release; the 6.18 LTS as the fallback package `linux-lts`) instead of the kernel LFS names.
 
 ### M1: Cross toolchain and temporary tools (x86_64) (done)
 - `build/11-cross-toolchain.sh`: binutils pass 1, gcc pass 1, Linux API headers, glibc (+ the book's toolchain sanity check), libstdc++.
@@ -243,7 +244,7 @@ freelfs/
 - **Host contamination.** Mitigations: a separate `$FLFS_TGT` triplet, a clean `env -i` build user, and the chroot.
 - **Scope.** We are writing our own bootloader, shell, compositor and toolkit. Each is a real project. Milestones are ordered so the distro is usable before every custom piece is done; for example, `-kernel` boot comes before `flboot`, and bash comes before `flsh`.
 - **Without systemd.** Some desktop software assumes logind or systemd. Mitigations: seatd, plus patches or shims per package when needed.
-- **Security upkeep.** LTS kernel, pinned sources, and cheap rebuilds through `flpkg`.
+- **Security upkeep.** Rolling release on the newest stable kernel with an LTS fallback, pinned sources, `build/cve-check.py` against the NVD, and cheap rebuilds through `flpkg`.
 
 ## 6. Open items
 - The exact look (colours, panel, menu, window decorations): decide from mockups before M7. Direction: Cinnamon-like layout, cleaner.

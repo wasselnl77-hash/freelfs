@@ -1,0 +1,32 @@
+# Sound Open Firmware: the DSP firmware and topology files of the SOF audio drivers
+# (snd-sof-pci-intel-*, snd-sof-amd-*). Many laptops from about 2019 (Intel Ice Lake, Tiger
+# Lake, Alder Lake, Meteor Lake, Lunar Lake; AMD Renoir, Rembrandt, Phoenix) have a
+# microphone array or SoundWire codecs that only work with it. Not in linux-firmware: the
+# project's own release. Goes to /usr/lib/firmware/intel/sof* (and amd/ for AMD's ACP).
+# Not installed: the .ldc logging dictionaries (debug only) and the host tools.
+pkgname=sof-firmware
+version=2026.09.2
+release=1
+worksrc=sof-bin-$version
+summary="Sound Open Firmware binaries and topologies (Intel and AMD laptop audio)"
+url=https://github.com/thesofproject/sof-bin
+license=(BSD-3-Clause custom)
+arch=(any)
+groups=(desktop)
+options=(!strip)
+source=(https://github.com/thesofproject/sof-bin/releases/download/v$version/sof-bin-$version.tar.gz)
+sha256=(5f7bc30b2b5c1e6b0da55a33fc44e2b7f56ae9b06952edcde614f51ef6b943e1)
+
+package() {
+	local d fw=$pkgdir/usr/lib/firmware/intel
+	install -d "$fw"
+	# the release has sof/ (IPC3), sof-ipc4/, sof-ipc4-lib/, sof-tplg/ and sof-ipc4-tplg/;
+	# sof-ace-tplg is a link to sof-ipc4-tplg
+	for d in sof sof-ipc4 sof-ipc4-lib sof-tplg sof-ipc4-tplg; do
+		[ -d "$d" ] && cp -a "$d" "$fw/"
+	done
+	ln -s sof-ipc4-tplg "$fw/sof-ace-tplg"
+	find "$fw" -name '*.ldc' -delete
+	install -Dm644 LICENCE.Intel "$pkgdir/usr/share/licenses/sof-firmware/LICENCE.Intel"
+	install -Dm644 LICENCE.NXP "$pkgdir/usr/share/licenses/sof-firmware/LICENCE.NXP"
+}

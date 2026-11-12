@@ -1,5 +1,5 @@
 pkgname=openssl
-version=4.0.1
+version=4.0.3
 release=1
 summary="TLS and general-purpose cryptography library"
 url=https://www.openssl.org/
@@ -8,7 +8,7 @@ arch=(x86_64)
 groups=(base)
 depends=(glibc zlib)
 source=(https://github.com/openssl/openssl/releases/download/openssl-$version/openssl-$version.tar.gz)
-sha256=(2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09)
+sha256=(325b5c806167c13b40b1ffeadfe0248197c00eccc4cf123ec1e28d2d2fd216d9)
 
 build() {
 	./config --prefix=/usr \

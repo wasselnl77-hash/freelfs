@@ -100,6 +100,13 @@ static int spawn(struct ft *f, char **cmd)
 		unsetenv("FLUI_PPM");
 		unsetenv("FLUI_PPM_DELAY");
 		signal(SIGCHLD, SIG_DFL);
+		/* a terminal starts in the home directory when the directory it was started in cannot be used
+		 * (the login chain can leave a user in root's unreadable home) */
+		if (access(".", R_OK | X_OK) != 0) {
+			const char *home = getenv("HOME");
+			if (home && *home && chdir(home) != 0)
+				(void)chdir("/");
+		}
 		if (cmd) {
 			execvp(cmd[0], cmd);
 		} else {

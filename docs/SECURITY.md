@@ -2,7 +2,7 @@
 
 What is protected today, how the signing key is kept, how to rotate it, how known
 vulnerabilities are tracked, the browser sandbox, and what Secure Boot would take.
-Written 2026-11-11. Nothing here is audited by anyone but the authors.
+Written 2026-11-11, updated 2026-11-12 (security update round). Nothing here is audited by anyone but the authors.
 
 Short list of what exists:
 
@@ -10,9 +10,39 @@ Short list of what exists:
 |---|---|
 | Package repo | minisign-format Ed25519 signatures on every package and on the index; the index carries a serial and an expiry (`valid-until`) and flpkg refuses expired or older ones |
 | Signing key | one key, offline custody rules below; a rotation mechanism with a transition period |
-| CVE tracking | `build/cve-check.py` + `build/cve-names.conf`, report in `docs/CVE-REPORT.md` |
-| Browser | WebKit's bubblewrap sandbox for the web processes (needs the rebuilt wpewebkit, see below) |
+| Release model | rolling: updates follow fixed upstream releases (section 0) |
+| CVE tracking | `build/cve-check.py` + `build/cve-names.conf`, report in `docs/CVE-REPORT.md`; kernel triage against the config: `build/cve-kernel.py`, `docs/CVE-KERNEL.md` |
+| Browser | WebKit's bubblewrap sandbox for the web processes (section 3; WPE WebKit 2.54.2) |
 | Boot | not signed: Secure Boot must be off |
+
+---
+
+## 0. Rolling release
+
+FreeLFS is a **rolling release**. There are no numbered versions to move between, and nothing is backported: a
+vulnerability is fixed by taking the **newest stable upstream release of the series that fixes it** (a point release in
+the same series when one exists, the next stable series when the old one gets no more fixes: the WPE WebKit 2.52 series,
+for example, stopped receiving the fixes of the advisory of 29 September 2026, so the browser engine moved to 2.54).
+Sources are pinned by hash in `sources.lock`, verified against the upstream signature or published checksum when the
+update is made, and the recipe `version` and `release` are bumped.
+
+* **Kernel.** Package `linux` is the newest stable kernel from kernel.org (7.3.x in Nov 2026). The config is
+  `config/kernel/freelfs.config`, carried to every new kernel with `make olddefconfig`; `recipes/linux` refuses to build
+  when a setting of the fragment is silently dropped (a renamed or removed symbol), so a kernel update cannot lose the
+  gamepad, uinput/uhid/ntsync, btrfs, rtw89, amdgpu or live-ISO settings unnoticed. Package `linux-lts` is the newest
+  6.18.y built from the same fragment with the local version `-freelfs-lts`; it is **optional** (not in the live ISO or the
+  default image: `flpkg install linux-lts`), and flboot lists it after the other kernels as "FreeLFS (LTS kernel ...)".
+  It is the fallback for hardware a new kernel breaks.
+* **Safety net.** `flpkg` takes a btrfs snapshot before every transaction (src/flsnap); flboot's "Start an earlier
+  state" starts any of them read-only, and `flsnap rollback` makes it the current state. Kernels live on the ESP and
+  are not part of a snapshot: an earlier state started by flboot uses the newest kernel on the ESP with the modules of
+  the snapshot. If the snapshot predates the kernel's modules (a kernel update lies between), the boot has no loadable
+  modules (the live-path file systems, disks, USB and simpledrm are built in, so it comes up with a plain framebuffer;
+  GPU, Wi-Fi and sound modules are missing). Then pick the LTS entry only if it was installed at that time, or boot the
+  state with a matching kernel: `docs/INTEGRATION-TODO.md` records this as open.
+* **What a rolling release does not give you:** no staged testing between upstream and the repository (a QEMU boot and
+  the test suites of this tree, not a distribution's testing period) and no backports. Check `build/cve-check.py` before
+  every publication.
 
 ---
 
@@ -167,6 +197,23 @@ something else runs on (`vulnerable:false`) or where no version range contains t
     build/cve-check.py --check-map               # are the CPE names in the map real?
     build/cve-check.py --offline                 # cache only
 
+**Triage rules** (added in the security round of 2026-11-12; the report counts what is left and lists what it set aside):
+
+* `ignore RECIPE ID reason` lines in `build/cve-names.conf` set aside one finding that was read and does not apply
+  (ruby's GitLab entry that NVD files under the ruby CPE by mistake; ffmpeg's RTSP, DASH, SFTP and mbedtls entries, because
+  ffmpeg is built with `--disable-network --disable-autodetect` and `strings` on `libavformat` shows none of those; the
+  Windows-only Python advisories; glibc's deprecated resolver functions that only `libresolv` defines).
+* The `buildtool` token (bison, flex, binutils, gcc, autoconf, cmake, ...): such findings are about hostile *source
+  files given to a tool the builder runs*, not about the running system. They are listed under "triaged", not counted.
+* The `optional` token (`linux-lts`): the package is not in the default image or the live ISO; its candidates are counted apart.
+* A "fixed in" bound that is a date (`2025-01-13`: an ffmpeg git-master or gcc commit date) is a development snapshot, not a
+  release, and cannot match a release number: dropped by the script itself.
+* Kernel: `build/cve-kernel.py` follows the fix commit of every candidate to the files it changes, walks the Makefiles of the
+  new kernel tree and looks every Kconfig symbol up in the build config: result in `docs/CVE-KERNEL.md`.
+* NVD's data for WebKit lags: it listed no WPE finding for 2.52.5, while the WPE advisory of 29 September 2026
+  (WSA-2026-0006, about 230 CVEs) names the 2.52 series as affected. For the browser engine the advisories at
+  wpewebkit.org/security are the source, not `cve-check.py`.
+
 Results are cached (12 h; `$FLFS_CACHE/cve`) because the NVD allows 5 requests in 30 s without a key; a full
 run takes about an hour the first time (minutes once cached). Read a finding before acting on it: a match on the version is a candidate
 (NVD entries without a version range match everything and are marked `?`; the kernel list includes
@@ -180,7 +227,7 @@ version). Latest result: `docs/CVE-REPORT.md`.
 | Run `cve-check.py`, read the diff to the last report, commit `docs/CVE-REPORT.md` | every Monday (10 minutes), and before every release | the data changes daily; the run is cheap once cached |
 | Critical or high, in a package that touches untrusted data (wpewebkit, curl, openssl, libxml2/libxslt, libpng, libjpeg-turbo, libwebp, freetype, harfbuzz, ffmpeg, gstreamer + plugins, glib/libsoup/glib-networking, sqlite, expat, zlib, xz, brotli, nghttp2, libarchive, mupdf, mesa, pipewire, flatpak/bubblewrap/ostree) | rebuild and publish within **7 days** of the upstream release | these are reachable from a web page, a download or a file the user opens |
 | WebKit: every WPE stable release (they follow the WebKitGTK/WPE security advisories, roughly every 3 to 4 weeks) | within **14 days**, or 7 for an exploited-in-the-wild advisory | the browser is the largest attack surface; wpewebkit takes hours to build, so plan the machine time |
-| Kernel: the 6.18 stable line | monthly, and within 14 days for a high one that applies to the config | most kernel CVEs concern drivers FreeLFS does not build; the report lists them all, triage by config |
+| Kernel: the newest stable series (`linux`); the 6.18 LTS (`linux-lts`) when it is installed | monthly, and within 14 days for a high one that applies to the config (`build/cve-kernel.py` says which do) | most kernel CVEs concern drivers FreeLFS does not build (75 of 132 in the first triage); the rest is fixed by the next stable point release |
 | Everything else in the image (base system, desktop libraries) | one monthly batch rebuild | lower exposure |
 | Build-only tools (autoconf, cmake, meson, ...) | at the next regular rebuild | not in the attack path of a running system |
 | `flpkg repo` re-sign | at least every 10 days (index valid 14) | see "Index expiry" |
@@ -197,15 +244,15 @@ guarantee that nothing is missing: CVEs without a CPE, and bugs nobody reported,
 
 WPE WebKit has a bubblewrap sandbox for its web processes, switched on at build time with
 `ENABLE_BUBBLEWRAP_SANDBOX` (needs libseccomp, `bwrap` and `xdg-dbus-proxy`; recipes `libseccomp`,
-`bubblewrap` and `xdg-dbus-proxy` exist and are in the image). Until wpewebkit release 1 it was built **off**:
+`bubblewrap` and `xdg-dbus-proxy` exist and are in the image). Until the 2.52.5-1 build it was **off**:
 the web processes, the part of a browser that runs hostile JavaScript and image/font/video parsers, ran with the
-user's full rights. **wpewebkit release 2** builds it **on**, freebws release 10 handles it.
+user's full rights. Since the security round of 2026-11-12 it is **on** (WPE WebKit 2.54.2, `freebws` release 13: the probe fix, and an explicit download policy because the 2.54 default ended a download navigation without starting a download).
 
 How it works (WebKit's own design, `BubblewrapLauncher.cpp`):
 
 * In the WPE 2.0 API the sandbox is enabled by default in the web context.
   `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` turns it off.
-* Each *web* process is started as `bwrap --args ... -- WPEWebProcess`: new user, pid, ipc, uts namespaces,
+* Each *web* process is started as `bwrap --args ... -- WPEWebProcess`: new user, mount, pid and uts namespaces (the IPC namespace is *not* unshared for a WPE web process: WebKit does that only for GTK/Wayland; measured in QEMU: `ns ipc SAME`),
   a seccomp filter, a private `/tmp` and an empty runtime dir, `/etc`, `/usr`, `/lib*` read-only, `/sys` bits for
   device discovery, the GPU nodes (`/dev/dri`, `/dev/udmabuf`), fonts, GStreamer data, the session bus only
   through `xdg-dbus-proxy`. The home directory, `~/.ssh`, the rest of `/run`, `/mnt`, `/media` are not visible.
@@ -222,6 +269,17 @@ What FreeBWS does:
 * Before it creates the web context, `freebws` runs bwrap once itself with the same kinds of namespaces (a probe
   `bwrap ... freebws --sandbox-child`) and checks that `xdg-dbus-proxy` exists. WebKit does not check this and
   *aborts the browser* at the first web process if bwrap cannot start.
+* **The probe and the FreeLFS folder layout.** The first probe (freebws release 10) failed in the image with
+  `bwrap: execvp /sysflfs/bin/freebws: No such file or directory`. On FreeLFS `/usr` is the *homes* directory (the
+  `@home` subvolume) and `/usr/bin`, `/usr/lib`, `/usr/share` are relative links to `../sysflfs/...`. The probe bound `/usr`
+  as a whole and then ran `/proc/self/exe`, whose real path is `/sysflfs/bin/freebws`, which does not exist in bwrap's
+  new root. That was a bug of the probe, not a sign that bwrap cannot work; binding `/usr` would also have shown every
+  user's home inside the sandbox. The probe now makes the binds WebKit makes itself (`/usr/lib`, `/usr/bin`, `/lib`,
+  `/lib64`, `/bin` one by one: bwrap resolves the links of a source path) and binds the directory of the real
+  executable read-only at its real path. WebKit's own binds (`BubblewrapLauncher.cpp`) never bind `/usr` as a whole
+  either, and bind the real path of every symlinked helper (`/usr/libexec/gstreamer-1.0/...`), so the web processes
+  are not affected by the layout. Checked in QEMU: the old probe reproduces the error, the new one exits 0 and
+  `/usr/<user>` is not visible inside.
 * `sandbox=auto` (default, key in `~/.config/freebws/config` or `FREEBWS_SANDBOX`): if the probe works, the sandbox is on;
   if not (no user namespaces, a container, a missing program) the web processes run **without** a sandbox, a
   `freebws: WARNING: the web process sandbox is NOT available (reason)` line goes to stderr (the freebws log) and

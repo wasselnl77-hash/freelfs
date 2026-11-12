@@ -5,7 +5,7 @@
 # anywhere else.
 pkgname=flinstall
 version=0.1
-release=2
+release=3
 summary="FreeLFS installer: language, keyboard, Wi-Fi, disk, account, time zone, install"
 license=(MIT)
 arch=(x86_64)

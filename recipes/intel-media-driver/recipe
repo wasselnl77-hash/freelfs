@@ -1,0 +1,24 @@
+# Intel's VA-API driver "iHD" (iHD_drv_video.so): hardware video decode (and encode) on
+# Broadwell (2014) and newer: H.264, HEVC, VP9, AV1 (Tiger Lake and newer), MPEG-2, JPEG. Older
+# Intel GPUs (Haswell and earlier) need the old i965 driver, which is not packaged. libva finds it
+# in /usr/lib/dri; ffmpeg (flvideo, mpv hwdec=vaapi-copy) and GStreamer's va plugin pick it up
+# on their own. Non-free kernels (media shaders) are the driver's default and stay on.
+pkgname=intel-media-driver
+version=26.4.2
+release=1
+worksrc=media-driver-intel-media-$version
+summary="Intel VA-API driver (iHD) for Broadwell and newer"
+url=https://github.com/intel/media-driver
+license=(MIT BSD-3-Clause)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc gcc libva gmmlib)
+makedepends=(cmake ninja pkgconf libva gmmlib)
+source=(intel-media-driver-$version.tar.gz::https://github.com/intel/media-driver/archive/refs/tags/intel-media-$version.tar.gz)
+sha256=(93e82dc3c3682feab12b8c861be8762730349d09d8c20f7dd78c0f533049e24a)
+build_style=cmake
+# no X11, no test suite, no CM runtime; the DRM/Wayland-only libva has no X11 backend
+configure_args=(-D MEDIA_RUN_TEST_SUITE=OFF -D BUILD_CMRTLIB=OFF -D MEDIA_BUILD_FATAL_WARNINGS=OFF
+	-D ENABLE_KERNELS=ON -D ENABLE_NONFREE_KERNELS=ON -D LIBVA_DRIVERS_PATH=/usr/lib/dri
+	-D CMAKE_POLICY_VERSION_MINIMUM=3.5 -D BUILD_TYPE=release)
+check() { :; }

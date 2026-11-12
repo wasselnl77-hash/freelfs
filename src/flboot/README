@@ -7,7 +7,9 @@ firmware starts by default, so no boot variables are needed. `flboot-install`
 puts it there; flpkg runs that again whenever the flboot package changes.
 
 The menu lists:
-  - every kernel on the ESP (/boot/vmlinuz-*), newest first;
+  - every kernel on the ESP (/boot/vmlinuz-*), newest first; the LTS kernel (package linux-lts,
+    vmlinuz-VERSION-freelfs-lts) comes after the others as "FreeLFS (LTS kernel VERSION)", the
+    fallback when a new kernel does not work with some hardware;
   - the entries in flboot/flboot.conf;
   - "Start an earlier state" (only when there are snapshots): a second screen
     with the btrfs snapshots listed in flboot/snapshots, which flsnap writes

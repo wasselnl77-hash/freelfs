@@ -117,6 +117,13 @@ static void kernel_file(const CHAR16 *name, void *ctx)
 	k->version[k->n++] = v;
 }
 
+/* the secondary kernel: the package linux-lts installs vmlinuz-VERSION-freelfs-lts */
+static bool is_lts(const char *v)
+{
+	size_t n = strlen(v);
+	return n > 4 && !memcmp(v + n - 4, "-lts", 4);
+}
+
 static char *join(const char *a, const char *b, const char *c)
 {
 	size_t na = strlen(a), nb = strlen(b), nc = strlen(c);
@@ -208,12 +215,22 @@ void conf_load(struct config *c)
 			k.version[j] = k.version[j - 1];
 			k.version[j - 1] = t;
 		}
+	/* the LTS kernel (if installed) is the fallback: after the others, however old or new its version */
+	int normal = 0;
+	for (int i = 0; i < k.n; i++)
+		if (!is_lts(k.version[i])) {
+			char *t = k.version[i];
+			for (int j = i; j > normal; j--)
+				k.version[j] = k.version[j - 1];
+			k.version[normal++] = t;
+		}
 	int first = c->n;
 	for (int i = 0; i < k.n; i++) {
 		struct entry *e = add(c);
 		if (!e)
 			break;
-		e->title = join("FreeLFS", i ? " (older kernel " : " (kernel ", join(k.version[i], ")", ""));
+		e->title = i >= normal ? join("FreeLFS (LTS kernel ", k.version[i], ")") :
+			   join("FreeLFS", i ? " (older kernel " : " (kernel ", join(k.version[i], ")", ""));
 		e->kernel = ascii_to16(join("\\vmlinuz-", k.version[i], ""));
 		e->version = k.version[i];
 	}

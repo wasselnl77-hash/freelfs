@@ -215,6 +215,10 @@ tool mcopy -i "$W/esp.img" "$kernel" "::/vmlinuz-$kver"
 # the installer (flinstall-helper) copies this kernel to the disk: the squashfs has no /boot
 cp "$kernel" "$W/iso/live/vmlinuz-$kver"
 tool mcopy -i "$W/esp.img" "$W/initrd.img" ::/initrd.img
+# CPU microcode (package "microcode", 8-9 MB uncompressed cpio): not in the ESP image (El Torito
+# images must stay under 32 MB, the live system does not need it), but the installer copies it
+# from here to the disk's ESP next to the kernel; flboot.conf there gets initrd=\ucode.img
+[ ! -f "$ROOT/boot/ucode.img" ] || cp "$ROOT/boot/ucode.img" "$W/iso/live/ucode.img"
 VT_COLORS="vt.default_red=29,224,63,216,111,198,86,216,122,239,95,232,143,215,127,240 vt.default_grn=33,108,155,181,168,120,182,220,129,128,191,201,192,160,208,242 vt.default_blu=37,108,99,106,220,221,194,224,137,128,131,138,236,232,218,244"
 # console=tty0 last: it is /dev/console, so the keyboard and the screen of a
 # real machine work in flinitrd's prompt

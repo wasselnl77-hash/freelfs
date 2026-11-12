@@ -1,0 +1,32 @@
+# Steps for FLFS_VM_TTY (build/m12-sandbox.sh): login, FreeBWS from the start menu, a real page, the sandbox checks
+# (docs/INTEGRATION-TODO.md, "Sandbox test steps" 2 to 5), a download from the host (@HOSTURL@), the fallback (6).
+wait 3
+key ret
+wait 14
+key meta_l
+wait 1
+type web
+key ret
+wait 40
+shot @S@/start.ppm
+run grep -iE "sandbox|WARNING" /usr/tester/.local/state/freelfs/log/freebws.log | head -n 5
+run sbxcheck START
+key ctrl-l
+wait 1
+type https://example.org\n
+wait 30
+shot @S@/https.ppm
+run sbxcheck HTTPS
+run grep -iE "dmabuf through|shm|restarting" /usr/tester/.local/state/freelfs/log/freebws.log | head -n 5
+key ctrl-l
+wait 1
+type @HOSTURL@/sample.bin\n
+wait 25
+shot @S@/download.ppm
+run ls -l /usr/tester/downloads/ ; sha256sum /usr/tester/downloads/sample.bin
+run tail -n 12 /usr/tester/.local/state/freelfs/log/freebws.log | cut -c1-200; find /usr/tester/.local/share/freebws /usr/tester/.config/freebws -name 'downloads.json' -exec cat {} \; 2>/dev/null | cut -c1-300
+run dmesg | grep -ci 'out of memory\|oom-kill'; pgrep -a "freebws|WPEWebProcess" | cut -c1-110
+run grep -ia -E 'download|policy|WebKitPolicy|decide|interrupted' /tmp/freebws.err | tail -n 25 | cut -c1-200
+# step 6, the fallback: bwrap not executable
+run chmod a-x /usr/bin/bwrap; su -s /bin/sh tester -c 'freebws --sandbox-check; echo rc=$?'; su -s /bin/sh tester -c 'FREEBWS_SANDBOX=on freebws 2>&1 | head -n 3; echo rc=$?'
+run chmod a+x /usr/bin/bwrap; su -s /bin/sh tester -c 'freebws --sandbox-check; echo rc=$?'

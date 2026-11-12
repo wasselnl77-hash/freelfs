@@ -251,6 +251,7 @@ static gboolean on_dest(WebKitDownload *wk, const char *suggested, struct dl *d)
 	g_free(d->name);
 	d->name = g_path_get_basename(path);
 	webkit_download_set_destination(wk, path);
+	fprintf(stderr, "freebws: download %d: %s -> %s\n", d->id, d->url ? d->url : "?", path);
 	g_free(dir);
 	WebKitURIResponse *r = webkit_download_get_response(wk);
 	if (r)
@@ -288,6 +289,7 @@ static void on_finished(WebKitDownload *wk, struct dl *d)
 
 static void on_failed(WebKitDownload *wk, GError *e, struct dl *d)
 {
+	fprintf(stderr, "freebws: download %d failed: %s\n", d->id, e && e->message ? e->message : "?");
 	d->state = e && e->code == WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER ? DL_CANCELLED : DL_FAILED;
 	g_free(d->error);
 	d->error = e && d->state == DL_FAILED ? g_strdup(e->message) : NULL;
@@ -307,6 +309,7 @@ static void on_started(WebKitNetworkSession *s, WebKitDownload *wk, gpointer dat
 	d->name = g_strdup("download");
 	d->started = g_get_real_time() / 1000000;
 	d->state = DL_ACTIVE;
+	fprintf(stderr, "freebws: download %d started: %s\n", d->id, d->url);
 	g_signal_connect(wk, "decide-destination", G_CALLBACK(on_dest), d);
 	g_signal_connect(wk, "received-data", G_CALLBACK(on_received), d);
 	g_signal_connect(wk, "finished", G_CALLBACK(on_finished), d);

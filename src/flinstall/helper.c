@@ -2047,6 +2047,11 @@ static int install_boot(void)
 	if (find_kernel(kernel, sizeof kernel) < 0)
 		return err("no kernel found for the new system"), -1;
 	const char *kname = strrchr(kernel, '/') + 1;
+	/* CPU microcode (build/recipes: package "microcode") sits next to the kernel; the EFI stub loads it
+	 * as an initrd before the kernel starts, only when the file exists (a missing initrd= file fails boot) */
+	char ucode[PATH_MAX];
+	snprintf(ucode, sizeof ucode, "%.*s/ucode.img", (int)(kname - kernel - 1), kernel);
+	int has_ucode = access(ucode, R_OK) == 0;
 	cmdf("mkdir -p %s/flboot", espdir);
 	if (!dry) {
 		mkdir(espdir, 0755);
@@ -2057,8 +2062,8 @@ static int install_boot(void)
 	snprintf(conf, sizeof conf,
 	         "# flboot.conf -- written by the installer; see /usr/share/doc/flboot/README\n"
 	         "timeout 5\n"
-	         "cmdline root=PARTUUID=%s rootwait ro quiet panic=30 console=tty0 %s\n",
-	         r->uuid, VT_COLORS);
+	         "cmdline %sroot=PARTUUID=%s rootwait ro quiet panic=30 console=tty0 %s\n",
+	         has_ucode ? "initrd=\\ucode.img " : "", r->uuid, VT_COLORS);
 	cmdf("# write %s/flboot/flboot.conf: root=PARTUUID=%s", espdir, r->uuid);
 	if (!dry) {
 		char p[PATH_MAX];
@@ -2074,6 +2079,13 @@ static int install_boot(void)
 	char *cp[] = {"cp", kernel, to, NULL};
 	if (run(cp, NULL))
 		return err("cannot stage the kernel"), -1;
+	char tu[PATH_MAX];
+	snprintf(tu, sizeof tu, "%s/ucode.img", espdir);
+	if (has_ucode) {
+		char *cu[] = {"cp", ucode, tu, NULL};
+		if (run(cu, NULL))
+			return err("cannot stage the CPU microcode"), -1;
+	}
 	const char *node = node_for(b);
 	char dst[PATH_MAX + 8], d1[PATH_MAX], d2[PATH_MAX], d3[PATH_MAX], img[PATH_MAX + 4];
 	snprintf(img, sizeof img, "%s", node);
@@ -2083,7 +2095,7 @@ static int install_boot(void)
 	snprintf(dst, sizeof dst, "::/");
 	setenv("MTOOLS_SKIP_CHECK", "1", 1);
 	setenv("MTOOLSRC", "/dev/null", 1);
-	char *mc[] = {"mcopy", "-i", img, "-s", "-o", "-Q", d1, d2, d3, dst, NULL};
+	char *mc[] = {"mcopy", "-i", img, "-s", "-o", "-Q", d1, d2, d3, has_ucode ? tu : dst, has_ucode ? dst : NULL, NULL};
 	if (run(mc, NULL))
 		return err("cannot copy the boot files to the boot partition"), -1;
 	return 0;

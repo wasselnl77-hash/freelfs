@@ -1,7 +1,7 @@
 # The FreeLFS Wayland compositor, from src/flcomp in the FreeLFS tree.
 pkgname=flcomp
 version=0.1
-release=13
+release=15
 summary="The FreeLFS Wayland compositor: CPU compositing, DRM/KMS, dmabuf clients, Xwayland window manager, no wlroots"
 license=(MIT)
 arch=(x86_64)

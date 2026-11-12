@@ -1,7 +1,7 @@
 # FreeLFS's own UEFI boot loader, from src/flboot in the FreeLFS tree.
 pkgname=flboot
 version=0.1
-release=5
+release=6
 summary="The FreeLFS UEFI boot loader"
 license=(MIT)
 arch=(x86_64)

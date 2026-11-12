@@ -159,6 +159,39 @@ static int read_int(const char *name)
 	return v;
 }
 
+/* Which backlight: a laptop can have several (acpi_video0, intel_backlight, amdgpu_bl1, nvidia_0).
+ * Prefer the kernel's "type": firmware, then platform, then raw; ties go to the first by name. */
+static void bl_pick(char *out, size_t n)
+{
+	static const char *const rank[] = { "firmware", "platform", "raw" };
+	int best = 99;
+	DIR *d = opendir("/sys/class/backlight");
+	struct dirent *de;
+	out[0] = 0;
+	while (d && (de = readdir(d))) {
+		char p[300], t[32] = "";
+		if (de->d_name[0] == '.')
+			continue;
+		snprintf(p, sizeof p, "/sys/class/backlight/%s/type", de->d_name);
+		FILE *f = fopen(p, "r");
+		if (f) {
+			if (fgets(t, sizeof t, f))
+				t[strcspn(t, "\n")] = 0;
+			fclose(f);
+		}
+		int r = 3;
+		for (int i = 0; i < 3; i++)
+			if (!strcmp(t, rank[i]))
+				r = i;
+		if (r < best || (r == best && strcmp(de->d_name, out + 21) < 0)) {
+			best = r;
+			snprintf(out, n, "/sys/class/backlight/%s", de->d_name);
+		}
+	}
+	if (d)
+		closedir(d);
+}
+
 static bool bl_find(void)
 {
 	if (bl_dir[0])
@@ -168,15 +201,7 @@ static bool bl_find(void)
 		snprintf(bl_dir, sizeof bl_dir, "%s", e);
 		return true;
 	}
-	DIR *d = opendir("/sys/class/backlight");
-	struct dirent *de;
-	while (d && (de = readdir(d)))
-		if (de->d_name[0] != '.') {
-			snprintf(bl_dir, sizeof bl_dir, "/sys/class/backlight/%s", de->d_name);
-			break;
-		}
-	if (d)
-		closedir(d);
+	bl_pick(bl_dir, sizeof bl_dir);
 	return bl_dir[0] != 0;
 }
 

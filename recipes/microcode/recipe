@@ -1,0 +1,62 @@
+# CPU microcode for Intel and AMD, loaded by the kernel before it starts (early loading: fixes
+# CPU bugs, and the security mitigations depend on it). This recipe builds
+#   /boot/ucode.img    an uncompressed cpio with kernel/x86/microcode/GenuineIntel.bin and
+#                      AuthenticAMD.bin, which the kernel's EFI stub loads as the first initrd
+#                      (flboot.conf cmdline initrd=\ucode.img; the kernel finds the microcode in
+#                      it before anything else exists). Written by the installer (flinstall) into
+#                      flboot.conf when the file is on the install medium (build/53-iso.sh).
+# The kernel's late loading (/usr/lib/firmware/intel-ucode) is off, so the raw Intel files are not
+# installed.
+# AMD's files come from linux-firmware (amd-ucode), Intel's from Intel's release, which is not in
+# linux-firmware any more. The image only holds client CPUs (Intel files up to 360 kB: the
+# Xeon files of Sapphire Rapids and newer are 0.5 to 3.3 MB each) and CPUs from 2013 on (06-37 up),
+# to stay at about 8.7 MB on the ESP.
+pkgname=microcode
+version=20261110
+release=1
+worksrc=Intel-Linux-Processor-Microcode-Data-Files-microcode-$version
+summary="Intel and AMD CPU microcode and the early-loading image /boot/ucode.img"
+url=https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files
+license=(custom)
+arch=(x86_64)
+groups=(desktop)
+makedepends=(python linux-firmware)
+options=(!strip)
+source=(microcode-$version.tar.gz::https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files/archive/refs/tags/microcode-$version.tar.gz)
+sha256=(989a5cd345808babee491da69ed80ae5741697bc87743a71d0ba611f3fd6afa5)
+
+package() {
+	install -d "$pkgdir/boot"
+	install -Dm644 license "$pkgdir/usr/share/licenses/microcode/LICENSE.Intel"
+	python3 -I - "$PWD/intel-ucode" /usr/lib/firmware/amd-ucode "$pkgdir/boot/ucode.img" <<-'PY'
+	import glob, os, sys
+	intel_dir, amd_dir, out = sys.argv[1:4]
+	def cat(files):
+	    return b"".join(open(f, "rb").read() for f in files)
+	# family 6 from Silvermont/Haswell (06-37, 2013) on; 0f-* (Pentium 4) and 06-0x to 06-2x are too old
+	intel = cat(sorted(f for f in glob.glob(intel_dir + "/*")
+	                   if os.path.basename(f) >= "06-37" and os.path.getsize(f) <= 360000))
+	amd = cat(sorted(glob.glob(amd_dir + "/microcode_amd*.bin")))
+	assert intel and amd, "microcode files missing"
+	ino = [0]
+	def entry(name, data, mode):
+	    ino[0] += 1
+	    nm = name.encode() + b"\0"
+	    hdr = "070701" + "".join("%08X" % v for v in (
+	        ino[0], mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(nm), 0))
+	    b = hdr.encode() + nm
+	    b += b"\0" * (-len(b) % 4)
+	    b += data
+	    b += b"\0" * (-len(b) % 4)
+	    return b
+	img = b""
+	for d in ("kernel", "kernel/x86", "kernel/x86/microcode"):
+	    img += entry(d, b"", 0o040755)
+	img += entry("kernel/x86/microcode/GenuineIntel.bin", intel, 0o100644)
+	img += entry("kernel/x86/microcode/AuthenticAMD.bin", amd, 0o100644)
+	img += entry("TRAILER!!!", b"", 0)
+	img += b"\0" * (-len(img) % 512)
+	open(out, "wb").write(img)
+	print("ucode.img: %d bytes (intel %d, amd %d)" % (len(img), len(intel), len(amd)))
+	PY
+}

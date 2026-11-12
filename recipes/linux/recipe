@@ -1,19 +1,20 @@
-# The LTS kernel: the architecture's defconfig plus config/kernel in the
+# The newest stable kernel from kernel.org (FreeLFS is a rolling release; the fallback is the
+# package linux-lts, the newest 6.18.y with the same config): the architecture's defconfig plus config/kernel in the
 # FreeLFS tree (everything needed to reach the root file system built in;
 # FreeLFS boots without an initramfs). It goes to /boot, which is the EFI
 # system partition (FAT: no symlinks); flboot finds every vmlinuz-* there.
 pkgname=linux
-version=6.18.59
-release=6
-summary="The Linux kernel (LTS) and its modules"
+version=7.3.4
+release=2
+summary="The Linux kernel (newest stable) and its modules"
 url=https://www.kernel.org/
 license=(GPL-2.0-only)
 arch=(x86_64)
 groups=(base)
 depends=(kmod)
 options=(!strip)
-source=(https://www.kernel.org/pub/linux/kernel/v6.x/linux-$version.tar.xz)
-sha256=(53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963)
+source=(https://www.kernel.org/pub/linux/kernel/v7.x/linux-$version.tar.xz)
+sha256=(b11b6df8295e8e991ff040b71aaa4994a8b55caa23b6b092907f195b5840fd1f)
 
 # Reproducible builds: the kernel otherwise records when, by whom and on
 # which host it was built.

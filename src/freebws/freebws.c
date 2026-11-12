@@ -2015,6 +2015,22 @@ static void on_close_req(WebKitWebView *v, struct tab *t)
 /* middle click and Ctrl-click on a link: a new tab in the background */
 static gboolean on_policy(WebKitWebView *v, WebKitPolicyDecision *d, WebKitPolicyDecisionType type, struct tab *t)
 {
+	/* a response the page cannot show (a file, application/octet-stream) or that the server marks as an
+	 * attachment is a download: decided here, not left to the engine's default (WPE 2.54 ended such a
+	 * navigation with "Frame load interrupted" and no download at all) */
+	if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
+		WebKitResponsePolicyDecision *rd = WEBKIT_RESPONSE_POLICY_DECISION(d);
+		WebKitURIResponse *resp = webkit_response_policy_decision_get_response(rd);
+		SoupMessageHeaders *hd = resp ? webkit_uri_response_get_http_headers(resp) : NULL;
+		const char *cd = hd ? soup_message_headers_get_one(hd, "Content-Disposition") : NULL;
+		if (!webkit_response_policy_decision_is_mime_type_supported(rd) || (cd && !g_ascii_strncasecmp(cd, "attachment", 10))) {
+			if (getenv("FREEBWS_POLICY_LOG"))
+				fprintf(stderr, "freebws: policy: download %s\n", resp ? webkit_uri_response_get_uri(resp) : "?");
+			webkit_policy_decision_download(d);
+			return TRUE;
+		}
+		return FALSE;
+	}
 	if (type != WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION && type != WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION)
 		return FALSE;
 	WebKitNavigationAction *na = webkit_navigation_policy_decision_get_navigation_action(
@@ -2131,7 +2147,7 @@ static unsigned mem_total_mb(void)
 
 /* ---- web process sandbox ----------------------------------------------------
  * WPE WebKit built with ENABLE_BUBBLEWRAP_SANDBOX (recipes/wpewebkit, release 2) starts every web
- * process inside bubblewrap by itself (user, pid, ipc and uts namespaces, a seccomp filter, a private
+ * process inside bubblewrap by itself (user, mount, pid and uts namespaces; ipc stays shared for WPE, a seccomp filter, a private
  * /tmp and a runtime dir of its own, / not visible: only /usr, /etc, /lib*, the GPU nodes /dev/dri
  * and /dev/udmabuf, fonts, the GStreamer data and what add_path_to_sandbox() names; the session bus
  * only through xdg-dbus-proxy). The network process is not sandboxed by WebKit (it reads and writes
@@ -2175,11 +2191,30 @@ static int sandbox_probe(char *why, size_t n)
 		return 0;
 	}
 	self[l] = 0;
-	/* as WebKit starts its web process: new user namespace (bwrap does that itself), uts, pid and
-	 * ipc namespaces, the usual mounts; the program is this one, in a mode that just exits */
-	char *argv[] = { BWRAP_PATH, "--unshare-uts", "--unshare-pid", "--unshare-ipc", "--ro-bind", "/usr", "/usr",
-			 "--ro-bind-try", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dev", "/dev",
-			 "--proc", "/proc", "--tmpfs", "/tmp", self, "--sandbox-child", NULL };
+	/* As WebKit starts its web process: new user namespace (bwrap does that itself), uts, pid and
+	 * ipc namespaces, the usual mounts; the program is this one, in a mode that just exits.
+	 *
+	 * The binds are the ones WebKit makes (BubblewrapLauncher.cpp): /usr/lib, /usr/bin, /lib, /lib64,
+	 * /bin one by one, never /usr as a whole. That matters on FreeLFS: /usr is the homes directory
+	 * (the @home subvolume) and /usr/bin, /usr/lib are relative links to ../sysflfs/..., so
+	 *  - binding /usr would show every user's home inside the sandbox and leave those links dangling
+	 *    (the first version of this probe did that: "execvp /sysflfs/bin/freebws: No such file");
+	 *  - /proc/self/exe is the real path (/sysflfs/bin/freebws), which only exists in the new root if
+	 *    the directory it is in is bound too. bwrap resolves the links of a source path itself, so
+	 *    binding the directory of the real executable at its real path is all it takes. */
+	char exedir[400];
+	snprintf(exedir, sizeof exedir, "%s", self);
+	char *slash = strrchr(exedir, '/');
+	if (slash && slash != exedir)
+		*slash = 0;
+	else
+		snprintf(exedir, sizeof exedir, "/usr/bin");
+	char *argv[] = { BWRAP_PATH, "--unshare-uts", "--unshare-pid", "--unshare-ipc",
+			 "--ro-bind-try", "/usr/lib", "/usr/lib", "--ro-bind-try", "/usr/bin", "/usr/bin",
+			 "--ro-bind-try", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64",
+			 "--ro-bind-try", "/bin", "/bin", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+			 "--ro-bind-try", exedir, exedir,	/* after the tmpfs: a build in /tmp must stay visible */
+			 self, "--sandbox-child", NULL };
 	gchar *err = NULL;
 	gint st = 0;
 	GError *ge = NULL;

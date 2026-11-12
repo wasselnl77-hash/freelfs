@@ -1,0 +1,20 @@
+# Translates between LLVM IR and SPIR-V: llvm-spirv and libLLVMSPIRVLib. Mesa's Intel drivers
+# need it at build time (shader compiler mesa_clc), libclc needs llvm-spirv. The version
+# must match LLVM (v22.1.x for LLVM 22.1.x).
+pkgname=spirv-llvm-translator
+version=22.1.8
+release=1
+worksrc=SPIRV-LLVM-Translator-$version
+summary="LLVM IR to SPIR-V translator"
+url=https://github.com/KhronosGroup/SPIRV-LLVM-Translator
+license=(Apache-2.0-WITH-LLVM-exception)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc gcc llvm spirv-tools)
+makedepends=(cmake ninja spirv-headers pkgconf)
+source=(spirv-llvm-translator-$version.tar.gz::https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v$version.tar.gz)
+sha256=(895bca0285fd4118800912a54527c0ae0d0c6e62591e807c3c96c6b342c4c5e2)
+build_style=cmake
+configure_args=(-D LLVM_INCLUDE_TESTS=OFF -D BUILD_SHARED_LIBS=ON -D LLVM_SPIRV_INCLUDE_TESTS=OFF
+	-D LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR=/usr -D CMAKE_POLICY_VERSION_MINIMUM=3.5)
+check() { :; }
