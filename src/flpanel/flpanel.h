@@ -72,6 +72,9 @@ struct panel {
 	int locked;        /* fl_shell lock_state */
 	fl_font *f_head, *f_big;
 	int ws_cols, ws_rows, ws_cur; /* workspaces (fl_shell version 5): the pager in the panel; 0 cols: none */
+	fl_win *wsw;                  /* the pager's right-click menu (wsmenu.c) */
+	int ws_open, ws_sel, ws_cx;   /* it is shown, the highlighted item, and where the pager is */
+	int ws_mx, ws_my;             /* the pointer in it at the last pass */
 };
 
 enum { VJ_NONE, VJ_QUERY, VJ_SET };
@@ -88,7 +91,7 @@ static inline void panel_hide(fl_win *w)
 }
 
 /* which flyout is open; one at a time (panel.c) */
-enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC };
+enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC, FLY_WS };
 void panel_flyouts_close(struct panel *p, int except);
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx); /* closes the others, then shows w */
 
@@ -128,6 +131,16 @@ void battery_action(struct panel *p, const char *key);
 void battery_conf_changed(struct panel *p);
 int battery_saver(const struct panel *p);
 void battery_demo(struct panel *p, int open);
+
+/* ---- wsmenu.c: the pager's right-click menu ---- */
+#define WSM_W 232
+#define WSM_H 150 /* 2 (edge) + 6 + 4 rows of 30 + 2 rules of 9 + 4: the rows are laid out in wsmenu.c */
+void wsmenu_init(struct panel *p);
+void wsmenu_draw(fl_ui *ui, void *ud);
+void wsmenu_open(struct panel *p);
+void wsmenu_close(struct panel *p);
+void wsmenu_toggle(struct panel *p);
+int wsmenu_is_open(const struct panel *p);
 
 void menu_init(struct panel *p);
 void desk_reposition(struct panel *p); /* the panel moved or changed height: the icons keep clear of it */

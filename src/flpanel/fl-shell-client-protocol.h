@@ -235,6 +235,7 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
 #define FL_SHELL_MOVE_WINDOW 17
 #define FL_SHELL_TOGGLE_OVERVIEW 18
 #define FL_SHELL_SET_DESKTOP 19
+#define FL_SHELL_SET_WINDOW_ENTRY 20
 
 /**
  * @ingroup iface_fl_shell
@@ -373,6 +374,10 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_SET_DESKTOP_SINCE_VERSION 6
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_SET_WINDOW_ENTRY_SINCE_VERSION 7
 
 /** @ingroup iface_fl_shell */
 static inline void
@@ -669,6 +674,22 @@ fl_shell_set_desktop(struct fl_shell *fl_shell, struct wl_surface *surface, int3
 {
 	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
 			 FL_SHELL_SET_DESKTOP, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, surface, x, y);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * The rectangle of the window's entry in the panel surface (surface coordinates,
+ * the panel's top left is 0, 0). The compositor shrinks a minimised window towards
+ * it and grows a restored one from it. It is only a hint for animations: without it
+ * (or with animations off) the window just appears and disappears. Send it again
+ * when the entry moves; w = 0 forgets it.
+ */
+static inline void
+fl_shell_set_window_entry(struct fl_shell *fl_shell, uint32_t id, int32_t x, int32_t y, int32_t w, int32_t h)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_SET_WINDOW_ENTRY, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, id, x, y, w, h);
 }
 
 #ifdef  __cplusplus

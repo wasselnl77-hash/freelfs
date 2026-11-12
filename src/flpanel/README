@@ -12,7 +12,15 @@ panel_labels=1 in ~/.config/freelfs/desktop.conf adds the name (flsettings
 has the switch). theme= and panel_labels= are re-read when the file changes.
 Workspace pager (fl_shell 5, left of the layout indicator, only when there is more than one workspace):
 a small grid, the workspace in view filled with the accent colour, cells with windows marked; a click
-switches, the wheel steps, a right click shows the compositor's overview (Super+Tab).
+switches, the wheel steps, a right click opens a small menu (wsmenu.c, a flyout like the volume one): Workspace
+overview (the compositor's Super+Tab), Add workspace, Remove workspace and Workspace settings... (runs
+`flsettings --page workspaces`). Add and remove change workspaces=COLSxROWS in desktop.conf with libflui's
+fl_conf_set, the call Settings uses (flpanel writes no other key); flcomp applies the file at once and its
+workspaces event redraws the pager. Add is one column more (a row more once there are 8 columns), remove one column
+fewer (a row fewer once there is one column), never below 1x1 or above 8x8; the item shows the grid it would make
+and is dim when there is no room. With one workspace the pager is not drawn, so Settings > Workspaces is the way
+back from 1x1. Grids up to 8x8 fit the panel (cells shrink above 4 rows). `flpanel --demo --workspaces` shows the
+menu (FLUI_PPM=FILE writes the panel to FILE and the menu to FILE.N). tests/pager.sh covers the menu.
 Clicking a window entry activates it (going to its workspace), or minimizes it if it is focused. The
 layout indicator cycles de, us, uk, fr (fl_shell set_keyboard_layout). Wi-Fi
 opens flsettings; the battery opens its flyout (below), the clock the notification centre.

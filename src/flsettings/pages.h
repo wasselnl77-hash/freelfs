@@ -26,5 +26,8 @@ int pages_draw(struct pages *p, int page, fl_ui *ui, fl_rect c);
 void pg_section(fl_ui *ui, fl_font *head, int x, int y, int w, const char *name);
 void pg_row_text(fl_ui *ui, fl_font *small, int x, int y, int maxw, const char *title, const char *what);
 int pg_choice(fl_ui *ui, uint32_t id, fl_rect r, const char *label, int on);
+/* "Super+Left / Super+Right" as flat key chips (a + joins the keys of a combination, a / separates
+ * alternatives); returns the end x. draw 0 only measures. */
+int pg_key_chips(fl_ui *ui, fl_font *f, int x, int y, int h, const char *combo, int draw);
 
 #endif

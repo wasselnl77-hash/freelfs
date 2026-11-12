@@ -1,16 +1,24 @@
 #!/bin/sh
 # Headless test of the workspace pager in the panel: the real flpanel under flcomp (no display, no
 # root, HOME is a scratch directory). Clicking a cell switches, the wheel steps, a right click shows
-# the overview. Needs ../flcomp built (flcomp, tests/shmclient), python3 and a dbus-daemon
-# (DBUS_DAEMON may name it). `make check`; PAGER_OUT=DIR keeps the screenshots (PPM).
+# the menu (overview, add or remove a workspace, settings). Needs ../flcomp built (flcomp, tests/shmclient;
+# FLCOMP_DIR names another build), python3 and a dbus-daemon (DBUS_DAEMON may name it). `make check`;
+# PAGER_OUT=DIR keeps the screenshots (PPM); PAGER_THEME=light runs it with the light theme.
 # SPDX-License-Identifier: MIT
 cd "$(dirname "$0")/.." || exit 1
 here=$(pwd)
-comp=$here/../flcomp
+comp=${FLCOMP_DIR:-$here/../flcomp}
 dir=$(mktemp -d)
 trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$dir"' EXIT
 export XDG_RUNTIME_DIR=$dir HOME=$dir XDG_CONFIG_HOME=$dir/cfg FLUI_CONF=$dir/desktop.conf
-mkdir -p "$dir/cfg"
+mkdir -p "$dir/cfg" "$dir/bin"
+# "Workspace settings" runs flsettings --page workspaces: a stand-in that writes down its arguments
+printf '#!/bin/sh\necho "$*" >> "%s/flsettings.args"\n' "$dir" >"$dir/bin/flsettings"
+chmod +x "$dir/bin/flsettings"
+export PATH=$dir/bin:$PATH
+[ -n "$PAGER_THEME" ] && echo "theme=$PAGER_THEME" >"$dir/desktop.conf"
+# the colours the checks look for: accent, dim text and the overview's backdrop of the theme
+if [ "$PAGER_THEME" = light ]; then ACC=2c7a4b DIM=4f5761 BACK=cdd2d8; else ACC=3f9b63 DIM=8a9199 BACK=15181c; fi
 unset WAYLAND_DISPLAY
 W=1000; H=600
 export FLCOMP_WALLPAPER= FLCOMP_HEADLESS=${W}x${H} FLCOMP_SESSION= FLCOMP_SCREENSHOT=$dir/shot.ppm
@@ -44,13 +52,13 @@ sleep 0.6
 shot() { sleep 0.3; kill -USR1 $cpid; sleep 0.5; [ -n "$PAGER_OUT" ] && cp "$dir/shot.ppm" "$PAGER_OUT/$1.ppm"; return 0; }
 send() { echo "$1" >"$dir/in"; sleep 0.15; }
 last_ws() { grep '^workspaces' "$dir/listen.out" | tail -1; }
-# cells FILE W H -> "x1 y1 cw ch": the accent coloured cell (the workspace in view) in the right part of the panel
+# cells FILE -> "x1 y1 cw ch": the accent coloured cell (the workspace in view) in the right part of the panel
 cells() {
-	python3 -I - "$@" <<'PY'
+	python3 -I - "$@" $ACC <<'PY'
 import sys
 f = open(sys.argv[1], 'rb'); f.readline(); w, h = map(int, f.readline().split()); f.readline(); d = f.read()
 pts = [(x, y) for y in range(h - 44, h) for x in range(w // 2, w)
-       if d[(y * w + x) * 3:(y * w + x) * 3 + 3] == bytes.fromhex('3f9b63')]
+       if d[(y * w + x) * 3:(y * w + x) * 3 + 3] == bytes.fromhex(sys.argv[2])]
 xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
 print(min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1)
 PY
@@ -97,15 +105,140 @@ shot pager-back
 "$comp/tests/shmclient" -l -W -s 3 -C "wsmove:1,3" >/dev/null &
 sleep 2
 shot pager-moved
-n=$(count "$dir/shot.ppm" 8a9199)
+n=$(count "$dir/shot.ppm" $DIM)
 [ "$n" -ge 4 ] && ok "a cell with a window in it has a mark" || bad "no mark in the cells ($n)"
-# a right click on the pager shows the overview
-send "move $((X + CW / 2)) $((Y + CH / 2))"
-send "button 273 1"
-send "button 273 0"
-sleep 0.3
+# ---- the right-click menu ----------------------------------------------------------------------------
+# menu_at FILE -> "x y": the top left of the menu above the panel (a flat accent edge over 200 px)
+menu_at() {
+	python3 -I - "$@" $ACC <<'PY'
+import sys
+f = open(sys.argv[1], 'rb'); f.readline(); w, h = map(int, f.readline().split()); f.readline(); d = f.read()
+acc = bytes.fromhex(sys.argv[2])
+for y in range(h - 44 - 200, h - 44):
+    run = 0
+    for x in range(w):
+        if d[(y * w + x) * 3:(y * w + x) * 3 + 3] == acc:
+            run += 1
+            if run >= 200:
+                print(x - run + 1, y); sys.exit(0)
+        else:
+            run = 0
+PY
+}
+# a right click on the pager (where the cell in view is, from a fresh picture)
+open_menu() {
+	shot tmp
+	set -- $(cells "$dir/shot.ppm")
+	[ -n "$1" ] || { bad "open_menu: no pager"; return 1; }
+	send "move $(($1 + $3 / 2)) $(($2 + $4 / 2))"
+	send "button 273 1"
+	send "button 273 0"
+	sleep 0.4
+}
+# menu_item NAME ITEM: take the picture NAME of the open menu, then click item 0 overview, 1 add, 2 remove, 3 settings
+menu_item() {
+	shot "$1"
+	set -- "$1" "$2" $(menu_at "$dir/shot.ppm")
+	[ -n "$3" ] || { bad "menu_item: no menu in the picture"; return 1; }
+	case $2 in 0) off=23;; 1) off=62;; 2) off=92;; *) off=131;; esac
+	click $(($3 + 100)) $(($4 + off))
+	sleep 0.6
+}
+conf_has() { grep -qx "workspaces=$1" "$dir/desktop.conf" 2>/dev/null; }
+# the file as a user would have written it (the theme stays), flcomp and the panel pick it up
+setconf() { { [ -n "$PAGER_THEME" ] && echo "theme=$PAGER_THEME"; echo "$1"; } >"$dir/desktop.conf"; }
+conf_now() { grep '^workspaces=' "$dir/desktop.conf" 2>/dev/null | tail -1; }
+
+open_menu
+shot pager-menu
+mpos=$(menu_at "$dir/shot.ppm")
+[ -n "$mpos" ] && ok "a right click on the pager opens the menu (at $mpos)" || bad "no menu"
+# its right edge is inside the screen and it sits right above the panel
+set -- $mpos
+[ "$(($2 + 150))" = "$((H - 44))" ] && ok "the menu is directly above the panel" || bad "menu y=$2"
+menu_item pager-menu-settings 3
+[ "$(cat "$dir/flsettings.args" 2>/dev/null)" = "--page workspaces" ] && ok "Workspace settings runs flsettings --page workspaces" || bad "flsettings args: $(cat "$dir/flsettings.args" 2>/dev/null)"
+shot tmp
+[ -z "$(menu_at "$dir/shot.ppm")" ] && ok "choosing an item closes the menu" || bad "menu still open"
+[ -z "$(conf_now)" ] && ok "nothing was written to desktop.conf so far" || bad "conf: $(conf_now)"
+
+# the overview item is the old right click action
+open_menu
+menu_item pager-menu-overview 0
 shot pager-overview
-[ "$(pixel "$dir/shot.ppm" 20 20)" = "15181c" ] || [ "$(pixel "$dir/shot.ppm" 600 20)" = "15181c" ] && ok "a right click on the pager opens the overview" || bad "no overview"
+[ "$(pixel "$dir/shot.ppm" 20 20)" = "$BACK" ] || [ "$(pixel "$dir/shot.ppm" 600 20)" = "$BACK" ] && ok "the overview item opens the overview" || bad "no overview"
+send "key 1 1"
+send "key 1 0"
+sleep 0.5
+shot tmp
+[ "$(pixel "$dir/shot.ppm" 20 20)" != "$BACK" ] && ok "Esc closes the overview" || bad "overview still open"
+
+# Add: one column more
+open_menu
+menu_item pager-menu-add 1
+conf_has 3x2 && ok "Add workspace writes workspaces=3x2" || bad "add: $(conf_now)"
+sleep 0.5
+[ "$(last_ws)" = "workspaces 3x2 current=0" ] && ok "the compositor applies 3x2 at once" || bad "after add: $(last_ws)"
+shot pager-3x2
+set -- $(cells "$dir/shot.ppm")
+X=$1; Y=$2; CW=$3; CH=$4
+click $((X + 2 * (CW + 2) + CW / 2)) $((Y + CH + 2 + CH / 2))
+[ "$(last_ws)" = "workspaces 3x2 current=5" ] && ok "the pager has the new cells: the sixth one switches there" || bad "click cell 6: $(last_ws)"
+# Remove, three times: 2x2, 1x2, 1x1
+click $((X + 2 * (CW + 2) + CW / 2)) $((Y + CH / 2))
+open_menu
+menu_item pager-menu-remove 2
+conf_has 2x2 && ok "Remove workspace writes workspaces=2x2" || bad "remove: $(conf_now)"
+sleep 0.5
+case $(last_ws) in "workspaces 2x2 "*) ok "the compositor applies 2x2 ($(last_ws))";; *) bad "after remove: $(last_ws)";; esac
+open_menu
+menu_item tmp 2
+conf_has 1x2 && ok "Remove again: 1x2" || bad "remove 2: $(conf_now)"
+sleep 0.5
+shot pager-1x2
+set -- $(cells "$dir/shot.ppm")
+[ "$4" -ge 5 ] && ok "the pager is one column of two cells (cell ${3}x${4})" || bad "pager 1x2: $*"
+open_menu
+menu_item tmp 2
+conf_has 1x1 && ok "Remove once more: 1x1, a row goes when there is one column" || bad "remove 3: $(conf_now)"
+sleep 0.5
+[ "$(last_ws)" = "workspaces 1x1 current=0" ] && ok "the compositor has one workspace" || bad "after 1x1: $(last_ws)"
+shot pager-1x1
+[ -z "$(cells "$dir/shot.ppm" 2>/dev/null)" ] && ok "with one workspace the pager is gone" || bad "pager still drawn"
+[ "$(count "$dir/shot.ppm" e0a030)" -gt 1000 ] && ok "the windows of the removed workspaces moved to the last one" || bad "window one is not on the remaining workspace"
+
+# the limits: 8 x 8 is the most; a bare number in the file is N x 1; a column in a 1 x N grid is a row
+setconf workspaces=8x7
+sleep 1
+open_menu
+menu_item pager-menu-8x7 1
+conf_has 8x8 && ok "Add at 8 columns makes a row: 8x8" || bad "add 8x7: $(conf_now)"
+sleep 0.5
+open_menu
+shot pager-menu-8x8
+menu_item tmp 1
+conf_has 8x8 && ok "Add at 8x8 does nothing" || bad "add at 8x8: $(conf_now)"
+shot tmp
+[ -n "$(menu_at "$dir/shot.ppm")" ] && ok "a dim item does not close the menu" || bad "menu closed by a dim item"
+send "key 1 1"
+send "key 1 0"
+sleep 0.4
+shot tmp
+[ -z "$(menu_at "$dir/shot.ppm")" ] && ok "Esc closes the menu" || bad "menu still open after Esc"
+shot pager-8x8
+set -- $(cells "$dir/shot.ppm")
+[ -n "$1" ] && ok "the pager draws 64 cells in the panel (cell ${3}x${4})" || bad "no 8x8 pager"
+setconf workspaces=3
+sleep 1
+open_menu
+menu_item tmp 1
+conf_has 4x1 && ok "a bare 3 in the file is 3x1; Add: 4x1" || bad "bare number: $(conf_now)"
+sleep 0.5
+setconf workspaces=1x3
+sleep 1
+open_menu
+menu_item tmp 2
+conf_has 1x2 && ok "Remove in 1x3: 1x2" || bad "1x3: $(conf_now)"
 [ $fails = 0 ] || { echo "--- flcomp log"; tail -8 "$dir/log"; }
 kill $cpid 2>/dev/null
 [ $fails = 0 ] && echo "all tests passed" || echo "$fails test(s) failed"

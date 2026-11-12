@@ -1,9 +1,9 @@
 flsettings -- FreeLFS settings
 ==============================
 
-Six pages behind a sidebar: General (theme, panel labels), Display, Mouse &
-touchpad, Keyboard (pages.c), Date & time (datetime.c) and Wi-Fi. `flsettings --page
-general|display|mouse|keyboard|datetime|wifi` opens on that page; if Settings
+Pages behind a sidebar: General (theme, panel labels), Display, Mouse &
+touchpad, Keyboard (pages.c), Workspaces (workspaces.c), Date & time (datetime.c) and Wi-Fi, then Snapshots and About. `flsettings --page
+general|display|mouse|keyboard|workspaces|datetime|wifi|snapshots|about` opens on that page; if Settings
 is already running the page is passed to it (a socket in $XDG_RUNTIME_DIR) and
 the new process exits.
 
@@ -40,6 +40,16 @@ them through libinput. Keyboard: the four layouts (also written to
 field to try it, and a read-only list of the keyboard shortcuts (flcomp's: Super, Alt-Tab,
 Super+arrows, Print, ...; keep it in step with src/flcomp/seat.c and docs/M7-DESIGN.md).
 Pages that do not fit the window scroll (wheel or bar).
+
+Workspaces (workspaces.c): "Across" and "Down" steppers (1 to 8 each), the total with a small picture of the grid and
+the quick choices 1, 2, 4, 6 and 8 (1x1, 2x1, 2x2, 3x2, 4x2). All of it is one key, workspaces=COLSxROWS in
+desktop.conf (a bare N, written by hand, is N x 1; the default without the key is 2x2, flcomp's), written with
+fl_conf_set like the other settings. flcomp applies it at once: windows on workspaces that are taken away move to the
+last one that is left, and the panel's pager follows. The page says that, and lists Super+Ctrl+arrows (switch),
+Super+Shift+arrows (move the window) and Super+Tab (overview); the Keyboard page's shortcut list has the same three.
+The pager's right-click menu in flpanel writes the same key. `make check` runs tests/workspaces.py (headless flcomp,
+clicks on the steppers and quick choices, desktop.conf and flcomp's announced grid checked; FLCOMP=, FLSETTINGS=,
+SHMCLIENT=, APPS_OUT=DIR for screenshots, APPS_THEME=light APPS_SUFFIX=-light).
 
 Wi-Fi: iwd's D-Bus API (net.connman.iwd on the system bus, libdbus;
 $DBUS_SYSTEM_BUS_ADDRESS overrides the bus). Lists networks with signal bars

@@ -522,6 +522,8 @@ void panel_flyouts_close(struct panel *p, int except)
 		battery_flyout_close(p);
 	if (except != FLY_NC)
 		notify_center_close(p);
+	if (except != FLY_WS)
+		wsmenu_close(p);
 }
 
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx)
@@ -799,24 +801,28 @@ static void draw_panel(fl_ui *ui, void *ud)
 		x -= 4;
 	}
 	/* the workspace pager: a small grid, the one in view filled with the accent colour, the ones with
-	 * windows marked; a click goes there, the wheel steps through them, a right click shows the overview
-	 * (the compositor's Super+Tab) */
+	 * windows marked; a click goes there, the wheel steps through them, a right click opens a menu
+	 * (wsmenu.c: the overview, add or remove a workspace, settings) */
 	if ((p->shell_ver >= 5 || p->demo) && p->ws_cols * p->ws_rows > 1) {
 		int cols = p->ws_cols, rows = p->ws_rows;
-		int ch = (22 - (rows - 1) * 2) / rows;
+		/* up to 4 rows the cells are as big as they can be in 22 px; with more the gap is 1 px and they
+		 * shrink so that 8 rows (the most Settings allows) still fit in the panel */
+		int gap = rows > 4 ? 1 : 2;
+		int ch = rows > 4 ? (34 - (rows - 1)) / rows : (22 - (rows - 1) * 2) / rows;
 		if (ch > 14)
 			ch = 14;
-		if (ch < 5)
-			ch = 5;
+		if (ch < (rows > 4 ? 3 : 5))
+			ch = rows > 4 ? 3 : 5;
 		int cwid = ch * 8 / 5;
-		int gw = cols * cwid + (cols - 1) * 2, gh = rows * ch + (rows - 1) * 2;
+		int gw = cols * cwid + (cols - 1) * gap, gh = rows * ch + (rows - 1) * gap;
 		int boxw = gw + 10;
 		x -= boxw;
+		p->ws_cx = x + boxw / 2;
 		fl_rect box = fl_r(x, 1 + (PANEL_H - 1 - (gh + 8)) / 2, boxw, gh + 8);
 		if (ui->mouse_in && fl_in(box, ui->mx, ui->my))
 			fl_fill_rect(cv, box, fl_th.raised);
-		for (int i = 0; i < cols * rows && i < 62; i++) {
-			fl_rect c = fl_r(box.x + 5 + (i % cols) * (cwid + 2), box.y + 4 + (i / cols) * (ch + 2), cwid, ch);
+		for (int i = 0; i < cols * rows && i < 64; i++) {
+			fl_rect c = fl_r(box.x + 5 + (i % cols) * (cwid + gap), box.y + 4 + (i / cols) * (ch + gap), cwid, ch);
 			int res = fl_widget(ui, ID_WS + (uint32_t)i, c, 0);
 			int cur = i == p->ws_cur, used = 0;
 			for (int k = 0; k < p->nwins; k++)
@@ -832,7 +838,7 @@ static void draw_panel(fl_ui *ui, void *ud)
 			if ((res & FL_CLICK) && p->shell && p->shell_ver >= 5)
 				fl_shell_set_workspace(p->shell, (uint32_t)i);
 		}
-		int bres = fl_widget(ui, ID_WS + 63, box, 0); /* after the cells: they take the press */
+		int bres = fl_widget(ui, ID_WS + 64, box, 0); /* after the cells: they take the press */
 		if (bres & FL_HOVER) {
 			if (ui->wheel && p->shell && p->shell_ver >= 5) {
 				int n = p->ws_cols * p->ws_rows, to = p->ws_cur + (ui->wheel > 0 ? 1 : -1);
@@ -840,8 +846,8 @@ static void draw_panel(fl_ui *ui, void *ud)
 					fl_shell_set_workspace(p->shell, (uint32_t)to);
 				ui->wheel = 0;
 			}
-			if ((bres & FL_RCLICK) && p->shell && p->shell_ver >= 5)
-				fl_shell_toggle_overview(p->shell);
+			if (bres & FL_RCLICK)
+				wsmenu_toggle(p);	/* overview, add or remove a workspace, settings */
 		}
 		x -= 4;
 	}
@@ -925,7 +931,7 @@ static void conf_changed(void *ud)
 int main(int argc, char **argv)
 {
 	struct panel p = {0};
-	int open_menu = 0, open_fly = 0, show_cards = 0, show_center = 0, show_bat = 0;
+	int open_menu = 0, open_fly = 0, open_ws = 0, show_cards = 0, show_center = 0, show_bat = 0;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--demo"))
 			p.demo = 1;
@@ -939,11 +945,14 @@ int main(int argc, char **argv)
 			open_menu = 1;
 		else if (!strcmp(argv[i], "--volume"))
 			open_fly = 1;
+		else if (!strcmp(argv[i], "--workspaces"))
+			open_ws = p.demo = 1;
 		else {
-			fprintf(stderr, "usage: flpanel [--demo] [--menu] [--volume] [--cards] [--center] [--battery]\n"
+			fprintf(stderr, "usage: flpanel [--demo] [--menu] [--volume] [--workspaces] [--cards] [--center] [--battery]\n"
 			                "  --demo  fake windows and a fixed clock (for screenshots)\n"
 			                "  --menu  start with the menu open\n"
 			                "  --volume  start with the volume flyout open\n"
+			                "  --workspaces  demo with the pager's menu open (FLUI_PPM=FILE writes FILE and FILE.N)\n"
 			                "  --cards, --center, --battery  demo with notification cards, the centre or the\n"
 			                "          battery flyout shown (FLUI_PPM=FILE writes file, file.3, file.4, file.5)\n");
 			return !strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ? 0 : 2;
@@ -1001,6 +1010,7 @@ int main(int argc, char **argv)
 	notify_init(&p);
 	battery_init(&p);
 	desk_init(&p);
+	wsmenu_init(&p); /* last: the other windows keep their numbers in FLUI_PPM file names */
 
 	if (p.demo) {
 		struct win demo[2] = {
@@ -1026,6 +1036,14 @@ int main(int argc, char **argv)
 		if (!open_fly) {
 			fl_win_destroy(p.fw);
 			p.fw = NULL;
+		}
+		if (open_ws) {
+			p.ws_open = 1;
+			p.ws_sel = 1;
+			fl_win_map(p.wsw);
+		} else {
+			fl_win_destroy(p.wsw);
+			p.wsw = NULL;
 		}
 	} else if (open_menu) {
 		menu_open(&p);

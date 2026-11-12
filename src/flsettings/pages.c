@@ -613,6 +613,9 @@ static const struct { const char *keys, *what; } shortcuts[] = {
 	{"Super+Left / Super+Right", "Snap to the left or right half"},
 	{"Super+Up", "Maximize"},
 	{"Super+Down", "Restore, or minimize"},
+	{"Super+Ctrl+Arrows", "Switch workspace"},
+	{"Super+Shift+Arrows", "Move the window to another workspace"},
+	{"Super+Tab", "Overview of the workspaces"},
 	{"Print", "Screenshot to the pictures folder"},
 	{"Media keys", "Volume, brightness, microphone"},
 	{"Ctrl+Alt+Backspace", "Log out at once"},
@@ -621,7 +624,7 @@ static const struct { const char *keys, *what; } shortcuts[] = {
 
 /* "Super+Left / Super+Right": every key a flat chip (raised, 1 px line), a dim + between the keys of a
  * combination and a dim / between alternatives. Returns the end x; draw 0 only measures. */
-static int key_chips(fl_ui *ui, fl_font *f, int x, int y, int h, const char *combo, int draw)
+int pg_key_chips(fl_ui *ui, fl_font *f, int x, int y, int h, const char *combo, int draw)
 {
 	fl_canvas *cv = &ui->cv;
 	const char *q = combo;
@@ -663,13 +666,13 @@ static int draw_shortcuts(fl_ui *ui, struct pages *p, int x, int y, int w)
 	y += 36;
 	int kw = 0;
 	for (size_t i = 0; i < sizeof shortcuts / sizeof *shortcuts; i++) {
-		int e = key_chips(ui, p->small, 0, 0, 22, shortcuts[i].keys, 0);
+		int e = pg_key_chips(ui, p->small, 0, 0, 22, shortcuts[i].keys, 0);
 		kw = e > kw ? e : kw;
 	}
 	kw += 24;
 	for (size_t i = 0; i < sizeof shortcuts / sizeof *shortcuts; i++) {
 		char fit[160];
-		key_chips(ui, p->small, x, y + 4, 22, shortcuts[i].keys, 1);
+		pg_key_chips(ui, p->small, x, y + 4, 22, shortcuts[i].keys, 1);
 		fl_text_fit(ui->f_reg, shortcuts[i].what, w - kw, fit, sizeof fit);
 		fl_text_in(&ui->cv, ui->f_reg, fl_r(x + kw, y, w - kw, 30), FL_LEFT, 0, fl_th.dim, fit);
 		y += 30;
