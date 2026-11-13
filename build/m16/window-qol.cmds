@@ -1,0 +1,26 @@
+@desktop
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid fledit >/tmp/fledit.log 2>&1 </dev/null &'
+@wait 5
+@mouse 500 26
+@click right
+@wait 1
+@shot @OUT@/e-winmenu.ppm
+@mouse 560 70
+@wait 1
+@shot @OUT@/e-winmenu-hover.ppm
+@key esc
+@drag 500 26 2 300 @OUT@/e-snap-preview.ppm
+@wait 2
+@shot @OUT@/e-snapped.ppm
+@drag 300 26 640 1 @OUT@/e-max-preview.ppm
+@wait 2
+@shot @OUT@/e-maxed.ppm
+@dclick
+@mouse 400 26
+@dclick
+@wait 2
+@shot @OUT@/e-dclick.ppm
+@click middle
+@wait 2
+@shot @OUT@/e-closed.ppm
+pgrep -c fledit

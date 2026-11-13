@@ -303,7 +303,7 @@ static int parse_pax(struct tar_reader *r, const char *buf, size_t len, struct p
 	while (off < len) {
 		char *end;
 		unsigned long n = strtoul(buf + off, &end, 10);
-		if (end == buf + off || *end != ' ' || n == 0 || off + n > len)
+		if (end == buf + off || *end != ' ' || n == 0 || n > len - off)
 			return fail(r, "bad pax header");
 		const char *kv = end + 1, *stop = buf + off + n - 1; /* at '\n' */
 		const char *eq = memchr(kv, '=', (size_t)(stop - kv));

@@ -524,6 +524,8 @@ void panel_flyouts_close(struct panel *p, int except)
 		notify_center_close(p);
 	if (except != FLY_WS)
 		wsmenu_close(p);
+	if (except != FLY_CTX)
+		ctx_close(p);
 }
 
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx)
@@ -605,6 +607,53 @@ static void clock_tick(void *ud)
 	struct panel *p = ud;
 	clock_arm(p);
 	fl_win_redraw(p->pw);
+}
+
+/* ---- taskbar buttons: right-click menu (ctxmenu.c), middle click closes ----------------------- */
+
+enum { TK_MIN = 1, TK_CLOSE, TK_WS = 100 };
+
+static void task_pick(struct panel *p, uintptr_t ud, int code)
+{
+	uint32_t id = (uint32_t)ud;
+	if (!p->shell)
+		return;
+	if (code == TK_MIN) {
+		int min = 0;
+		for (int k = 0; k < p->nwins; k++)
+			if (p->wins[k].id == id)
+				min = p->wins[k].minimized;
+		if (min)
+			fl_shell_activate(p->shell, id);
+		else
+			fl_shell_minimize(p->shell, id);
+	} else if (code == TK_CLOSE) {
+		fl_shell_close(p->shell, id);
+	} else if (code >= TK_WS && p->shell_ver >= 5) {
+		fl_shell_move_window(p->shell, id, (uint32_t)(code - TK_WS));
+	}
+}
+
+static void task_menu(struct panel *p, struct win *w, int cx)
+{
+	struct ctx_item it[14];
+	char lab[8][40];
+	int n = 0, k = 0;
+	it[n++] = (struct ctx_item){w->minimized ? "Restore" : "Minimize", 1, TK_MIN};
+	/* the other workspaces, the nearest first (eight at most); Maximize has no request in fl_shell yet */
+	int total = p->ws_cols * p->ws_rows;
+	if (p->shell_ver >= 5 && total > 1) {
+		it[n++] = (struct ctx_item){NULL, 0, 0};
+		for (int j = 1; j < total && k < 8; j++) {
+			int idx = (w->ws + j) % total;
+			snprintf(lab[k], sizeof lab[k], "Move to workspace %d", idx + 1);
+			it[n++] = (struct ctx_item){lab[k], 1, TK_WS + idx};
+			k++;
+		}
+	}
+	it[n++] = (struct ctx_item){NULL, 0, 0};
+	it[n++] = (struct ctx_item){"Close", 1, TK_CLOSE};
+	ctx_open(p, cx, it, n, task_pick, (uintptr_t)w->id);
 }
 
 static void draw_panel(fl_ui *ui, void *ud)
@@ -894,6 +943,11 @@ static void draw_panel(fl_ui *ui, void *ud)
 			w->eh = r.h;
 			fl_shell_set_window_entry(p->shell, w->id, r.x, r.y, r.w, r.h);
 		}
+		/* middle click closes the window, right click opens its menu */
+		if ((res & FL_HOVER) && (ui->release & FL_BTN_M) && p->shell)
+			fl_shell_close(p->shell, w->id);
+		if (res & FL_RCLICK)
+			task_menu(p, w, r.x + r.w / 2);
 		if ((res & FL_CLICK) || ((res & FL_FOCUS) && (ui->key == XKB_KEY_Return || ui->key == XKB_KEY_space))) {
 			ui->key = 0;
 			if (p->shell) {

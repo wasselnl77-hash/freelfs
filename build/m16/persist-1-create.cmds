@@ -1,0 +1,8 @@
+grep -E ' /run/live/(src|iso) ' /proc/mounts
+ls /drives
+su -s /bin/sh tester -c 'flmount list'
+su -s /bin/sh tester -c 'flpersist status'
+su -s /bin/sh tester -c 'flpersist create 512M; echo rc=$?'
+ls -l /run/live/src/
+su -s /bin/sh tester -c 'flpersist status'
+sync

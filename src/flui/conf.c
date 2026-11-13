@@ -70,11 +70,12 @@ void fl_theme_set(int dark)
 
 /* ---- the file ----------------------------------------------------------------- */
 
-#define MAXKEYS 64
-static struct {
-	char key[32], val[96];
-} kv[MAXKEYS];
-static int nkv;
+/* every key and value is kept whole, on the heap: nothing is cut or dropped when the file is written */
+struct kvp {
+	char *key, *val;
+};
+static struct kvp *kv;
+static int nkv, capkv;
 static char path_buf[512];
 
 const char *fl_conf_path(void)
@@ -89,28 +90,54 @@ const char *fl_conf_path(void)
 	return path_buf;
 }
 
+static void kv_clear(void)
+{
+	for (int i = 0; i < nkv; i++) {
+		free(kv[i].key);
+		free(kv[i].val);
+	}
+	nkv = 0;
+}
+
 static void kv_set(const char *k, const char *v)
 {
 	for (int i = 0; i < nkv; i++)
 		if (!strcmp(kv[i].key, k)) {
-			snprintf(kv[i].val, sizeof kv[i].val, "%s", v);
+			char *nv = strdup(v);
+			if (nv) {
+				free(kv[i].val);
+				kv[i].val = nv;
+			}
 			return;
 		}
-	if (nkv < MAXKEYS) {
-		snprintf(kv[nkv].key, sizeof kv[nkv].key, "%s", k);
-		snprintf(kv[nkv].val, sizeof kv[nkv].val, "%s", v);
-		nkv++;
+	if (nkv == capkv) {
+		int nc = capkv ? capkv * 2 : 32;
+		struct kvp *n = realloc(kv, (size_t)nc * sizeof *n);
+		if (!n)
+			return;
+		kv = n;
+		capkv = nc;
 	}
+	char *kk = strdup(k), *vv = strdup(v);
+	if (!kk || !vv) {
+		free(kk);
+		free(vv);
+		return;
+	}
+	kv[nkv].key = kk;
+	kv[nkv].val = vv;
+	nkv++;
 }
 
 static void read_file(void)
 {
-	nkv = 0;
+	kv_clear();
 	FILE *f = fopen(fl_conf_path(), "r");
 	if (!f)
 		return;
-	char line[160];
-	while (fgets(line, sizeof line, f)) {
+	char *line = NULL;
+	size_t cap = 0;
+	while (getline(&line, &cap, f) >= 0) { /* any line length */
 		char *s = line;
 		while (*s == ' ' || *s == '\t')
 			s++;
@@ -121,8 +148,10 @@ static void read_file(void)
 			continue;
 		*eq = 0;
 		char *v = eq + 1;
+		while (*v == ' ' || *v == '\t') /* theme = light reads as light */
+			v++;
 		size_t n = strlen(v);
-		while (n && (v[n - 1] == '\n' || v[n - 1] == ' ' || v[n - 1] == '\r'))
+		while (n && (v[n - 1] == '\n' || v[n - 1] == ' ' || v[n - 1] == '\t' || v[n - 1] == '\r'))
 			v[--n] = 0;
 		char *k = s;
 		size_t kn = strlen(k);
@@ -130,6 +159,7 @@ static void read_file(void)
 			k[--kn] = 0;
 		kv_set(k, v);
 	}
+	free(line);
 	fclose(f);
 }
 
@@ -181,6 +211,8 @@ static void kv_del(const char *k)
 {
 	for (int i = 0; i < nkv; i++)
 		if (!strcmp(kv[i].key, k)) {
+			free(kv[i].key);
+			free(kv[i].val);
 			kv[i] = kv[--nkv];
 			return;
 		}

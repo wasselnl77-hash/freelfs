@@ -29,6 +29,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include "flauth-check.h"
+
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -886,6 +888,33 @@ int main(int argc, char **argv)
 	if (argc < 2 || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
 		usage(argc < 2 ? stderr : stdout);
 		return argc < 2 ? 2 : 0;
+	}
+	/* going back to a snapshot, deleting and pruning ask for the person's password (flauth); the others
+	 * (create, list, show, status) do not */
+	if (getuid() != geteuid() && (!strcmp(argv[1], "rollback") || !strcmp(argv[1], "delete") ||
+				      !strcmp(argv[1], "rm") || !strcmp(argv[1], "prune")) && !flauth_ok(getuid())) {
+		uid_t u = getuid();
+		gid_t g = getgid();
+		if (getenv("FLAUTH_TRIED") || setresgid(g, g, g) < 0 || setresuid(u, u, u) < 0) {
+			fputs("flsnap: your password is needed (flauth)\n", stderr);
+			return 77;
+		}
+		setenv("FLAUTH_TRIED", "1", 1);
+		const char *reason = !strcmp(argv[1], "rollback") ? "Make the computer start from an earlier state."
+				     : "Delete system snapshots.";
+		char *args[64];
+		int k = 0;
+		args[k++] = "flauth";
+		args[k++] = "--reason";
+		args[k++] = (char *)reason;
+		args[k++] = "--";
+		args[k++] = "/usr/bin/flsnap";
+		for (int i = 1; i < argc && k < 62; i++)
+			args[k++] = argv[i];
+		args[k] = NULL;
+		execv("/usr/bin/flauth", args);
+		fputs("flsnap: your password is needed, and flauth is not installed\n", stderr);
+		return 77;
 	}
 	setup();
 	const char *c = argv[1];

@@ -10,7 +10,7 @@ DESTDIR ?=
 # the protocol is flcomp's; the recipe copies it here
 PROTO ?= ../flcomp/protocol/fl-shell.xml
 
-OBJS = panel.o menu.o flyout.o notify.o battery.o perfmode.o deskicons.o wsmenu.o fl-shell-protocol.o
+OBJS = panel.o menu.o flyout.o notify.o battery.o perfmode.o deskicons.o wsmenu.o fl-shell-protocol.o dialog.o ctxmenu.o
 
 all: flpanel flnotify flpower
 

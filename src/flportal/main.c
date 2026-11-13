@@ -603,7 +603,12 @@ static void shot_done(GObject *src, GAsyncResult *res, gpointer ud)
 		g_clear_error(&err);
 		return; /* cancelled: the request is gone already */
 	}
-	if (!portal_req_find(r->handle) || portal_req_find(r->handle) != r)
+	/* the request may be gone (closed by the caller) and r freed: only compare the pointer
+	 * and the process, never touch r before it is known to be alive */
+	struct req *l = reqs;
+	while (l && l != r)
+		l = l->next;
+	if (!l || r->proc != G_SUBPROCESS(src))
 		return;
 	gint st = g_subprocess_get_if_exited(r->proc) ? g_subprocess_get_exit_status(r->proc) : -1;
 	if (st == 0 && g_file_test(r->shot, G_FILE_TEST_EXISTS)) {
@@ -697,11 +702,39 @@ static const char portal_xml[] =
 	"</interface>"
 	"</node>";
 
+/* Only the frontend (the owner of org.freedesktop.portal.Desktop) may call the impl interfaces;
+ * FLPORTAL_ANY_SENDER=1 turns the check off for the tests. */
+static gboolean sender_ok(const char *sender)
+{
+	if (g_getenv("FLPORTAL_ANY_SENDER"))
+		return TRUE;
+	GError *err = NULL;
+	GVariant *v = g_dbus_connection_call_sync(conn, "org.freedesktop.DBus", "/org/freedesktop/DBus",
+	                                          "org.freedesktop.DBus", "GetNameOwner",
+	                                          g_variant_new("(s)", "org.freedesktop.portal.Desktop"),
+	                                          G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NONE, 1000, NULL, &err);
+	if (!v) {
+		g_clear_error(&err);
+		return FALSE;
+	}
+	const char *owner = NULL;
+	g_variant_get(v, "(&s)", &owner);
+	gboolean ok = owner && sender && !strcmp(owner, sender);
+	g_variant_unref(v);
+	return ok;
+}
+
 static void method_call(GDBusConnection *c, const char *sender, const char *path, const char *iface,
                         const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer ud)
 {
 	const char *ifn = iface + strlen("org.freedesktop.impl.portal.");
 	portal_say("%s.%s from %s", ifn, method, sender);
+	if (!sender_ok(sender)) {
+		portal_say("refused: %s is not xdg-desktop-portal", sender);
+		g_dbus_method_invocation_return_error_literal(inv, G_DBUS_ERROR, G_DBUS_ERROR_ACCESS_DENIED,
+		                                              "only xdg-desktop-portal may call the impl interfaces");
+		return;
+	}
 	if (!strcmp(ifn, "FileChooser")) {
 		const char *handle, *app_id, *parent, *title;
 		GVariant *opts;

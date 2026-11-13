@@ -1,0 +1,9 @@
+@desktop
+echo 'readme text' > /home/tester/readme.txt; chown 1000:999 /home/tester/readme.txt
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flfiles /home/tester >/tmp/files.log 2>&1 </dev/null &'
+@wait 5
+@mouse 511 270
+@dclick
+@wait 4
+ps -eo pid,comm | grep -E "fledit" | grep -v grep
+@shot @OUT@/g4-file.ppm

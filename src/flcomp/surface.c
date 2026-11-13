@@ -273,8 +273,16 @@ struct surface *pick(int x, int y, int *lx, int *ly)
 			return NULL;
 		}
 	}
-	if (desktop_visible() && (r = tree_pick(C.desktop, x, y, lx, ly)))	/* the icons: below every window */
-		return r;
+	if (desktop_visible()) {	/* the icons: below every window; the layer takes the pointer all over the
+				 * output where no window is, whatever its buffer covers (a small buffer is enough) */
+		if ((r = tree_pick(C.desktop, x, y, lx, ly)))
+			return r;
+		int ox, oy;
+		surface_origin(C.desktop, &ox, &oy);
+		*lx = x - ox;
+		*ly = y - oy;
+		return C.desktop;
+	}
 	return NULL;
 }
 

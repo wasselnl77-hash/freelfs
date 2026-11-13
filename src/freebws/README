@@ -26,13 +26,17 @@ Tabs (tabstrip.c draws the row)
   Click a tab to select it; the x on the active or hovered tab, or a middle
   click on any tab, closes it; + opens a new tab. A spinner shows a tab that
   is loading, a dimmer title one that was discarded.
-  target=_blank and window.open open a tab in front (related to the opener, so
-  window.opener works); Ctrl-click and middle-click on a link open one in the
-  background. window.close() closes the tab.
+  target=_blank and window.open open a tab in front when its page is ready
+  (related to the opener, so window.opener and postMessage work: OAuth and
+  sign-in popups). Ctrl-click and middle-click on a link open one in the
+  background. window.close() closes the popup and selects the page that opened
+  it. At 24 tabs the oldest background tab that is not loading is closed (it
+  stays in the Ctrl-Shift-T list); when there is none a notice says so.
   All tabs share one WebKitWebContext and the one network process. WebKit sees
   background tabs as hidden (it throttles them). A background tab that was not
-  looked at for 10 minutes, or the oldest one when less than a fifth of the memory
-  (at most 384 MB) is free, is discarded: its web view is destroyed, its
+  looked at for 30 minutes, or the oldest one when less than a fifth of the memory
+  (at most 384 MB) is free, is discarded (the opener of a popup that is still
+  open and a tab that is loading are never discarded): its web view is destroyed, its
   back/forward list kept, and selecting it loads the page again (scroll position
   and form input are lost). Tabs that load or play audio are never discarded.
 
@@ -139,3 +143,24 @@ Web process sandbox (docs/SECURITY.md)
   the homes directory and /usr/bin a link to ../sysflfs/bin, so /proc/self/exe was /sysflfs/bin/freebws
   (release 10 did not bind that and reported "bwrap: execvp /sysflfs/bin/freebws: No such file or
   directory"). Now /usr is the real system directory and /sysflfs a link to it.
+
+Popups, user agent, cookies (round 16)
+  window.open popups: javascript-can-open-windows-automatically is on, so a popup
+  from a script (after an await, seconds after the click) is not dropped. The
+  popup's tab is shown at ready-to-show (a fallback after 5 s).
+  User agent: useragent=STRING in ~/.config/freebws/config replaces the default,
+  which is a Chrome on Linux string with WebKit's own version
+  (Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/MAJ.MIN.MIC (KHTML, like Gecko)
+  Chrome/CHROME_UA_VERSION Safari/537.36; the constant is in freebws.c, move it
+  up now and then). Google refuses browsers it does not know, so no WPE token.
+  Cookies: cookies=always (default) or cookies=no-third-party (or
+  FREEBWS_COOKIES=) sets WebKit's cookie accept policy on the default network
+  session. The default keeps all cookies. WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY
+  is not the default because sign-in frames and popups that set cookies for the
+  page that opened them broke with it, and it was not checked against a real
+  sign-in here. The choice is still open for a test on the laptop.
+  count.js (the shield's count) no longer wraps window.fetch. It only watches
+  failed sub-resources now.
+  The first-start filter gate: a navigation that waits for the filters is held
+  until they are ready, and a newer address replaces the held one (the stale one
+  is never loaded over the page the user is on).

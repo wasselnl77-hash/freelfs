@@ -135,6 +135,11 @@ static void xfer_append(struct xfer *t, const void *p, size_t n)
 {
 	if (t->off > 0 && t->off == t->len)
 		t->len = t->off = 0;
+	if (t->len + n > MAX_BYTES) {	/* an X client offering gigabytes: cut it off */
+		t->done = true;
+		xfer_flush(t);
+		return;
+	}
 	char *nb = realloc(t->buf, t->len + n);
 	if (!nb)
 		return;

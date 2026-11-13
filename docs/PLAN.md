@@ -219,6 +219,29 @@ are systemd-only. FreeLFS therefore follows:
 - Public binary repo and signing keys.
 - CI that rebuilds changed recipes and checks reproducibility.
 
+#### Live persistence and USB drives (round 16)
+
+- **Persistent home on the stick.** On a Ventoy stick (the ISO is a file on the data partition), put a file
+  `freelfs-persist.img` (an ext4 or btrfs image) at the top of that partition, or next to the ISO. `flinitrd` sees it,
+  makes the stick writable, loop-mounts the image read-write and bind-mounts it over the live `/home`; `rc.sysinit`
+  copies the live user's skeleton home into an empty image and the ownership step gives it to her. Without the file,
+  everything stays in RAM as before. `flive.nopersist` on the kernel command line turns it off. Only `/home` is kept
+  (Flatpak apps the person installs live in `~/.local/share/flatpak`, so they are kept too); the system itself is still
+  the read-only ISO. Make the image with `flpersist create SIZE [--btrfs]` (setuid for the group seat; for example
+  `flpersist create 4G`: it makes the stick writable, allocates the file and runs mkfs); `flpersist status` says
+  none, ready or active. Settings > About runs `flpersist create 4G` in a live session. A stick written with dd has
+  no file system to hold the image: not supported.
+- **USB drives.** `flmount` (setuid, group seat) is the one helper: `list`, `mount`, `unmount`, `eject` (see its header
+  for the line format). A plugged-in removable partition is mounted by a udev rule (`90-flmount.rules`) at
+  `/drives/LABEL`, nosuid,nodev,noexec, with the uid and gid of the session's user on vfat/exFAT, and the session sees
+  the notification "USB stick 'LABEL' connected" (flnotify, with an Open button that starts Files there). The live boot
+  stick is made writable and bound to `/drives/LABEL`; `flinitrd` clears the kernel read-only flag it set while probing
+  on every device before the live system starts. NTFS is not supported (the kernel has no NTFS driver built in).
+- **Root actions ask for a password.** `flauth` (setuid, group seat, PAM-free: crypt() against /etc/shadow, rate limited,
+  a flui dialog run as the person) gates `flpkg-seat install|remove` and `flsnap rollback|delete|prune`: without a
+  fresh stamp (`/run/flauth/ok-UID`, 5 minutes) they start themselves again through flauth. The live session's tester
+  has no password and is not asked.
+
 ### M10: aarch64 port (not started)
 aarch64 returns once there is hardware to test on (the recipes declare `arch=(x86_64)` until then).
 

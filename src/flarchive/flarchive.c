@@ -233,6 +233,24 @@ static struct archive *reader_open(const char *path, struct archive_entry **e, i
 	return NULL;
 }
 
+/* A hardlink target that could reach outside the folder: absolute, or with a .. part. Such an entry is
+ * skipped, because the link would name a file the archive does not own. */
+static int unsafe_link(const char *t)
+{
+	if (t[0] == '/')
+		return 1;
+	for (const char *s = t; *s;) {
+		const char *e = strchr(s, '/');
+		size_t l = e ? (size_t)(e - s) : strlen(s);
+		if (l == 2 && s[0] == '.' && s[1] == '.')
+			return 1;
+		if (!e)
+			break;
+		s = e + 1;
+	}
+	return 0;
+}
+
 /* the path of an entry as we show it: no leading ./ or /, no trailing / */
 static void norm_path(const char *in, char *out, size_t cap)
 {
@@ -362,7 +380,11 @@ static int child_extract(const struct jobargs *j, int fd)
 			norm_path(pn, p, sizeof p);
 		else
 			p[0] = 0;
-		if (p[0] && in_selection(p, j->sel, j->nsel)) {
+		const char *hl0 = archive_entry_hardlink(e);
+		int unsafe_hl = hl0 && unsafe_link(hl0);
+		if (unsafe_hl)
+			skipped++;
+		if (p[0] && !unsafe_hl && in_selection(p, j->sel, j->nsel)) {
 			snprintf(np, sizeof np, "%s", p + sel_strip(p, j->sel, j->nsel));
 			archive_entry_set_pathname(e, np);
 			const char *hl = archive_entry_hardlink(e);
@@ -601,18 +623,22 @@ static int add_tree(struct cctx *c, const char *full, const char *arc)
 		close(fdi);
 	}
 	if (S_ISDIR(st.st_mode)) {
-		struct dirent **names;
+		struct dirent **names = NULL;
 		int n = scandir(full, &names, NULL, cmp_names);
-		for (int i = 0; i < n; i++) {
-			if (strcmp(names[i]->d_name, ".") && strcmp(names[i]->d_name, "..") && !c->failed) {
-				char cf[PATH_MAX], ca[PATH_MAX];
-				join(cf, sizeof cf, full, names[i]->d_name);
-				snprintf(ca, sizeof ca, "%s/%s", arc, names[i]->d_name);
-				add_tree(c, cf, ca);
+		if (n < 0) {
+			c->skipped++; /* unreadable folder: left out (names is not set on failure) */
+		} else {
+			for (int i = 0; i < n; i++) {
+				if (strcmp(names[i]->d_name, ".") && strcmp(names[i]->d_name, "..") && !c->failed) {
+					char cf[PATH_MAX], ca[PATH_MAX];
+					join(cf, sizeof cf, full, names[i]->d_name);
+					snprintf(ca, sizeof ca, "%s/%s", arc, names[i]->d_name);
+					add_tree(c, cf, ca);
+				}
+				free(names[i]);
 			}
-			free(names[i]);
+			free(names);
 		}
-		free(names);
 	}
 	return c->failed ? -1 : 0;
 }

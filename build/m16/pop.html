@@ -1,0 +1,4 @@
+<html><head><title>MAIN-PAGE</title></head><body style="background:#fff;color:#000">
+<button id="b" style="font-size:40px;margin:80px;padding:20px" onclick="window.open('child.html')">open popup</button>
+<script>addEventListener("message", function (e) { document.title = "BACK:" + e.data; document.body.append(" got " + e.data); });</script>
+</body></html>

@@ -1,0 +1,13 @@
+wait 3
+shot $OUT/h-greeter.ppm
+type secret1\n
+wait 14
+shot $OUT/h-desktop.ppm
+run u=$(id -u bob); su -s /bin/sh bob -c "export XDG_RUNTIME_DIR=/run/user/$u WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$u/bus; (flpkg-seat remove bc >/tmp/o.txt 2>&1; echo rc=\$? >> /tmp/o.txt) &" ; sleep 5; echo started
+shot $OUT/h-dialog.ppm
+type wrongpw\n
+wait 4
+shot $OUT/h-wrong.ppm
+type secret1\n
+wait 10
+run cat /tmp/o.txt; flpkg list | grep -c '^bc '; ls -l /run/flauth

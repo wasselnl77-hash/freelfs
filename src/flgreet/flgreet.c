@@ -123,16 +123,20 @@ static int run_greeter(char *out, size_t cap)
 		say("flcomp or flgreet-ui is missing");
 		return -1;
 	}
-	if (pipe(fds) < 0)
+	if (pipe2(fds, O_CLOEXEC) < 0)
 		return -1;
 	mkdir("/run/flgreet", 0700);
 	chmod("/run/flgreet", 0700);
 	time_t t0 = time(NULL);
 	pid_t pid = fork();
-	if (pid < 0)
+	if (pid < 0) {
+		close(fds[0]);
+		close(fds[1]);
 		return -1;
+	}
 	if (pid == 0) {
 		close(fds[0]);
+		fcntl(fds[1], F_SETFD, 0);	/* only this one goes on to flcomp (and from there to flgreet-ui alone) */
 		char fdstr[16];
 		snprintf(fdstr, sizeof fdstr, "%d", fds[1]);
 		clearenv();
@@ -161,6 +165,8 @@ static int run_greeter(char *out, size_t cap)
 		if (r <= 0)
 			break;
 		n += (size_t)r;
+		if (memchr(buf, '\n', n))
+			break;
 		if (n >= sizeof buf - 1)
 			break; /* too long to be a name */
 	}

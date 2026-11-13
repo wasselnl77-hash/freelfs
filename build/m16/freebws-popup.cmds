@@ -1,0 +1,21 @@
+@desktop
+@put @HERE@/pop.html /home/tester/pop.html
+@put @HERE@/child.html /home/tester/child.html
+chown 1000:999 /home/tester/pop.html /home/tester/child.html
+@key meta_l
+@wait 1
+@type web
+@key ret
+@wait 70
+@key ctrl-l
+@wait 1
+@type file:///home/tester/pop.html
+@key ret
+@wait 12
+@shot @OUT@/k-page.ppm
+@mouse 250 270
+@click
+@wait 6
+@shot @OUT@/k-popup.ppm
+@wait 8
+@shot @OUT@/k-after.ppm

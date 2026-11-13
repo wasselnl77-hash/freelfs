@@ -8,6 +8,10 @@ CFLAGS += -std=c17 -D_GNU_SOURCE -Wall -Wextra -Wshadow -Wno-unused-parameter
 PREFIX ?= /usr
 DESTDIR ?=
 
+# the tests' clients (lock, desktop, output) are not the desktop's own programs: flshell.c lets any client use the
+# privileged requests when this is set (and flcomp does not run as root)
+export FLCOMP_TRUST_ANY = 1
+
 PKGS = wayland-server libdrm libinput libseat xkbcommon libudev libpng xcb xcb-xfixes xcb-composite xcb-res
 # EGL, GBM and GLES: headers only. gl.c loads the libraries with dlopen when a client needs the GPU path
 # (linked, they pull libgallium and libLLVM into every session: 20 MB of RAM at idle).
@@ -27,7 +31,7 @@ GEN = xdg-shell-protocol.h xdg-shell-protocol.c fl-shell-protocol.h fl-shell-pro
 	fl-screencopy-protocol.h fl-screencopy-protocol.c \
 	linux-dmabuf-unstable-v1-protocol.h linux-dmabuf-unstable-v1-protocol.c \
 	xwayland-shell-protocol.h xwayland-shell-protocol.c
-OBJS = main.o render.o surface.o xdg.o seat.o flshell.o drm.o dmabuf.o gl.o config.o output.o media.o osd.o switcher.o shot.o lock.o power.o perf.o theme.o sound.o anim.o overview.o screencopy.o xwm.o xwsel.o xwdeco.o \
+OBJS = main.o render.o surface.o xdg.o seat.o flshell.o drm.o dmabuf.o gl.o config.o output.o media.o osd.o switcher.o shot.o lock.o power.o perf.o theme.o sound.o anim.o overview.o popup.o screencopy.o xwm.o xwsel.o xwdeco.o \
 	xdg-shell-protocol.o fl-shell-protocol.o fl-screencopy-protocol.o linux-dmabuf-unstable-v1-protocol.o xwayland-shell-protocol.o
 
 all: flcomp

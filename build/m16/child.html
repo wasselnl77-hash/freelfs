@@ -1,0 +1,3 @@
+<html><head><title>CHILD-POPUP</title></head><body style="background:#cfc;color:#000"><h1>I am the popup</h1>
+<script>if (window.opener) window.opener.postMessage("from-child", "*"); setTimeout(function () { window.close(); }, 3000);</script>
+</body></html>

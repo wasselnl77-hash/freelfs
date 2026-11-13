@@ -891,8 +891,23 @@ static void draw_prompt(fl_ui *ui, struct wifi *w, fl_rect a)
 		} else if ((ui->mods & FL_MOD_CTRL) && (ui->key == 'v' || ui->key == 'V')) {
 			size_t n = 0;
 			char *clip = fl_clipboard_get(w->app, &n);
-			for (size_t i = 0; clip && i < n && clip[i] != '\n' && clip[i] != '\r' && w->pwlen < PWMAX; i++)
-				w->pw[w->pwlen++] = clip[i];
+			/* whole UTF-8 characters, up to PWMAX bytes; the buffer stays NUL terminated */
+			for (size_t i = 0; clip && i < n && clip[i] != '\n' && clip[i] != '\r';) {
+				unsigned char c0 = (unsigned char)clip[i];
+				if (c0 >= 0x80 && c0 < 0xc0) { /* stray continuation byte */
+					i++;
+					continue;
+				}
+				size_t cl = c0 >= 0xf0 ? 4 : c0 >= 0xe0 ? 3 : c0 >= 0xc0 ? 2 : 1, k2 = 1;
+				while (k2 < cl && i + k2 < n && ((unsigned char)clip[i + k2] & 0xc0) == 0x80)
+					k2++;
+				if (k2 < cl || w->pwlen + cl > PWMAX)
+					break;
+				memcpy(w->pw + w->pwlen, clip + i, cl);
+				w->pwlen += (int)cl;
+				i += cl;
+			}
+			w->pw[w->pwlen] = 0;
 			if (clip) {
 				explicit_bzero(clip, n);
 				free(clip);

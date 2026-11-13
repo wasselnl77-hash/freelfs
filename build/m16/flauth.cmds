@@ -1,0 +1,3 @@
+useradd -m -G seat,audio,video,render,users bob; echo 'bob:secret1' | chpasswd && echo made
+id bob; flpkg list | grep -c '^bc '
+sleep 3; pkill -x flcomp; sleep 6; pgrep -x flgreet-ui >/dev/null && echo greeter-again

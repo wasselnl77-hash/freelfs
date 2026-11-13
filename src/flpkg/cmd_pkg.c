@@ -33,10 +33,10 @@ int cmd_install(int argc, char **argv)
 	static const struct option longopts[] = {
 		{"nodeps", no_argument, NULL, 'd'},   {"yes", no_argument, NULL, 'y'},
 		{"asdeps", no_argument, NULL, 'a'},   {"overwrite", required_argument, NULL, 'o'},
-		{"needed", no_argument, NULL, 'n'},   {0},
+		{"needed", no_argument, NULL, 'n'},   {"unsigned", no_argument, NULL, 'u'}, {0},
 	};
 	struct txn_opts opts = {0};
-	bool yes = false, asdeps = false, needed = false;
+	bool yes = false, asdeps = false, needed = false, allow_unsigned = false;
 	int c;
 	optind = 1;
 	while ((c = getopt_long(argc, argv, "y", longopts, NULL)) != -1) {
@@ -46,13 +46,21 @@ int cmd_install(int argc, char **argv)
 		case 'a': asdeps = true; break;
 		case 'o': sl_add(&opts.overwrite, optarg); break;
 		case 'n': needed = true; break;
+		case 'u': allow_unsigned = true; break;
 		default: return 2;
 		}
 	}
 	if (optind == argc)
-		die("usage: flpkg install [--nodeps] [--asdeps] [--needed] [--overwrite GLOB] FILE.flpkg...");
+		die("usage: flpkg install [--nodeps] [--unsigned] [--asdeps] [--needed] [--overwrite GLOB] FILE.flpkg...");
 
 	struct txn *t = txn_new(cfg.root, &opts);
+
+	/* A file on the command line is checked like a repo package (FILE.sig next to it)
+	 * unless --unsigned; the policy "never" in flpkg.conf also skips it. */
+	if (!allow_unsigned)
+		for (int i = optind; i < argc; i++)
+			if (has_suffix(argv[i], ".flpkg"))
+				repo_verify_local(argv[i]);
 
 	/* Names go through the repos; files are installed as they are. */
 	struct strlist names = {0};

@@ -12,7 +12,7 @@ flpkg=$PWD/flpkg
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 conf=$work/flpkg.conf
-printf 'builddir = %s/build\ncache = %s/cache\n' "$work" "$work" > "$conf"
+printf 'builddir = %s/build\ncache = %s/cache\nsignatures = never\n' "$work" "$work" > "$conf"
 root=$work/root
 pkgs=$work/pkgs
 mkdir -p "$root" "$pkgs"
@@ -87,13 +87,13 @@ check "verify clean after recovery" 'fl verify && grep -q "^0 problems" "$work/o
 
 echo "layout change"
 mkdir -p "$root/var/log" && echo kept > "$root/var/log/old.log"
-check "a real /var becomes a link to sysflfs/data" 'fl install -y "$layout" && [ "$(readlink "$root/var")" = sysflfs/data ]'
-check "its contents moved along" '[ "$(cat "$root/sysflfs/data/log/old.log")" = kept ] && [ -d "$root/sysflfs/data/lib/flpkg" ]'
+check "a real /var becomes a link to usr/data" 'fl install -y "$layout" && [ "$(readlink "$root/var")" = usr/data ]'
+check "its contents moved along" '[ "$(cat "$root/usr/data/log/old.log")" = kept ] && [ -d "$root/usr/data/lib/flpkg" ]'
 check "the database still works through the link" 'fl list && grep -qx "layout 1.0-1" "$work/out"'
 check "reinstalling over the identical link is fine" 'fl install -y "$layout"'
 check "verify clean after the move" 'fl verify && grep -q "^0 problems" "$work/out"'
 root2=$work/root2
-check "into an empty root, one transaction: the link comes first" '"$flpkg" --config "$conf" --root "$root2" install -y "$layout" "$demo1" > "$work/out" 2>&1 && [ "$(readlink "$root2/etc")" = sysflfs/settings ] && [ -f "$root2/sysflfs/settings/demo.conf" ]'
+check "into an empty root, one transaction: the link comes first" '"$flpkg" --config "$conf" --root "$root2" install -y "$layout" "$demo1" > "$work/out" 2>&1 && [ "$(readlink "$root2/etc")" = usr/settings ] && [ -f "$root2/usr/settings/demo.conf" ]'
 check "a package's files moved with /etc stay its own" 'fl verify && grep -q "^0 problems" "$work/out" && fl owns /etc/demo.conf && grep -q "owned by demo" "$work/out"'
 
 echo "transaction tests: $fails failed"

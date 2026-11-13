@@ -1,0 +1,16 @@
+@desktop
+@mon drive_add 0 if=none,id=u,file=@OUT@/usb.img,format=raw
+@mon device_add usb-storage,drive=u,id=ud,bus=xhci.0
+@wait 4
+@shot @OUT@/b-notify1.ppm
+@wait 2
+@shot @OUT@/b-notify2.ppm
+su -s /bin/sh tester -c 'flmount unmount /dev/sda; echo unmount-rc=$?'
+grep -c drives /proc/mounts
+su -s /bin/sh tester -c 'flmount mount /dev/sda; echo mount-rc=$?'
+su -s /bin/sh tester -c 'flmount eject /dev/sda; echo eject-rc=$?'
+@wait 2
+ls /dev/sda* 2>&1 | head -2
+@key meta_l
+@wait 2
+@shot @OUT@/b-menu.ppm

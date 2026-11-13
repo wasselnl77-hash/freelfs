@@ -221,6 +221,26 @@ static void check_signature(const char *file, const char *sig, const char *name,
 	pubkeys_free(keys, n);
 }
 
+void repo_verify_local(const char *file)
+{
+	if (!strcmp(cfg.signatures, "never"))
+		return;
+	char *sig = xasprintf("%s.sig", file);
+	const char *base = strrchr(file, '/');
+	base = base ? base + 1 : file;
+	struct stat st;
+	if (stat(sig, &st) < 0)
+		die("%s is not signed (no %s); use --unsigned to install it anyway", file, sig);
+	struct pubkey *keys;
+	size_t n;
+	keys_effective(&keys, &n);
+	char *err = NULL;
+	if (verify_file_ex(keys, n, file, sig, base, &err, NULL, NULL) < 0)
+		die("%s%s (use --unsigned to install it anyway)", err, n ? "" : " (no trusted keys in the key directory)");
+	pubkeys_free(keys, n);
+	free(sig);
+}
+
 char *repo_fetch(const struct repopkg *rp)
 {
 	char *dir = cache_path("pkg");

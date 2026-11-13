@@ -2,7 +2,7 @@
 # scripts. They come from config/etc in the FreeLFS tree.
 pkgname=initscripts
 version=0.1
-release=8
+release=9
 summary="FreeLFS boot scripts: rc.sysinit, rc, rc.shutdown and services"
 license=(MIT)
 arch=(any)

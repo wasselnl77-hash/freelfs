@@ -1,0 +1,6 @@
+# flmount: mount a file system that appears on a removable drive (flmount decides what is removable: the disk says
+# so, or it hangs off USB; the live boot stick and internal disks are left to it) and clean up when it is pulled.
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/bin/flmount --hotplug /dev/%k"
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/bin/flmount --hotplug /dev/%k"
+ACTION=="remove", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", RUN+="/usr/bin/flmount --gone /dev/%k"
+ACTION=="remove", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", RUN+="/usr/bin/flmount --gone /dev/%k"

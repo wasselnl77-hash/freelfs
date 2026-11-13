@@ -27,7 +27,11 @@ opens flsettings; the battery opens its flyout (below), the clock the notificati
 
 Menu: opened by the start button or by fl_shell's menu_toggle (Super).
 Search, five categories, programs, Lock (greyed out until /usr/bin/fllock
-exists; fllock asks flcomp for the lock, see src/fllock), Log out (fl_shell logout), Shut down (runs `poweroff`).
+exists; fllock asks flcomp for the lock, see src/fllock), Lock, Log out, Restart and Shut down: each opens a dialog (dialog.c) with a 30 s countdown
+(Cancel, Esc, or the main button now), then runs `flpower logout|restart|off`. A failure shows that
+command's stderr in an error window (the status comes back on a second pipe; the panel ignores SIGCHLD).
+A "Recent" category lists the last 8 files of ~/.local/share/recently-used.xbel that still exist (read only
+when the file exists; opened with gio open).
 Programs are the .desktop files in the applications directory of $XDG_DATA_HOME
 (default ~/.local/share) and every $XDG_DATA_DIRS entry (default
 /usr/local/share:/usr/share); /usr/share, ~/.local/share/flatpak/exports/share
@@ -125,3 +129,17 @@ Build: make; make install (PREFIX, DESTDIR). Needs libflui.
 Clock: calls tzset() each time it draws, so a new /etc/localtime (Settings > Date & time)
 shows within the minute, at once when Settings sets tz_changed= in desktop.conf;
 clock_24h=0 there switches it to 12-hour ("Mon 9 Nov  3:32 PM").
+
+Taskbar buttons (panel.c, ctxmenu.c): middle click closes the window (fl_shell close). Right click opens
+a flyout above the panel with Minimize (or Restore), Move to workspace N (the nearest eight others), Close.
+Maximize is not in fl_shell yet.
+
+Desktop (deskicons.c): one raw surface over the whole output (fl_shell set_desktop 0,0), alpha 1 where
+nothing is drawn, so the pointer reaches it everywhere. Icons on a grid: programs with
+X-FreeLFS-Desktop-Icon=true, and every file and folder in ~/Desktop (rescanned every 4 s). Click selects,
+Ctrl-click adds, a drag on empty desktop rubber-band selects, dragging moves the selection and snaps to the
+grid, double click opens. Positions and "show" are in $XDG_CONFIG_HOME/freelfs/desktop-icons.conf (show=0
+hides the icons; the right-click menu turns them back on). Right click on the empty desktop: New folder,
+New text file, Open terminal here (flterm in ~/Desktop), Change wallpaper (flsettings --page general, the
+wallpaper is on that page), Settings, Show or Hide desktop icons. Right click on an icon: Open, Rename,
+Move to Trash (freedesktop trash, ~/.local/share/Trash). Not done: drop from Files, Open with, Properties.

@@ -3,7 +3,7 @@
 # packed into the ISO's initramfs by build/53-iso.sh, not in the images.
 pkgname=flinitrd
 version=0.1
-release=2
+release=3
 summary="The init of the FreeLFS live initramfs"
 license=(MIT)
 arch=(x86_64)

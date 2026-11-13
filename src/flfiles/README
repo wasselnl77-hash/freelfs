@@ -4,23 +4,56 @@ flfiles -- the FreeLFS file manager
     flfiles [FOLDER]
 
 Window: back, forward, up, an editable path field and a new-folder button on
-top; Places (Home and the folders named in ~/.config/user-dirs.dirs, Trash)
-and Drives (System = /sysflfs, everything mounted under /drives) on the left;
-an icon grid; a status bar. The folder is watched with inotify, so changes
-show up on their own. There is no polling: idle means no wakeups.
+top; Places (Home, the folders named in ~/.config/user-dirs.dirs, Trash) and
+Drives (System, removable and boot drives, mounts under /drives or /run/media)
+on the left; an icon grid; a status bar. The folder is watched with inotify,
+so changes show up on their own. Idle means no wakeups, apart from the drive
+check every 3 s.
 
 Hidden files: names with a leading dot, and names listed one per line in the
 folder's own .hidden file. Ctrl-H shows them.
 
-Keys: Enter opens, Backspace or Alt-Up goes up, Alt-Left/Right history,
-Ctrl-L the path field, F2 rename, Del moves to ~/.local/share/Trash (in the
-Trash it deletes for good, after asking), Ctrl-C / Ctrl-X / Ctrl-V copy, cut
-and paste (also between two flfiles windows), Ctrl-Shift-N new folder,
-Ctrl-A select all, F5 refresh, letters jump to a name. Right click opens a
-menu. Ctrl-click and Shift-click select several.
+Keys: Enter or double-click opens (a folder opens in place, a file starts its
+default app), Backspace or Alt-Up goes up, Alt-Left/Right history, Ctrl-L the
+path field, F2 rename, Del moves to the Trash, Shift-Del deletes for good
+(asks first), Ctrl-C / Ctrl-X / Ctrl-V copy, cut and paste (also between two
+flfiles windows), Ctrl-Shift-N new folder, Ctrl-A select all, F5 refresh,
+letters jump to a name, Menu key opens the context menu. Ctrl-click and
+Shift-click select several.
 
-Delete and Move to Trash first ask `flcrash --cant` about the selection: a vital system folder
-(/sysflfs, /boot, ...) brings up the "You can't do that." screen, and "Never mind" leaves everything alone.
+Right click on a file or folder: Open, Open with... (every app that handles the
+type, the default first), Cut, Copy, Paste, Rename, Move to Trash, Delete
+permanently, Extract here, Compress, Properties (name, type, size, modified,
+permissions, location), Open terminal here (a folder item opens the terminal in
+that folder). Right click on empty space: New folder, New empty file, Paste,
+Open terminal here, Show hidden files; in the Trash also Empty Trash. In the
+Trash: Restore, Copy, Delete for good.
+
+Drag and drop: drag items onto a folder in the grid or a sidebar entry to move
+them; hold Ctrl to copy. Drop on Trash in the sidebar to trash them.
+
+Copy, move, trash, delete and restore run as a job in a child process with a
+progress card at the bottom right and a Stop button; the window stays usable.
+Stop ends after the file in progress. A name clash asks Replace, Keep both
+(the copy gets a new name) or Skip, with "Do the same for the rest".
+
+Trash follows the freedesktop spec: ~/.local/share/Trash/files with a
+.trashinfo for each item in info/. Restore puts an item back where its
+.trashinfo says it was. Empty Trash deletes everything in it.
+
+Drives come from flmount (see below). Click an unmounted drive to mount it and
+open it; the eject button ejects it. If flmount reports an error, the message
+is shown in a dialog. Without flmount the removable drives stay hidden and
+System and the /drives and /run/media mounts still show.
+
+  flmount list                   one line per partition:
+                                 DEV TAB LABEL TAB FSTYPE TAB SIZE_BYTES TAB MOUNTPOINT|- TAB removable|boot|internal
+  flmount mount DEV              prints the mountpoint, exit 0
+  flmount eject DEV              unmounts and powers down; errors on stderr, non-zero exit
+
+Delete and Move to Trash first ask `flcrash --cant` about the selection: a vital
+system folder (/sysflfs, /boot, ...) brings up the "You can't do that." screen,
+and "Never mind" leaves everything alone.
 
 Enter on a file starts the default app for its MIME type: the type comes from the shared MIME
 database (/usr/share/mime/globs2), the app from mimeapps.list ([Default Applications], then
@@ -28,4 +61,3 @@ database (/usr/share/mime/globs2), the app from mimeapps.list ([Default Applicat
 /usr/share/applications/mimeapps.list: images -> Images, PDF/EPUB -> Documents, audio -> Music, video ->
 Videos, text -> fledit, archives -> Archives), else the first .desktop file that lists the type.
 Text files with no known name still open in fledit; a file with no app reports that.
-Copying runs in the window's own loop, so a very large copy holds the window.

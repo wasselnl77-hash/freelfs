@@ -2,7 +2,7 @@
 <protocol name="fl_shell">
   <copyright>SPDX-License-Identifier: MIT</copyright>
 
-  <interface name="fl_shell" version="7">
+  <interface name="fl_shell" version="8">
     <description summary="FreeLFS desktop shell protocol">
       Private protocol between flcomp and the desktop programs (flpanel,
       flsettings). The panel owns the bottom panel and the start menu; the
@@ -304,6 +304,16 @@
       <arg name="y" type="int"/>
       <arg name="w" type="int"/>
       <arg name="h" type="int"/>
+    </request>
+
+    <!-- version 8 -->
+
+    <request name="maximize" since="8">
+      <description summary="maximize or restore a window">
+        Toggles a window between maximized and its old size (a snapped window is maximized).
+        The panel's window menu uses it.
+      </description>
+      <arg name="id" type="uint"/>
     </request>
   </interface>
 </protocol>

@@ -62,6 +62,19 @@ step "Remounting root read-write" remount_root rw
 step "Mounting local file systems" mount -a -t nonfs,nfs4,smbfs,cifs -O no_netdev
 step "Activating swap" swapon -a
 
+# Live session with a persistent home (flinitrd bound freelfs-persist.img as /home): a first time, /home is
+# empty; put the live user's skeleton home there, then the ownership step below gives it to her.
+live_home() {
+	grep -q ' /run/live/persist ' /proc/mounts || return 0
+	[ -d /run/live/rom/home ] || return 0
+	local d
+	for d in /run/live/rom/home/*; do
+		[ -d "$d" ] && [ ! -e "/home/${d##*/}" ] && cp -a "$d" /home/
+	done
+	return 0
+}
+live_home
+
 # Ownership that the rootless build could not set. flpkg keeps a list of it;
 # an image built without packages has config/ownership.list instead, applied
 # once and again when the list changes.
@@ -84,6 +97,11 @@ fix_owners() {
 	touch "$stamp"
 }
 step "Setting file ownership" fix_owners
+
+# removable drives that are plugged in already (and the live boot stick): under /drives
+if [ -x /usr/bin/flmount ]; then
+	step "Mounting removable drives" flmount --auto
+fi
 
 set_hostname() {
 	local h=freelfs

@@ -22,9 +22,9 @@
 
 #include "flpanel.h"
 
-enum { ID_SEARCH = 1, ID_CAT = 10, ID_LIST = 30, ID_LOCK = 40, ID_LOGOUT, ID_SHUTDOWN };
+enum { ID_SEARCH = 1, ID_CAT = 10, ID_LIST = 30, ID_LOCK = 40, ID_LOGOUT, ID_RESTART, ID_SHUTDOWN };
 
-static const char *const cat_names[CAT_COUNT] = {"All programs", "Internet", "Office", "System", "Settings"};
+static const char *const cat_names[CAT_COUNT] = {"All programs", "Internet", "Office", "System", "Settings", "Recent"};
 
 /* ---- .desktop files ------------------------------------------------------------------------- */
 
@@ -185,6 +185,114 @@ static void scan_dir(struct panel *p, const char *dir, int *cap)
 	closedir(d);
 }
 
+/* ---- recently used files: the freedesktop list (~/.local/share/recently-used.xbel), read only when it
+ * exists. The newest RECENT_N that still exist become entries of the Recent category: name, path,
+ * and an Exec that opens them with gio. */
+#define RECENT_N 8
+
+static void percent_decode(char *s)
+{
+	char *o = s;
+	for (char *i = s; *i; i++) {
+		if (i[0] == '%' && isxdigit((unsigned char)i[1]) && isxdigit((unsigned char)i[2])) {
+			char h[3] = {i[1], i[2], 0};
+			*o++ = (char)strtol(h, NULL, 16);
+			i += 2;
+		} else {
+			*o++ = *i;
+		}
+	}
+	*o = 0;
+}
+
+/* the value of attribute NAME in an XML start tag line, or 0 */
+static int xml_attr(const char *line, const char *name, char *out, size_t cap)
+{
+	char key[40];
+	snprintf(key, sizeof key, " %s=\"", name);
+	const char *v = strstr(line, key);
+	if (!v)
+		return 0;
+	v += strlen(key);
+	const char *end = strchr(v, '"');
+	if (!end)
+		return 0;
+	size_t n = (size_t)(end - v);
+	if (n >= cap)
+		n = cap - 1;
+	memcpy(out, v, n);
+	out[n] = 0;
+	return 1;
+}
+
+static void add_recent(struct panel *p, int *cap)
+{
+	const char *xd = getenv("XDG_DATA_HOME"), *h = getenv("HOME");
+	char path[512];
+	if (xd && *xd)
+		snprintf(path, sizeof path, "%s/recently-used.xbel", xd);
+	else
+		snprintf(path, sizeof path, "%s/.local/share/recently-used.xbel", h ? h : "");
+	FILE *f = fopen(path, "r");
+	if (!f)
+		return;
+	struct {
+		char file[512], when[40];
+	} top[RECENT_N];
+	int nt = 0;
+	char line[2048];
+	while (fgets(line, sizeof line, f)) {
+		if (!strstr(line, "<bookmark"))
+			continue;
+		char href[1024] = "", when[40] = "", file[512];
+		if (!xml_attr(line, "href", href, sizeof href) || strncmp(href, "file://", 7))
+			continue;
+		if (!xml_attr(line, "modified", when, sizeof when))
+			when[0] = 0;
+		snprintf(file, sizeof file, "%s", href + 7);
+		percent_decode(file);
+		if (file[0] != '/' || access(file, F_OK) != 0)
+			continue;
+		/* newest first: where it goes in the list of the best RECENT_N so far */
+		int at = 0;
+		while (at < nt && strcmp(top[at].when, when) >= 0)
+			at++;
+		if (at >= RECENT_N)
+			continue;
+		int last = nt < RECENT_N ? nt : RECENT_N - 1;
+		for (int k = last; k > at; k--)
+			top[k] = top[k - 1];
+		snprintf(top[at].file, sizeof top[at].file, "%s", file);
+		snprintf(top[at].when, sizeof top[at].when, "%s", when);
+		if (nt < RECENT_N)
+			nt++;
+	}
+	fclose(f);
+	for (int k = 0; k < nt; k++) {
+		char q[600];
+		if (!fl_shq(q, sizeof q, top[k].file) || strlen(q) + 10 >= 256)
+			continue;
+		if (p->napps == *cap) {
+			*cap = *cap ? *cap * 2 : 32;
+			struct entry *n = realloc(p->apps, (size_t)*cap * sizeof(*p->apps));
+			if (!n)
+				return;
+			p->apps = n;
+		}
+		struct entry e;
+		memset(&e, 0, sizeof e);
+		const char *base = strrchr(top[k].file, '/');
+		base = base && base[1] ? base + 1 : top[k].file;
+		snprintf(e.name, sizeof e.name, "%s", base);
+		snprintf(e.what, sizeof e.what, "%s", top[k].file);
+		snprintf(e.exec, sizeof e.exec, "gio open %s", q);
+		e.glyph[0] = (char)toupper((unsigned char)e.name[0]);
+		e.glyph[1] = 0;
+		e.cats = 1u << CAT_RECENT;
+		p->apps[p->napps++] = e;
+	}
+}
+
 /* Scan DATA/applications once: DATA is a data directory (a trailing slash is ignored). */
 static void scan_data(struct panel *p, const char *data, int *cap, char seen[][400], int *nseen)
 {
@@ -269,6 +377,7 @@ void menu_init(struct panel *p)
 	} else {
 		scan_all(p, &cap);
 	}
+	add_recent(p, &cap);
 	if (p->napps)
 		qsort(p->apps, (size_t)p->napps, sizeof(*p->apps), cmp_entry);
 	p->cat = CAT_ALL;
@@ -383,11 +492,20 @@ void menu_draw(fl_ui *ui, void *ud)
 	fl_text_in(cv, ui->f_med, fl_r(12, 472, 200, 47), FL_LEFT, 0, fl_th.text, p->user);
 	int x = W - 1 - 8, y = 472 + (47 - 32) / 2;
 	{
+		/* each asks first (dialog.c): a countdown, then flpower does it */
 		int w = fl_text_width(ui->f_reg, "Shut down", -1) + 22;
 		x -= w;
 		if (fl_button(ui, ID_SHUTDOWN, fl_r(x, y, w, 32), "Shut down", FL_BTN_OUTLINE)) {
 			menu_close(p);
-			launch("flpower off", 0);
+			dlg_power(p, POW_OFF);
+			return;
+		}
+		x -= 4;
+		w = fl_text_width(ui->f_reg, "Restart", -1) + 20;
+		x -= w;
+		if (fl_button(ui, ID_RESTART, fl_r(x, y, w, 32), "Restart", FL_BTN_PLAIN)) {
+			menu_close(p);
+			dlg_power(p, POW_RESTART);
 			return;
 		}
 		x -= 4;
@@ -395,8 +513,7 @@ void menu_draw(fl_ui *ui, void *ud)
 		x -= w;
 		if (fl_button(ui, ID_LOGOUT, fl_r(x, y, w, 32), "Log out", FL_BTN_PLAIN)) {
 			menu_close(p);
-			if (p->shell)
-				fl_shell_logout(p->shell);
+			dlg_power(p, POW_LOGOUT);
 			return;
 		}
 		x -= 4;

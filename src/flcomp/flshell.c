@@ -3,7 +3,10 @@
 #include "comp.h"
 #include "fl-shell-protocol.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static void for_shells(void (*fn)(struct wl_resource *, void *), void *arg)
 {
@@ -170,14 +173,44 @@ static void sh_set_layout(struct wl_client *c, struct wl_resource *r, const char
 	seat_set_layout(name);
 }
 
+/* Only the desktop's own programs may end the session, take the lock, change the output or
+ * place the desktop surface. Identified by the client's /proc/PID/exe (a process cannot
+ * change that), FLCOMP_TRUST_ANY=1 lifts it for the tests. */
+static bool trusted_client(struct wl_client *c)
+{
+	static const char *const ok[] = { "flpanel", "fllock", "flgreet", "flgreet-ui", "flsettings", NULL };
+	if (getenv("FLCOMP_TRUST_ANY"))	/* whoever starts flcomp sets its environment (flgreet clears it) */
+		return true;
+	pid_t pid = 0;
+	wl_client_get_credentials(c, &pid, NULL, NULL);
+	char link[40], exe[256];
+	snprintf(link, sizeof link, "/proc/%d/exe", (int)pid);
+	ssize_t n = readlink(link, exe, sizeof exe - 1);
+	if (n <= 0)
+		return false;
+	exe[n] = 0;
+	char *base = strrchr(exe, '/');
+	if (!base || (strncmp(exe, "/usr/bin/", 9) && strncmp(exe, "/usr/sbin/", 10) && strncmp(exe, "/usr/libexec/", 13)))
+		return false;
+	base++;
+	for (int i = 0; ok[i]; i++)
+		if (!strcmp(base, ok[i]))
+			return true;
+	return false;
+}
+
 static void sh_logout(struct wl_client *c, struct wl_resource *r)
 {
+	if (!trusted_client(c))
+		return;
 	quit(0);
 }
 
 static void sh_set_output(struct wl_client *c, struct wl_resource *r, uint32_t w, uint32_t h,
 			  uint32_t hz, uint32_t scale)
 {
+	if (!trusted_client(c))
+		return;
 	if (w <= 16384 && h <= 16384 && hz <= 1000 && scale <= 1000 && output_set((int)w, (int)h, (int)hz, (int)scale)) {
 		output_watch_client(c);
 	} else {
@@ -217,6 +250,8 @@ static void sh_set_notifications(struct wl_client *c, struct wl_resource *r, str
 
 static void sh_set_desktop(struct wl_client *c, struct wl_resource *r, struct wl_resource *sr, int32_t x, int32_t y)
 {
+	if (!trusted_client(c))
+		return;
 	struct surface *s = wl_resource_get_user_data(sr);
 	if (s->role != ROLE_NONE && s->role != ROLE_DESKTOP) {
 		wl_resource_post_error(r, FL_SHELL_ERROR_ROLE, "surface already has a role");
@@ -234,6 +269,13 @@ static void sh_set_desktop(struct wl_client *c, struct wl_resource *r, struct wl
 		damage_tree(s);
 }
 
+static void sh_maximize(struct wl_client *c, struct wl_resource *r, uint32_t id)
+{
+	struct window *w = window_by_id(id);
+	if (w)
+		window_action_on(w, WA_TOGGLE_MAXIMIZE);
+}
+
 static void sh_set_window_entry(struct wl_client *c, struct wl_resource *r, uint32_t id, int32_t x, int32_t y,
 				int32_t w, int32_t h)
 {
@@ -246,6 +288,8 @@ static void sh_set_window_entry(struct wl_client *c, struct wl_resource *r, uint
 
 static void sh_lock(struct wl_client *c, struct wl_resource *r, struct wl_resource *sr)
 {
+	if (!trusted_client(c))
+		return;
 	struct surface *s = wl_resource_get_user_data(sr);
 	if (s->role != ROLE_NONE && s->role != ROLE_LOCK) {
 		wl_resource_post_error(r, FL_SHELL_ERROR_ROLE, "surface already has a role");
@@ -283,6 +327,7 @@ static void sh_toggle_overview(struct wl_client *c, struct wl_resource *r)
 
 static const struct fl_shell_interface shell_impl = {
 	.set_window_entry = sh_set_window_entry,
+	.maximize = sh_maximize,
 	.set_desktop = sh_set_desktop,
 	.set_workspace = sh_set_workspace,
 	.move_window = sh_move_window,
@@ -331,5 +376,5 @@ static void shell_bind(struct wl_client *c, void *data, uint32_t version, uint32
 
 void flshell_init(void)
 {
-	wl_global_create(C.dpy, &fl_shell_interface, 7, NULL, shell_bind);
+	wl_global_create(C.dpy, &fl_shell_interface, 8, NULL, shell_bind);
 }

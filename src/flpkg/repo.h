@@ -24,6 +24,8 @@ const struct repopkg *repo_find(const struct reposet *rs, const char *name);
 /* Copy a package into the cache and check its sha256 and signature;
  * returns the cached path. */
 char *repo_fetch(const struct repopkg *rp);
+/* Verify FILE.sig for a local package file (dies on failure; leaves the files alone). */
+void repo_verify_local(const char *file);
 
 /* solve.c */
 struct choice {

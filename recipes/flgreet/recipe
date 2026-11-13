@@ -1,7 +1,7 @@
 # flgreet, from src/flgreet in the FreeLFS tree.
 pkgname=flgreet
 version=0.1
-release=5
+release=6
 summary="FreeLFS login screen: runs on tty1, flcomp plus a password check, then login"
 license=(MIT)
 arch=(x86_64)

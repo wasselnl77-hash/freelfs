@@ -2,14 +2,14 @@
 # src/flpackages in the FreeLFS tree.
 pkgname=flpackages
 version=0.1
-release=3
+release=4
 summary="FreeLFS package app: installed list, search, install and remove"
 license=(MIT)
 arch=(x86_64)
 # the Software Store (flstore) replaced this app on the desktop; it stays as the provider of
 # flpkg-seat (the store depends on it), so it is no longer in the desktop group
 groups=()
-depends=(glibc flui wayland flpkg)
+depends=(glibc flui wayland flpkg flauth)
 # the helper runs as root for the group seat, like flpower in flpanel
 owner=("/usr/bin/flpkg-seat 0 98 4750")
 makedepends=(flui)

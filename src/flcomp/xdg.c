@@ -82,10 +82,22 @@ struct window *window_by_id(uint32_t id)
 
 void window_raise(struct window *w)
 {
-	if (C.windows.next == &w->link)
+	/* always-on-top windows stay above the others: a normal window goes in below the last of them */
+	struct wl_list *at = &C.windows;
+	if (!w->above) {
+		struct window *o;
+		wl_list_for_each(o, &C.windows, link) {
+			if (o == w)
+				continue;
+			if (!o->above)
+				break;
+			at = &o->link;
+		}
+	}
+	if (at->next == &w->link)
 		return;
 	wl_list_remove(&w->link);
-	wl_list_insert(&C.windows, &w->link);
+	wl_list_insert(at, &w->link);
 	if (w->mapped)
 		damage_tree(w->surf);
 }
@@ -277,9 +289,28 @@ static void window_unsnap(struct window *w)
 }
 
 /* the keyboard shortcuts for the focused window (seat.c) */
+void window_set_above(struct window *w, bool on)
+{
+	w->above = on;
+	window_raise(w);
+	if (w->mapped)
+		damage_tree(w->surf);
+}
+
 void window_action(int act)
 {
-	struct window *w = C.focused;
+	window_action_on(C.focused, act);
+}
+
+int window_geom_h_pub(struct window *w)
+{
+	return geom_h(w);
+}
+
+void window_action_on(struct window *w, int act)
+{
+	if (act == WA_TOGGLE_MAXIMIZE)
+		act = w && w->maximized ? WA_RESTORE_OR_MINIMIZE : WA_MAXIMIZE;
 	if (!w || !w->mapped || w->minimized || w->fullscreen)
 		return;
 	switch (act) {
@@ -556,6 +587,8 @@ void grab_motion(void)
 		return;
 	int dx = (int)(C.px - G.sx), dy = (int)(C.py - G.sy);
 	if (G.mode == 1) {
+		/* at the left or right screen edge: half the screen; at the top edge: maximize (the outline shows it) */
+		snap_preview_set(w->fullscreen ? 0 : C.px < 4 ? -1 : C.px >= C.w - 4 ? 1 : C.py < 4 ? 2 : 0);
 		int nx = G.wx + dx, ny = G.wy + dy;
 		int top = xwm_insets(w).t;	/* the title bar of an X window must stay on screen */
 		if (ny < top)
@@ -593,6 +626,14 @@ void grab_motion(void)
 void grab_end(void)
 {
 	struct window *w = G.w;
+	int snapk = snap_preview_kind();
+	snap_preview_set(0);
+	if (G.mode == 1 && w && snapk) {
+		G.mode = 0;
+		G.w = NULL;
+		window_action_on(w, snapk < 0 ? WA_SNAP_LEFT : snapk == 1 ? WA_SNAP_RIGHT : WA_MAXIMIZE);
+		return;
+	}
 	if (G.mode == 2 && w) {
 		w->resizing = false;
 		window_configure(w, w->cfg_w, w->cfg_h);

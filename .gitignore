@@ -19,3 +19,4 @@ __pycache__/
 /src/snappel/snappel
 /src/snappel/tests/ops_test
 /src/flsettings/flsettings
+/src/libdssl/tests/conform

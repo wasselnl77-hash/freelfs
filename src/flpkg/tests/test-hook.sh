@@ -10,7 +10,7 @@ flpkg=$PWD/flpkg
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 conf=$work/flpkg.conf
-printf 'builddir = %s/build\ncache = %s/cache\nsnapshots = 3\n' "$work" "$work" > "$conf"
+printf 'builddir = %s/build\ncache = %s/cache\nsnapshots = 3\nsignatures = never\n' "$work" "$work" > "$conf"
 root=$work/root
 hooks=$work/hooks
 mkdir -p "$root" "$hooks" "$work/pkg1" "$work/pkg2"

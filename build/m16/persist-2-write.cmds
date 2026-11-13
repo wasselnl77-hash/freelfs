@@ -1,0 +1,8 @@
+grep -E ' /home | /run/live/persist ' /proc/mounts
+ls -la /home /home/tester | head -20
+su -s /bin/sh tester -c 'flpersist status'
+echo persisted-ok > /home/tester/marker.txt; chown 1000:999 /home/tester/marker.txt
+ls -l /home/tester/marker.txt
+sync
+poweroff
+@poweroffwait 90

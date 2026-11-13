@@ -25,7 +25,7 @@
 
 #define ROW 56
 #define MAXINFO 10
-enum { ID_A_REPORT = 800 };
+enum { ID_A_REPORT = 800, ID_A_KEEP = 810, ID_A_MAKE, ID_A_NOTNOW };
 
 struct about {
 	fl_app *app;
@@ -34,13 +34,16 @@ struct about {
 	char label[MAXINFO][24], value[MAXINFO][160];
 	int n;
 	int live;
-	/* the report job */
+	/* the job: "Save a report" (flreport), or "Keep my files" (flpersist) when persist is set */
 	pid_t pid;
 	int fd;
 	char out[600];
 	size_t len;
 	char msg[700];
 	int msg_err;
+	int persist, ask, have_st, st;
+	char pmsg[400];
+	int pmsg_err;
 };
 
 static int read_line(const char *path, char *out, size_t cap)
@@ -186,7 +189,8 @@ static void job_end(struct about *a)
 	}
 	if (a->pid > 0) {
 		int st = 0;
-		waitpid(a->pid, &st, 0);
+		a->have_st = waitpid(a->pid, &st, 0) > 0;
+		a->st = st;
 		a->pid = 0;
 	}
 }
@@ -235,11 +239,22 @@ static void report_ready(void *ud, int fd, short rev)
 		*--nl = 0;
 	char *last = strrchr(a->out, '\n');
 	last = last ? last + 1 : a->out;
-	int st = 0;
-	pid_t pid = a->pid;
+	int was_persist = a->persist;
+	a->persist = 0;
 	job_end(a);
-	(void)pid;
-	(void)st;
+	if (was_persist) {
+		/* flpersist: its output (stderr included) is the reason when it fails */
+		if (a->have_st && WIFEXITED(a->st) && WEXITSTATUS(a->st) == 0) {
+			snprintf(a->pmsg, sizeof a->pmsg, "Done. Your files and settings stay on this stick after a restart.");
+			a->pmsg_err = 0;
+		} else {
+			snprintf(a->pmsg, sizeof a->pmsg, "Could not keep your files%s%s", last[0] ? ": " : ".", last[0] ? last : "flpersist did not finish.");
+			a->pmsg_err = 1;
+		}
+		if (a->win)
+			fl_win_redraw(a->win);
+		return;
+	}
 	if (last[0] == '/' && access(last, R_OK) == 0) {
 		snprintf(a->msg, sizeof a->msg, "Saved %s", last);
 		a->msg_err = 0;
@@ -251,11 +266,9 @@ static void report_ready(void *ud, int fd, short rev)
 		fl_win_redraw(a->win);
 }
 
-static void report_start(struct about *a)
+/* run prog with up to two arguments; its output comes back to report_ready. want_err: stderr too. */
+static void job_launch(struct about *a, const char *prog, const char *arg1, const char *arg2, int want_err)
 {
-	const char *prog = getenv("FLREPORT");
-	if (!prog || !*prog)
-		prog = "flreport";
 	int fds[2];
 	if (pipe2(fds, O_CLOEXEC) < 0) {
 		snprintf(a->msg, sizeof a->msg, "Cannot start: %s", strerror(errno));
@@ -274,11 +287,15 @@ static void report_start(struct about *a)
 		int nul = open("/dev/null", O_RDWR);
 		if (nul >= 0) {
 			dup2(nul, 0);
-			dup2(nul, 2);
+			if (!want_err)
+				dup2(nul, 2);
+			close(nul);
 		}
 		dup2(fds[1], 1);
+		if (want_err)
+			dup2(fds[1], 2);
 		signal(SIGCHLD, SIG_DFL);
-		execlp(prog, prog, "-q", (char *)NULL);
+		execlp(prog, prog, arg1, arg2, (char *)NULL);
 		_exit(127);
 	}
 	close(fds[1]);
@@ -287,10 +304,29 @@ static void report_start(struct about *a)
 	a->pid = pid;
 	a->len = 0;
 	a->out[0] = 0;
-	a->msg[0] = 0;
 	fl_fd_add(a->app, a->fd, POLLIN, report_ready, a);
 	if (a->win)
 		fl_win_redraw(a->win);
+}
+
+static void report_start(struct about *a)
+{
+	const char *prog = getenv("FLREPORT");
+	if (!prog || !*prog)
+		prog = "flreport";
+	a->msg[0] = 0;
+	job_launch(a, prog, "-q", NULL, 0);
+}
+
+/* Keep my files: flpersist create 4G on the boot stick (FLPERSIST names another program, for tests) */
+static void persist_start(struct about *a)
+{
+	const char *prog = getenv("FLPERSIST");
+	if (!prog || !*prog)
+		prog = "flpersist";
+	a->pmsg[0] = 0;
+	a->persist = 1;
+	job_launch(a, prog, "create", "4G", 1);
 }
 
 int about_draw(struct about *a, fl_ui *ui, fl_rect c)
@@ -335,6 +371,44 @@ int about_draw(struct about *a, fl_ui *ui, fl_rect c)
 	} else if (a->pid > 0) {
 		fl_text(&ui->cv, a->small, x, y, fl_th.dim, "This takes about ten seconds.", -1);
 		y += 20;
+	}
+	if (a->live) {
+		y += 24;
+		pg_section(ui, a->head, x, y, w, "Live system");
+		y += 28;
+		pg_row_text(ui, a->small, x, y, w - 290, "Keep my files on this USB stick",
+		            "Files and settings you save stay on the stick after a restart.");
+		fl_rect kb = fl_r(x + w - 280, y + 12, 280, 32);
+		if (a->pid > 0) {
+			fl_stroke_rect(&ui->cv, kb, 1, fl_th.line);
+			fl_text_in(&ui->cv, ui->f_reg, kb, FL_CENTER, 0, fl_th.dim, a->persist ? "Working..." : "Busy");
+		} else if (!a->ask && fl_button(ui, ID_A_KEEP, kb, "Keep my files on this USB stick", FL_BTN_OUTLINE)) {
+			a->ask = 1;
+		}
+		y += ROW;
+		if (a->ask) {
+			char fit[300];
+			fl_text_fit(a->small, "Creates a 4 GB file on the boot stick. It takes a few minutes and needs 4 GB free on the stick.",
+			            w, fit, sizeof fit);
+			fl_text(&ui->cv, a->small, x, y, fl_th.text, fit, -1);
+			y += 22;
+			fl_text_fit(a->small, "Nothing else on the stick is changed. Cancel leaves everything as it is.", w, fit, sizeof fit);
+			fl_text(&ui->cv, a->small, x, y, fl_th.dim, fit, -1);
+			y += 34;
+			if (fl_button(ui, ID_A_MAKE, fl_r(x + w - 264, y, 128, 32), "Create file", FL_BTN_ACCENT)) {
+				a->ask = 0;
+				persist_start(a);
+			}
+			if (fl_button(ui, ID_A_NOTNOW, fl_r(x + w - 128, y, 128, 32), "Cancel", FL_BTN_OUTLINE))
+				a->ask = 0;
+			y += 44;
+		}
+		if (a->pmsg[0]) {
+			char fit[420];
+			fl_text_fit(a->small, a->pmsg, w, fit, sizeof fit);
+			fl_text(&ui->cv, a->small, x, y, a->pmsg_err ? fl_th.err : fl_th.text, fit, -1);
+			y += 20;
+		}
 	}
 	return y + 24 - c.y;
 }

@@ -17,6 +17,16 @@ stop_services() {
 
 case $1 in
 	0 | 6)
+		# the desktop goes first: with seatd gone flcomp would die with status 1 and the
+		# crash screen would show during the power-off
+		: > /run/flshutdown
+		pkill -TERM -x flgreet 2> /dev/null
+		pkill -TERM -x flcomp 2> /dev/null
+		for i in 1 2 3 4 5 6 7 8; do
+			pgrep -x flcomp > /dev/null || break
+			sleep 0.5
+		done
+		pkill -KILL -x flcomp 2> /dev/null
 		stop_services
 		exec /etc/rc.d/rc.shutdown "$1"
 		;;

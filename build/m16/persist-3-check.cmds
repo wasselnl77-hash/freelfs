@@ -1,0 +1,3 @@
+grep -E ' /home ' /proc/mounts
+cat /home/tester/marker.txt
+ls -ld /home/tester

@@ -22,7 +22,7 @@ iface_up() {
 
 iface_down() {
 	local iface=$1 mode=$2
-	[ "$mode" = dhcp ] && dhcpcd -q -x "$iface"
+	[ "$mode" = dhcp ] && timeout 8 dhcpcd -q -x "$iface"
 	ip addr flush dev "$iface"
 	ip link set "$iface" down
 }
@@ -40,7 +40,7 @@ case $1 in
 		;;
 	stop)
 		if [ ${#NETWORK[@]} -eq 0 ]; then
-			step "Stopping DHCP" dhcpcd -q -x
+			step "Stopping DHCP" timeout 8 dhcpcd -q -x
 		else
 			for entry in "${NETWORK[@]}"; do
 				read -r iface mode _ <<< "$entry"

@@ -33,6 +33,7 @@ if [ "$(id -u)" != 0 ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${FLCOMP_NOSTAR
 		flcomp_state=${XDG_STATE_HOME:-$HOME/.local/state}/freelfs/log
 		{ mkdir -p "$flcomp_state" && tail -n 3000 "$flcomp_log" >"$flcomp_state/flcomp.log"; } 2>/dev/null
 		[ "$flcomp_status" = 0 ] && exit 0
+		[ -e /run/flshutdown ] && exit 0	# the system is going down: no crash screen
 		flcomp_now=$(date +%s)
 		flcomp_secs=$((flcomp_now - flcomp_t0))
 		# flcrash-test leaves a note when it wants to pretend something

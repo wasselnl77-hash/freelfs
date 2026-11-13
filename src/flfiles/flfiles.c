@@ -9,6 +9,7 @@
  * action runs at the end of the pass, so the entry list is never changed
  * while it is being drawn.
  */
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -30,15 +31,20 @@
 
 enum {
 	ID_BACK = 1, ID_FWD, ID_UP, ID_PATH, ID_NEW, ID_GRID, ID_SCROLL,
-	ID_SIDE = 100, ID_CELL = 1000, ID_MENU = 0x40000, ID_DLG = 0x41000,
+	ID_SIDE = 100, ID_DRIVE = 200, ID_EJECT = 300, ID_CELL = 1000, ID_MENU = 0x40000, ID_DLG = 0x41000,
+	ID_JOB = 0x42000, ID_OW = 0x43000,
 };
+
+#define DRV_MAX 24 /* drives shown in the sidebar */
 
 enum { TOOL_H = 44, STATUS_H = 28, SIDE_W = 188, CELL_W = 108, CELL_H = 98, ICON = 40 };
 
 enum { A_NONE, A_OPEN, A_NAV, A_BACK, A_FWD, A_UP, A_NEWDIR, A_RENAME, A_TRASH, A_COPY, A_CUT,
-       A_PASTE, A_HIDDEN, A_REFRESH, A_SELALL, A_DO_MKDIR, A_DO_RENAME, A_DO_DELETE, A_FOCUS_PATH, A_EXTRACT, A_COMPRESS };
+       A_PASTE, A_HIDDEN, A_REFRESH, A_SELALL, A_DO_MKDIR, A_DO_RENAME, A_DO_DELETE, A_FOCUS_PATH, A_EXTRACT, A_COMPRESS,
+       A_NEWFILE, A_DO_NEWFILE, A_PERMDEL, A_PROPS, A_OPENWITH, A_TERMINAL, A_RESTORE, A_EMPTY, A_DO_EMPTY,
+       A_DROP, A_JOB_START, A_MOUNT, A_EJECT };
 
-enum { OV_NONE, OV_MENU, OV_PROMPT, OV_CONFIRM };
+enum { OV_NONE, OV_MENU, OV_PROMPT, OV_CONFIRM, OV_CLASH, OV_OPENWITH, OV_PROPS, OV_MSG };
 
 struct entry {
 	char *name;
@@ -50,8 +56,53 @@ struct entry {
 struct place {
 	char label[40], path[PATH_MAX];
 	fl_icon ic;
-	int drive;
 };
+
+/* a removable or boot partition from flmount, or a mount under /drives or /run/media; System is first */
+struct drive {
+	char dev[64], label[64], fstype[24], path[PATH_MAX];
+	unsigned long long size;
+	int mounted, removable, system;
+};
+
+/* a file job's item: paths are heap strings; action is set by the clash dialog */
+struct jitem {
+	char *src, *dst, *info; /* info: the .trashinfo to remove with it, or NULL */
+	char name[NAME_MAX + 1];
+	int action, clash;
+};
+
+struct job {
+	int op, n;
+	struct jitem *it;
+	pid_t pid;
+	int rfd;
+	char buf[1024];
+	size_t blen;
+	long long total, done;
+	int ok, bad, cancelled, cancel_req, clear_clip;
+	char cur[NAME_MAX + 1], err[200], title[96];
+};
+
+struct app_choice {
+	char desk[PATH_MAX], name[96];
+};
+
+struct F;
+
+/* one flmount call: stdout and stderr in buf[0] and buf[1], exit status from the status pipe */
+struct hlp {
+	struct F *f;
+	int kind; /* HK_* */
+	pid_t pid;
+	int fd[3], open_n;
+	char *buf[2];
+	size_t len[2], cap[2];
+	int status;
+	char label[64], dev[64];
+};
+
+enum { HK_LIST, HK_MOUNT, HK_EJECT };
 
 struct menu_item {
 	const char *label, *hint;
@@ -62,7 +113,7 @@ struct F {
 	fl_app *app;
 	fl_win *win;
 	fl_font *small, *head;
-	fl_timer *msg_timer;
+	fl_timer *msg_timer, *tick;
 	int inited;
 
 	char cwd[PATH_MAX], pathbuf[PATH_MAX];
@@ -80,7 +131,13 @@ struct F {
 
 	struct place *places;
 	int nplaces;
-	char trash_files[PATH_MAX];
+	char trash_files[PATH_MAX], trash_base[PATH_MAX];
+
+	/* drives: the list from flmount, and the last one built (kept to see a change) */
+	struct drive drv[DRV_MAX], drv2[DRV_MAX];
+	int ndrv, ndrv2, flm_ok;
+	struct hlp *lst, *opr;
+	int mi_fd;
 
 	int ino_fd, ino_wd;
 
@@ -93,15 +150,32 @@ struct F {
 	/* queued action */
 	int act, act_idx;
 	char act_path[PATH_MAX];
+	int ctx_item, dr_copy;
+
+	/* drag and drop inside the window: 1 pressed, 2 dragging */
+	int dr_state, dr_x, dr_y;
+	char dr_target[PATH_MAX];
+	fl_rect dr_rect;
+
+	/* copy, move, trash, delete and restore: the running job, and the one waiting for clash answers */
+	struct job *job;
+	struct jitem *pend;
+	int npend, pend_op, pend_clip, clash_idx, clash_all;
 
 	/* overlays */
 	int ov;
-	struct menu_item menu[10];
+	struct menu_item menu[20];
 	int nmenu, menu_x, menu_y, menu_sel;
 	int prompt_act;
 	char prompt_title[96], prompt_text[NAME_MAX + 1], prompt_err[160];
-	char confirm_text[200];
+	char confirm_title[64], confirm_text[200], confirm_btn[16];
+	int confirm_act;
 	int ov_new;
+	char dlg_title[96], dlg_text[600];
+	struct app_choice ac[12];
+	int nac;
+	char ac_file[PATH_MAX], ac_mime[128];
+	char pr[6][PATH_MAX + 64];
 };
 
 static const char *const text_ext[] = {
@@ -236,11 +310,106 @@ static int valid_name(const char *s, char *why, size_t cap)
 	return 1;
 }
 
+/* "base", then "base 2", "base 3" ... the first name free in dir */
+static void next_free(const char *dir, const char *base, char *out, size_t cap)
+{
+	char p[PATH_MAX];
+	for (int i = 1; i < 10000; i++) {
+		if (i == 1)
+			snprintf(out, cap, "%s", base);
+		else
+			snprintf(out, cap, "%s %d", base, i);
+		join(p, sizeof p, dir, out);
+		if (!path_exists(p))
+			return;
+	}
+	snprintf(out, cap, "%s", base);
+}
+
+/* %XX escapes (trashinfo Path=) back to bytes */
+static void pct_decode(const char *s, char *out, size_t cap)
+{
+	size_t o = 0;
+	for (; *s && o + 1 < cap; s++) {
+		if (s[0] == '%' && isxdigit((unsigned char)s[1]) && isxdigit((unsigned char)s[2])) {
+			char hx[3] = {s[1], s[2], 0};
+			out[o++] = (char)strtol(hx, NULL, 16);
+			s += 2;
+		} else {
+			out[o++] = *s;
+		}
+	}
+	out[o] = 0;
+}
+
+/* \040 style escapes of /proc/mounts back to bytes */
+static void mount_unescape(const char *in, char *out, size_t cap)
+{
+	size_t o = 0;
+	for (size_t i = 0; in[i] && o + 1 < cap; i++) {
+		if (in[i] == '\\' && in[i + 1] >= '0' && in[i + 1] <= '3' && in[i + 2] >= '0' && in[i + 2] <= '7' &&
+		    in[i + 3] >= '0' && in[i + 3] <= '7') {
+			out[o++] = (char)(((in[i + 1] - '0') << 6) | ((in[i + 2] - '0') << 3) | (in[i + 3] - '0'));
+			i += 3;
+		} else {
+			out[o++] = in[i];
+		}
+	}
+	out[o] = 0;
+}
+
+/* ---- jobs: the child side. The child reads job_cancel and sends progress lines on job_wfd. */
+
+static volatile sig_atomic_t job_cancel;
+static int job_wfd = -1;
+static long long job_bytes, job_reported;
+
+static void job_on_usr1(int sig)
+{
+	(void)sig;
+	job_cancel = 1;
+}
+
+/* one line to the window: "T total", "I name", "P done", "E message", "D ok bad cancelled" */
+static void job_send(const char *fmt, ...)
+{
+	char line[600];
+	va_list ap;
+	va_start(ap, fmt);
+	int n = vsnprintf(line, sizeof line, fmt, ap);
+	va_end(ap);
+	if (job_wfd < 0 || n <= 0)
+		return;
+	if (n >= (int)sizeof line)
+		n = (int)sizeof line - 1;
+	for (int off = 0; off < n;) {
+		ssize_t w = write(job_wfd, line + off, (size_t)(n - off));
+		if (w < 0 && errno == EINTR)
+			continue;
+		if (w <= 0)
+			return;
+		off += (int)w;
+	}
+}
+
+static void job_progress(size_t n)
+{
+	job_bytes += (long long)n;
+	if (job_bytes - job_reported >= 256 * 1024) {
+		job_reported = job_bytes;
+		job_send("P %lld\n", job_bytes);
+	}
+}
+
 /* ---- file operations ----------------------------------------------------------------------- */
 
 static int remove_tree(const char *path)
 {
 	struct stat st;
+	if (job_cancel) {
+		errno = EINTR;
+		return -1;
+	}
 	if (lstat(path, &st) < 0)
 		return -1;
 	if (S_ISDIR(st.st_mode)) {
@@ -272,6 +441,10 @@ static int copy_tree(const char *src, const char *dst, int depth)
 		return -1;
 	if (depth > 64) {
 		errno = ELOOP;
+		return -1;
+	}
+	if (job_cancel) {
+		errno = EINTR;
 		return -1;
 	}
 	if (S_ISDIR(st.st_mode)) {
@@ -320,6 +493,11 @@ static int copy_tree(const char *src, const char *dst, int depth)
 	static char buf[65536];
 	int rc = 0;
 	for (;;) {
+		if (job_cancel) {
+			rc = -1;
+			errno = EINTR;
+			break;
+		}
 		ssize_t n = read(in, buf, sizeof buf);
 		if (n < 0) {
 			rc = -1;
@@ -334,6 +512,7 @@ static int copy_tree(const char *src, const char *dst, int depth)
 				goto done;
 			}
 			off += w;
+			job_progress((size_t)w);
 		}
 	}
 done:;
@@ -396,7 +575,7 @@ static void pct_encode(const char *s, char *out, size_t cap)
 }
 
 /* FreeDesktop trash: files in Trash/files, a .trashinfo in Trash/info */
-static int trash_path(struct F *f, const char *path)
+static int trash_path(const char *path)
 {
 	const char *home = getenv("HOME");
 	if (!home || !*home) {
@@ -453,7 +632,6 @@ static int trash_path(struct F *f, const char *path)
 		errno = e;
 		return -1;
 	}
-	(void)f;
 	return 0;
 }
 
@@ -711,7 +889,7 @@ static void inotify_ready(void *ud, int fd, short rev)
 
 /* ---- places and drives --------------------------------------------------------------------------- */
 
-static void place_add(struct F *f, const char *label, const char *path, fl_icon ic, int drive)
+static void place_add(struct F *f, const char *label, const char *path, fl_icon ic)
 {
 	struct place *np = realloc(f->places, (size_t)(f->nplaces + 1) * sizeof *np);
 	if (!np)
@@ -721,7 +899,6 @@ static void place_add(struct F *f, const char *label, const char *path, fl_icon 
 	snprintf(p->label, sizeof p->label, "%s", label);
 	snprintf(p->path, sizeof p->path, "%s", path);
 	p->ic = ic;
-	p->drive = drive;
 }
 
 static int is_dir_path(const char *p)
@@ -769,12 +946,13 @@ static int user_dir(const char *key, char *out, size_t cap)
 	return found;
 }
 
+/* the PLACES list; drives are drives_rebuild's */
 static void places_load(struct F *f)
 {
 	f->nplaces = 0;
 	const char *home = getenv("HOME");
 	if (home && *home && is_dir_path(home))
-		place_add(f, "Home", home, FL_ICON_HOME, 0);
+		place_add(f, "Home", home, FL_ICON_HOME);
 	static const struct { const char *key, *label, *dflt; } ud[] = {
 		{"XDG_DESKTOP_DIR", "Desktop", "desktop"}, {"XDG_DOCUMENTS_DIR", "Documents", "documents"},
 		{"XDG_DOWNLOAD_DIR", "Downloads", "downloads"}, {"XDG_MUSIC_DIR", "Music", "music"},
@@ -786,41 +964,10 @@ static void places_load(struct F *f)
 			snprintf(p, sizeof p, "%s/%s", home, ud[i].dflt);
 		if (!is_dir_path(p) || !strcmp(p, home))
 			continue;
-		place_add(f, ud[i].label, p, FL_ICON_FOLDER, 0);
+		place_add(f, ud[i].label, p, FL_ICON_FOLDER);
 	}
 	if (f->trash_files[0])
-		place_add(f, "Trash", f->trash_files, FL_ICON_TRASH, 0);
-
-	/* drives: the system, then what is mounted under /drives */
-	if (is_dir_path("/sysflfs"))
-		place_add(f, "System", "/sysflfs", FL_ICON_DRIVE, 1);
-	else
-		place_add(f, "System", "/", FL_ICON_DRIVE, 1);
-	FILE *fp = fopen("/proc/mounts", "r");
-	if (fp) {
-		char line[1024];
-		while (fgets(line, sizeof line, fp)) {
-			char dev[256], mp[PATH_MAX];
-			if (sscanf(line, "%255s %4095s", dev, mp) != 2)
-				continue;
-			/* mount points escape spaces as \040 */
-			char dec[PATH_MAX];
-			size_t o = 0;
-			for (size_t i = 0; mp[i] && o + 1 < sizeof dec; i++) {
-				if (mp[i] == '\\' && mp[i + 1] >= '0' && mp[i + 1] <= '3' && strlen(mp + i) >= 4) {
-					dec[o++] = (char)(((mp[i + 1] - '0') << 6) | ((mp[i + 2] - '0') << 3) | (mp[i + 3] - '0'));
-					i += 3;
-				} else {
-					dec[o++] = mp[i];
-				}
-			}
-			dec[o] = 0;
-			if (strncmp(dec, "/drives/", 8) || !dec[8])
-				continue;
-			place_add(f, base_name(dec), dec, FL_ICON_DRIVE, 1);
-		}
-		fclose(fp);
-	}
+		place_add(f, "Trash", f->trash_files, FL_ICON_TRASH);
 }
 
 /* ---- actions ----------------------------------------------------------------------------------------- */
@@ -1121,20 +1268,11 @@ static int exec_args(const char *desktop, const char *file, char **argv, int max
 	return n > 0 ? 0 : -1;
 }
 
-/* 1: started an app for the file */
-static int open_by_mime(struct F *f, const char *path, const char *name)
+/* start the app of a desktop file on one file; 0 if the file has no usable Exec= */
+static int spawn_desktop(struct F *f, const char *desktop, const char *path, const char *name)
 {
-	char mime[128] = "", dt[PATH_MAX];
-	if (mime_of_name(name, mime, sizeof mime) < 0)
-		snprintf(mime, sizeof mime, "%s", is_text_name(name) || sniff_text(path) ? "text/plain" : "");
-	if (!mime[0])
-		return 0;
-	if (app_for_mime(mime, dt, sizeof dt) < 0) {
-		if (strncmp(mime, "text/", 5) || app_for_mime("text/plain", dt, sizeof dt) < 0)
-			return 0;
-	}
 	char *argv[32] = {0};
-	if (exec_args(dt, path, argv, 32) < 0)
+	if (exec_args(desktop, path, argv, 32) < 0)
 		return 0;
 	pid_t pid = fork();
 	if (pid == 0) {
@@ -1148,6 +1286,21 @@ static int open_by_mime(struct F *f, const char *path, const char *name)
 	if (pid < 0)
 		say(f, 1, "Cannot start the app for %s: %s", name, strerror(errno));
 	return 1;
+}
+
+/* 1: started an app for the file */
+static int open_by_mime(struct F *f, const char *path, const char *name)
+{
+	char mime[128] = "", dt[PATH_MAX];
+	if (mime_of_name(name, mime, sizeof mime) < 0)
+		snprintf(mime, sizeof mime, "%s", is_text_name(name) || sniff_text(path) ? "text/plain" : "");
+	if (!mime[0])
+		return 0;
+	if (app_for_mime(mime, dt, sizeof dt) < 0) {
+		if (strncmp(mime, "text/", 5) || app_for_mime("text/plain", dt, sizeof dt) < 0)
+			return 0;
+	}
+	return spawn_desktop(f, dt, path, name);
 }
 
 static void open_entry(struct F *f, int i)
@@ -1242,82 +1395,7 @@ static void do_copy(struct F *f, int cut)
 	free(buf);
 }
 
-static void do_paste(struct F *f)
-{
-	size_t n = 0;
-	char *clip = fl_clipboard_get(f->app, &n);
-	if (!clip) {
-		say(f, 0, "Nothing to paste");
-		return;
-	}
-	char *text = malloc(n + 1);
-	if (!text) {
-		free(clip);
-		return;
-	}
-	memcpy(text, clip, n);
-	text[n] = 0;
-	free(clip);
-	int cut = 0;
-	char *line = text, *save = NULL;
-	line = strtok_r(text, "\n", &save);
-	if (!line || (strcmp(line, "x-flfiles/copy") && strcmp(line, "x-flfiles/cut"))) {
-		say(f, 0, "Nothing to paste");
-		free(text);
-		return;
-	}
-	cut = !strcmp(line, "x-flfiles/cut");
-	int done = 0, failed = 0;
-	char last[NAME_MAX + 1] = "";
-	while ((line = strtok_r(NULL, "\n", &save))) {
-		if (line[0] != '/')
-			continue;
-		struct stat st;
-		if (lstat(line, &st) < 0) {
-			failed++;
-			continue;
-		}
-		char dname[PATH_MAX];
-		snprintf(dname, sizeof dname, "%s", line);
-		char *slash = strrchr(dname, '/');
-		const char *name = base_name(line);
-		if (slash && slash != dname)
-			*slash = 0;
-		else
-			snprintf(dname, sizeof dname, "/");
-		int same_dir = !strcmp(dname, f->cwd);
-		if (cut && same_dir) {
-			done++;
-			snprintf(last, sizeof last, "%s", name);
-			continue;
-		}
-		size_t sl = strlen(line);
-		if (S_ISDIR(st.st_mode) && !strncmp(f->cwd, line, sl) && (f->cwd[sl] == '/' || f->cwd[sl] == 0)) {
-			say(f, 1, "Cannot put a folder inside itself");
-			failed++;
-			continue;
-		}
-		char nn[NAME_MAX + 1], dst[PATH_MAX];
-		unique_name(f->cwd, name, S_ISDIR(st.st_mode), nn, sizeof nn);
-		join(dst, sizeof dst, f->cwd, nn);
-		int rc = cut ? move_path(line, dst) : copy_tree(line, dst, 0);
-		if (rc < 0) {
-			say(f, 1, "Could not %s %s: %s", cut ? "move" : "copy", name, strerror(errno));
-			failed++;
-		} else {
-			done++;
-			snprintf(last, sizeof last, "%s", nn);
-		}
-	}
-	free(text);
-	if (cut && done && !failed)
-		fl_clipboard_set(f->app, "", 0);
-	refresh(f);
-	if (last[0] && done == 1)
-		select_name(f, last);
-	if (!failed)
-		say(f, 0, "%s %d item%s", cut ? "Moved" : "Pasted", done, done == 1 ? "" : "s");
-}
+
 
 /* The easter egg: `flcrash --cant PATH...` shows "You can't do that." when one of the paths is a
  * vital system folder (/sysflfs, /boot, ...) and exits 1 on "Never mind". Anything else (not one of
@@ -1381,62 +1459,860 @@ static int egg_ok_selection(struct F *f)
 	return ok;
 }
 
-static void do_trash(struct F *f)
+/* ---- jobs: copy, move, trash, delete and restore ----------------------------------------------------------
+ * A job runs in a forked child that does the file work. The child reports on a pipe ("T total", "I name",
+ * "P done", "E message", "D ok bad cancelled") and the window reads that pipe from its loop, so a big copy
+ * never holds the screen. Cancel sends SIGUSR1: the child stops after the file it is on. SIGCHLD stays
+ * ignored in the window, so a job ends at the pipe's EOF; nothing is waited for. Name clashes are asked
+ * for in the window before the child starts (Replace, Keep both, Skip). */
+
+enum { JOB_COPY, JOB_MOVE, JOB_TRASH, JOB_DELETE, JOB_RESTORE };
+enum { JA_PROCEED, JA_REPLACE, JA_SKIP };
+
+static void job_clean(char *out, const char *in)
 {
-	if (!egg_ok_selection(f)) {
-		say(f, 0, "Left it where it is");
-		return;
-	}
-	int done = 0, failed = 0;
-	for (int i = 0; i < f->n; i++) {
-		if (!f->sel[i])
-			continue;
-		char p[PATH_MAX];
-		join(p, sizeof p, f->cwd, f->ents[i].name);
-		if (trash_path(f, p) < 0) {
-			say(f, 1, "Could not move %s to the Trash: %s", f->ents[i].name, strerror(errno));
-			failed++;
-		} else {
-			done++;
-		}
-	}
-	int keep = f->cur;
-	refresh(f);
-	if (f->n) {
-		f->cur = f->anchor = keep < f->n ? keep : f->n - 1;
-	}
-	if (done && !failed)
-		say(f, 0, "Moved %d item%s to the Trash", done, done == 1 ? "" : "s");
+	size_t n = 0;
+	for (; in[0] && n < NAME_MAX; in++, n++)
+		out[n] = (in[0] == '\n' || in[0] == '\r') ? ' ' : in[0];
+	out[n] = 0;
 }
 
-static void do_delete(struct F *f)
+static void mkdir_parent(const char *path)
 {
+	char t[PATH_MAX];
+	snprintf(t, sizeof t, "%s", path);
+	char *s = strrchr(t, '/');
+	if (s && s != t) {
+		*s = 0;
+		mkdir_p(t);
+	}
+}
+
+/* the bytes under path: what copying or deleting it moves */
+static long long tree_bytes(const char *path, int depth)
+{
+	struct stat st;
+	if (job_cancel || depth > 64 || lstat(path, &st) < 0)
+		return 0;
+	if (!S_ISDIR(st.st_mode))
+		return S_ISREG(st.st_mode) ? (long long)st.st_size : 0;
+	DIR *d = opendir(path);
+	if (!d)
+		return 0;
+	long long t = 0;
+	struct dirent *e;
+	while ((e = readdir(d))) {
+		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+			continue;
+		char sub[PATH_MAX];
+		join(sub, sizeof sub, path, e->d_name);
+		t += tree_bytes(sub, depth + 1);
+	}
+	closedir(d);
+	return t;
+}
+
+/* the child: never returns */
+static void job_child(struct job *j, int wfd)
+{
+	job_wfd = wfd;
+	job_bytes = job_reported = 0;
+	signal(SIGUSR1, job_on_usr1);
+	signal(SIGCHLD, SIG_DFL);
+	signal(SIGPIPE, SIG_DFL);
+	long long *sz = calloc((size_t)j->n + 1, sizeof *sz);
+	if (!sz)
+		_exit(1);
+	long long total = 0;
+	for (int i = 0; i < j->n; i++)
+		if (j->it[i].action != JA_SKIP) {
+			sz[i] = tree_bytes(j->it[i].src, 0);
+			total += sz[i];
+		}
+	job_send("T %lld\n", total);
+	int ok = 0, bad = 0;
+	long long acc = 0;
+	for (int i = 0; i < j->n && !job_cancel; i++) {
+		struct jitem *it = &j->it[i];
+		if (it->action == JA_SKIP)
+			continue;
+		char nm[NAME_MAX + 1];
+		job_clean(nm, it->name);
+		job_send("I %s\n", nm);
+		job_bytes = acc;
+		int rc = 0;
+		switch (j->op) {
+		case JOB_COPY:
+		case JOB_MOVE:
+			if (it->action == JA_REPLACE)
+				remove_tree(it->dst);
+			if (path_exists(it->dst)) {
+				errno = EEXIST;
+				rc = -1;
+			} else {
+				rc = j->op == JOB_COPY ? copy_tree(it->src, it->dst, 0) : move_path(it->src, it->dst);
+				if (rc == 0 && j->op == JOB_MOVE && it->info)
+					unlink(it->info);
+			}
+			break;
+		case JOB_TRASH:
+			rc = trash_path(it->src);
+			break;
+		case JOB_DELETE:
+			rc = remove_tree(it->src);
+			if (rc == 0 && it->info)
+				unlink(it->info);
+			break;
+		case JOB_RESTORE:
+			if (it->action == JA_REPLACE)
+				remove_tree(it->dst);
+			if (path_exists(it->dst)) {
+				errno = EEXIST;
+				rc = -1;
+			} else {
+				mkdir_parent(it->dst);
+				rc = move_path(it->src, it->dst);
+				if (rc == 0 && it->info)
+					unlink(it->info);
+			}
+			break;
+		}
+		if (rc < 0 && job_cancel)
+			break;
+		if (rc < 0) {
+			bad++;
+			job_send("E %s: %s\n", nm, strerror(errno));
+		} else {
+			ok++;
+		}
+		acc += sz[i];
+		job_bytes = acc;
+		job_reported = acc;
+		job_send("P %lld\n", acc);
+	}
+	job_send("D %d %d %d\n", ok, bad, job_cancel ? 1 : 0);
+	_exit(0);
+}
+
+static void job_free_items(struct jitem *it, int n)
+{
+	for (int i = 0; it && i < n; i++) {
+		free(it[i].src);
+		free(it[i].dst);
+		free(it[i].info);
+	}
+	free(it);
+}
+
+static void job_free(struct job *j)
+{
+	job_free_items(j->it, j->n);
+	free(j);
+}
+
+static const char *job_verb(int op)
+{
+	switch (op) {
+	case JOB_COPY: return "Copied";
+	case JOB_MOVE: return "Moved";
+	case JOB_TRASH: return "Trashed";
+	case JOB_RESTORE: return "Restored";
+	default: return "Deleted";
+	}
+}
+
+static void job_line(struct job *j, const char *ln)
+{
+	const char *arg = ln[0] && ln[1] ? ln + 2 : "";
+	switch (ln[0]) {
+	case 'T': j->total = atoll(ln + 1); break;
+	case 'I': snprintf(j->cur, sizeof j->cur, "%s", arg); break;
+	case 'P': j->done = atoll(ln + 1); break;
+	case 'E': snprintf(j->err, sizeof j->err, "%s", arg); break;
+	case 'D': sscanf(ln + 1, "%d %d %d", &j->ok, &j->bad, &j->cancelled); break;
+	}
+}
+
+static void job_end(struct F *f)
+{
+	struct job *j = f->job;
+	f->job = NULL;
+	fl_fd_remove(f->app, j->rfd);
+	close(j->rfd);
+	int stopped = j->cancelled || j->cancel_req;
+	if (stopped)
+		say(f, 0, "Stopped. %d item%s done", j->ok, j->ok == 1 ? "" : "s");
+	else if (j->bad)
+		say(f, 1, "%d item%s failed: %s", j->bad, j->bad == 1 ? "" : "s", j->err[0] ? j->err : "error");
+	else
+		say(f, 0, "%s %d item%s", job_verb(j->op), j->ok, j->ok == 1 ? "" : "s");
+	if (j->clear_clip && !stopped && !j->bad)
+		fl_clipboard_set(f->app, "", 0);
+	refresh(f);
+	job_free(j);
+	fl_win_redraw(f->win);
+}
+
+static void job_ready(void *ud, int fd, short rev)
+{
+	struct F *f = ud;
+	struct job *j = f->job;
+	(void)rev;
+	if (!j || fd != j->rfd)
+		return;
+	for (;;) {
+		ssize_t n = read(fd, j->buf + j->blen, sizeof j->buf - 1 - j->blen);
+		if (n < 0 && errno == EINTR)
+			continue;
+		if (n < 0 && errno == EAGAIN)
+			break;
+		if (n <= 0) {
+			job_end(f);
+			return;
+		}
+		j->blen += (size_t)n;
+		char *s = j->buf, *nl;
+		while ((nl = memchr(s, '\n', j->blen - (size_t)(s - j->buf)))) {
+			*nl = 0;
+			job_line(j, s);
+			s = nl + 1;
+		}
+		size_t used = (size_t)(s - j->buf);
+		memmove(j->buf, s, j->blen - used);
+		j->blen -= used;
+		if (j->blen == sizeof j->buf - 1)
+			j->blen = 0; /* a line longer than the buffer: dropped */
+	}
+	fl_win_redraw(f->win);
+}
+
+static void job_start(struct F *f)
+{
+	struct jitem *it = f->pend;
+	int n = f->npend, op = f->pend_op;
+	f->pend = NULL;
+	f->npend = 0;
+	if (f->job) {
+		job_free_items(it, n);
+		say(f, 1, "Wait for the current job to finish");
+		return;
+	}
+	struct job *j = calloc(1, sizeof *j);
+	int fds[2];
+	if (!j || pipe2(fds, O_CLOEXEC) < 0) {
+		free(j);
+		job_free_items(it, n);
+		say(f, 1, "Cannot start: %s", strerror(errno));
+		return;
+	}
+	j->op = op;
+	j->n = n;
+	j->it = it;
+	j->rfd = fds[0];
+	j->clear_clip = f->pend_clip;
+	const char *what = op == JOB_COPY ? "Copying" : op == JOB_MOVE ? "Moving" : op == JOB_TRASH ? "Moving to the Trash"
+	                   : op == JOB_RESTORE ? "Restoring" : "Deleting";
+	snprintf(j->title, sizeof j->title, "%s %d item%s", what, n, n == 1 ? "" : "s");
+	j->pid = fork();
+	if (j->pid == 0) {
+		close(fds[0]);
+		job_child(j, fds[1]);
+	}
+	close(fds[1]);
+	if (j->pid < 0) {
+		close(fds[0]);
+		say(f, 1, "Cannot start: %s", strerror(errno));
+		job_free(j);
+		return;
+	}
+	fcntl(fds[0], F_SETFL, O_NONBLOCK);
+	fl_fd_add(f->app, fds[0], POLLIN, job_ready, f);
+	f->job = j;
+	fl_win_redraw(f->win);
+}
+
+/* the window's Stop button */
+static void job_stop(struct F *f)
+{
+	if (f->job && !f->job->cancel_req) {
+		f->job->cancel_req = 1;
+		kill(f->job->pid, SIGUSR1);
+	}
+	fl_win_redraw(f->win);
+}
+
+/* a free name next to the item's destination: "name copy", "name copy 2" ... */
+static void keep_both(struct jitem *x)
+{
+	char dir[PATH_MAX], nn[NAME_MAX + 1], p[PATH_MAX];
+	snprintf(dir, sizeof dir, "%s", x->dst);
+	char *s = strrchr(dir, '/');
+	if (s == dir)
+		dir[1] = 0;
+	else if (s)
+		*s = 0;
+	struct stat st;
+	int isdir = lstat(x->src, &st) == 0 && S_ISDIR(st.st_mode);
+	unique_name(dir, base_name(x->dst), isdir, nn, sizeof nn);
+	join(p, sizeof p, dir, nn);
+	char *np = strdup(p);
+	if (np) {
+		free(x->dst);
+		x->dst = np;
+	}
+	x->action = JA_PROCEED;
+}
+
+static int inside_dir(const char *dir, const char *src)
+{
+	size_t l = strlen(src);
+	return !strncmp(dir, src, l) && (dir[l] == '/' || dir[l] == 0);
+}
+
+/* Queue a job. Takes it[] over: freed here, or by the job. dir is the destination folder, or NULL. */
+static void request_job(struct F *f, int op, const char *dir, struct jitem *it, int n, int clear_clip)
+{
+	if (f->job || f->npend) {
+		job_free_items(it, n);
+		say(f, 1, "Wait for the current job to finish");
+		return;
+	}
+	int first = -1;
+	for (int i = 0; i < n; i++) {
+		struct jitem *x = &it[i];
+		struct stat st;
+		int isdir = lstat(x->src, &st) == 0 && S_ISDIR(st.st_mode);
+		if ((op == JOB_COPY || op == JOB_MOVE) && dir && isdir && inside_dir(dir, x->src)) {
+			say(f, 1, "Cannot put a folder inside itself");
+			job_free_items(it, n);
+			return;
+		}
+		if (op == JOB_MOVE && x->dst && !strcmp(x->src, x->dst))
+			x->action = JA_SKIP;
+		else if (op == JOB_COPY && x->dst && !strcmp(x->src, x->dst))
+			keep_both(x);
+		if (x->action != JA_SKIP && x->dst && (op == JOB_COPY || op == JOB_MOVE || op == JOB_RESTORE) &&
+		    path_exists(x->dst)) {
+			x->clash = 1;
+			if (first < 0)
+				first = i;
+		}
+	}
+	f->pend = it;
+	f->npend = n;
+	f->pend_op = op;
+	f->pend_clip = clear_clip;
+	if (first >= 0) {
+		f->clash_idx = first;
+		f->clash_all = 0;
+		f->ov = OV_CLASH;
+		fl_win_redraw(f->win);
+	} else {
+		queue(f, A_JOB_START);
+	}
+}
+
+/* the answer to the name clash shown: act for it, and for the rest when "same for the rest" is on */
+static void clash_answer(struct F *f, int act)
+{
+	for (int i = f->clash_idx; i < f->npend; i++) {
+		struct jitem *x = &f->pend[i];
+		if (!x->clash || (i != f->clash_idx && !f->clash_all))
+			continue;
+		x->clash = 0;
+		if (act == JA_PROCEED)
+			keep_both(x);
+		else
+			x->action = act;
+	}
+	for (int i = 0; i < f->npend; i++)
+		if (f->pend[i].clash) {
+			f->clash_idx = i;
+			fl_win_redraw(f->win);
+			return;
+		}
+	f->ov = OV_NONE;
+	queue(f, A_JOB_START);
+}
+
+static void clash_cancel(struct F *f)
+{
+	job_free_items(f->pend, f->npend);
+	f->pend = NULL;
+	f->npend = 0;
+	f->ov = OV_NONE;
+	say(f, 0, "Cancelled. Nothing was changed.");
+}
+
+/* the selected entries as jitems; dir (or NULL) gives each one's destination */
+static struct jitem *sel_items(struct F *f, const char *dir, int *n)
+{
+	struct jitem *it = calloc((size_t)count_sel(f) + 1, sizeof *it);
+	*n = 0;
+	for (int i = 0; it && i < f->n; i++) {
+		if (!f->sel[i])
+			continue;
+		struct jitem *x = &it[*n];
+		char p[PATH_MAX];
+		join(p, sizeof p, f->cwd, f->ents[i].name);
+		x->src = strdup(p);
+		if (dir) {
+			join(p, sizeof p, dir, f->ents[i].name);
+			x->dst = strdup(p);
+		}
+		if (in_trash(f)) {
+			snprintf(p, sizeof p, "%s/info/%s.trashinfo", f->trash_base, f->ents[i].name);
+			x->info = strdup(p);
+		}
+		snprintf(x->name, sizeof x->name, "%s", f->ents[i].name);
+		(*n)++;
+	}
+	return it;
+}
+
+/* the selected trash entries, back to where their .trashinfo says they came from */
+static struct jitem *restore_items(struct F *f, int *n)
+{
+	struct jitem *it = sel_items(f, NULL, n);
+	for (int i = 0; it && i < *n; i++) {
+		struct jitem *x = &it[i];
+		char ip[PATH_MAX], line[PATH_MAX + 64], dst[PATH_MAX] = "";
+		snprintf(ip, sizeof ip, "%s/info/%s.trashinfo", f->trash_base, x->name);
+		FILE *fp = fopen(ip, "r");
+		if (fp) {
+			while (fgets(line, sizeof line, fp))
+				if (!strncmp(line, "Path=", 5)) {
+					line[strcspn(line, "\r\n")] = 0;
+					pct_decode(line + 5, dst, sizeof dst);
+					break;
+				}
+			fclose(fp);
+		}
+		if (dst[0] != '/') {
+			const char *home = getenv("HOME");
+			snprintf(dst, sizeof dst, "%s/%s", home ? home : "/", x->name);
+		}
+		x->dst = strdup(dst);
+	}
+	return it;
+}
+
+/* every entry of the Trash, for Empty Trash */
+static struct jitem *trash_all_items(struct F *f, int *n)
+{
+	*n = 0;
+	DIR *d = opendir(f->trash_files);
+	if (!d)
+		return NULL;
+	int cnt = 0;
+	while (readdir(d))
+		cnt++;
+	rewinddir(d);
+	struct jitem *it = calloc((size_t)cnt + 1, sizeof *it);
+	struct dirent *e;
+	while (it && (e = readdir(d))) {
+		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+			continue;
+		char p[PATH_MAX], ip[PATH_MAX];
+		join(p, sizeof p, f->trash_files, e->d_name);
+		snprintf(ip, sizeof ip, "%s/info/%s.trashinfo", f->trash_base, e->d_name);
+		it[*n].src = strdup(p);
+		it[*n].info = strdup(ip);
+		snprintf(it[*n].name, sizeof it[*n].name, "%s", e->d_name);
+		(*n)++;
+	}
+	closedir(d);
+	return it;
+}
+
+/* Delete permanently: asks first, then A_DO_DELETE */
+static void ask_permanent(struct F *f)
+{
+	int c = count_sel(f);
+	if (!c)
+		return;
 	if (!egg_ok_selection(f)) {
 		say(f, 0, "Left it where it is");
 		return;
 	}
-	int done = 0, failed = 0;
-	char info[PATH_MAX];
-	for (int i = 0; i < f->n; i++) {
-		if (!f->sel[i])
+	f->ov = OV_CONFIRM;
+	snprintf(f->confirm_title, sizeof f->confirm_title, "Delete permanently");
+	if (c == 1 && f->cur >= 0 && f->sel[f->cur])
+		snprintf(f->confirm_text, sizeof f->confirm_text, "Delete \"%s\" for good? This cannot be undone.",
+		         f->ents[f->cur].name);
+	else
+		snprintf(f->confirm_text, sizeof f->confirm_text, "Delete %d items for good? This cannot be undone.", c);
+	snprintf(f->confirm_btn, sizeof f->confirm_btn, "Delete");
+	f->confirm_act = A_DO_DELETE;
+}
+
+/* a drop on a folder (or the Trash) in the window: move, or copy with Ctrl */
+static void drop_selection(struct F *f, const char *dir, int copy)
+{
+	int n = 0;
+	if (!strcmp(dir, f->trash_files)) {
+		if (!egg_ok_selection(f)) {
+			say(f, 0, "Left it where it is");
+			return;
+		}
+		struct jitem *it = sel_items(f, NULL, &n);
+		if (!n) {
+			free(it);
+			return;
+		}
+		request_job(f, JOB_TRASH, NULL, it, n, 0);
+		return;
+	}
+	struct jitem *it = sel_items(f, dir, &n);
+	if (!n) {
+		free(it);
+		return;
+	}
+	request_job(f, copy ? JOB_COPY : JOB_MOVE, dir, it, n, 0);
+}
+
+/* ---- drives: flmount does the mounting ---------------------------------------------------------------------
+ * flmount list | mount DEV | eject DEV (its CLI is in the README). Each call runs as a child whose stdout,
+ * stderr and exit status come back on three pipes that the window's loop reads, so nothing waits. The list
+ * is asked for on start, on a change of /proc/self/mountinfo (POLLPRI) and every 3 s while the window is
+ * open. If flmount is missing, the removable rows stay hidden and only the timer and mount changes are
+ * skipped. */
+
+static void hlp_add(struct hlp *h, int i, const char *s, size_t n)
+{
+	if (h->len[i] + n + 1 > 65536)
+		return;
+	if (h->len[i] + n + 1 > h->cap[i]) {
+		size_t nc = (h->len[i] + n + 1) * 2 + 256;
+		char *nb = realloc(h->buf[i], nc);
+		if (!nb)
+			return;
+		h->buf[i] = nb;
+		h->cap[i] = nc;
+	}
+	memcpy(h->buf[i] + h->len[i], s, n);
+	h->len[i] += n;
+	h->buf[i][h->len[i]] = 0;
+}
+
+static void hlp_free(struct hlp *h)
+{
+	free(h->buf[0]);
+	free(h->buf[1]);
+	free(h);
+}
+
+static void show_msg(struct F *f, const char *title, const char *text)
+{
+	snprintf(f->dlg_title, sizeof f->dlg_title, "%s", title);
+	snprintf(f->dlg_text, sizeof f->dlg_text, "%s", text);
+	f->ov = OV_MSG;
+	fl_win_redraw(f->win);
+}
+
+/* split tab fields in place; returns the count (at most max) */
+static int split_tabs(char *line, char **fld, int max)
+{
+	int n = 0;
+	char *t = line;
+	for (;;) {
+		fld[n++] = t;
+		char *tab = strchr(t, '\t');
+		if (!tab || n == max)
+			break;
+		*tab = 0;
+		t = tab + 1;
+	}
+	return n;
+}
+
+/* the drive list from flmount list (NULL: flmount is not there), plus the mounts under /drives and /run/media */
+static void drives_rebuild(struct F *f, const char *list)
+{
+	memset(f->drv2, 0, sizeof f->drv2);
+	int n = 0;
+	struct drive *s = &f->drv2[n++];
+	s->system = 1;
+	s->mounted = 1;
+	snprintf(s->label, sizeof s->label, "System");
+	snprintf(s->path, sizeof s->path, "%s", is_dir_path("/sysflfs") ? "/sysflfs" : "/");
+	if (list) {
+		char *copy = strdup(list);
+		char *p = copy;
+		while (copy && p && *p && n < DRV_MAX) {
+			char *e = strchr(p, '\n');
+			char *next = e ? e + 1 : NULL;
+			if (e)
+				*e = 0;
+			size_t l = strlen(p);
+			if (l && p[l - 1] == '\r')
+				p[l - 1] = 0;
+			char *fld[6] = {0};
+			int nf = split_tabs(p, fld, 6);
+			if (nf == 6 && fld[0][0] && (!strcmp(fld[5], "removable") || !strcmp(fld[5], "boot"))) {
+				struct drive *d = &f->drv2[n++];
+				snprintf(d->dev, sizeof d->dev, "%s", fld[0]);
+				snprintf(d->label, sizeof d->label, "%s", fld[1][0] ? fld[1] : base_name(fld[0]));
+				snprintf(d->fstype, sizeof d->fstype, "%s", fld[2]);
+				d->size = strtoull(fld[3], NULL, 10);
+				d->mounted = strcmp(fld[4], "-") != 0;
+				if (d->mounted)
+					snprintf(d->path, sizeof d->path, "%s", fld[4]);
+				d->removable = 1;
+			}
+			p = next;
+		}
+		free(copy);
+	}
+	FILE *fp = fopen("/proc/mounts", "r");
+	if (fp) {
+		char line[1024];
+		while (n < DRV_MAX && fgets(line, sizeof line, fp)) {
+			char dev[256], mp[PATH_MAX], dec[PATH_MAX];
+			if (sscanf(line, "%255s %4095s", dev, mp) != 2)
+				continue;
+			mount_unescape(mp, dec, sizeof dec);
+			int under = (!strncmp(dec, "/drives/", 8) && dec[8]) || (!strncmp(dec, "/run/media/", 11) && dec[11]);
+			if (!under)
+				continue;
+			int seen = 0;
+			for (int i = 0; i < n; i++)
+				if (!strcmp(f->drv2[i].path, dec))
+					seen = 1;
+			if (seen)
+				continue;
+			struct drive *d = &f->drv2[n++];
+			snprintf(d->dev, sizeof d->dev, "%s", dev);
+			snprintf(d->label, sizeof d->label, "%s", base_name(dec));
+			snprintf(d->path, sizeof d->path, "%s", dec);
+			d->mounted = 1;
+			d->removable = 1;
+		}
+		fclose(fp);
+	}
+	f->ndrv2 = n;
+	if (f->ndrv != f->ndrv2 || memcmp(f->drv, f->drv2, sizeof f->drv)) {
+		memcpy(f->drv, f->drv2, sizeof f->drv);
+		f->ndrv = f->ndrv2;
+		fl_win_redraw(f->win);
+	}
+}
+
+static void drive_refresh(struct F *f);
+
+static void hlp_done(struct hlp *h)
+{
+	struct F *f = h->f;
+	char out[65536], err[4096];
+	snprintf(out, sizeof out, "%s", h->buf[0] ? h->buf[0] : "");
+	snprintf(err, sizeof err, "%s", h->buf[1] ? h->buf[1] : "");
+	int ok = h->status == 0;
+	switch (h->kind) {
+	case HK_LIST:
+		if (f->lst == h)
+			f->lst = NULL;
+		f->flm_ok = ok;
+		drives_rebuild(f, ok ? out : NULL);
+		break;
+	case HK_MOUNT: {
+		if (f->opr == h)
+			f->opr = NULL;
+		if (ok) {
+			char mp[PATH_MAX];
+			snprintf(mp, sizeof mp, "%s", out);
+			mp[strcspn(mp, "\r\n")] = 0;
+			drive_refresh(f);
+			if (mp[0] == '/')
+				load_dir(f, mp, 1);
+		} else {
+			char text[700];
+			snprintf(text, sizeof text, "%s", err[0] ? err : "flmount did not finish.");
+			char title[120];
+			snprintf(title, sizeof title, "Could not mount %s", h->label);
+			show_msg(f, title, text);
+		}
+		break;
+	}
+	case HK_EJECT: {
+		if (f->opr == h)
+			f->opr = NULL;
+		if (ok) {
+			say(f, 0, "Ejected %s. It is safe to remove.", h->label);
+		} else {
+			char text[700];
+			snprintf(text, sizeof text, "%s", err[0] ? err : "flmount did not finish.");
+			char title[120];
+			snprintf(title, sizeof title, "Could not eject %s", h->label);
+			show_msg(f, title, text);
+		}
+		drive_refresh(f);
+		break;
+	}
+	}
+	hlp_free(h);
+}
+
+static void hlp_ready(void *ud, int fd, short rev)
+{
+	struct hlp *h = ud;
+	int i = fd == h->fd[0] ? 0 : fd == h->fd[1] ? 1 : 2;
+	char b[1024];
+	(void)rev;
+	for (;;) {
+		ssize_t n = read(fd, b, sizeof b);
+		if (n < 0 && errno == EINTR)
 			continue;
-		char p[PATH_MAX];
-		join(p, sizeof p, f->cwd, f->ents[i].name);
-		if (remove_tree(p) < 0) {
-			say(f, 1, "Could not delete %s: %s", f->ents[i].name, strerror(errno));
-			failed++;
+		if (n < 0 && errno == EAGAIN)
+			return;
+		if (n > 0) {
+			if (i == 2) {
+				char t[16];
+				size_t m = (size_t)n < sizeof t - 1 ? (size_t)n : sizeof t - 1;
+				memcpy(t, b, m);
+				t[m] = 0;
+				h->status = atoi(t);
+			} else {
+				hlp_add(h, i, b, (size_t)n);
+			}
 			continue;
 		}
-		/* its .trashinfo, next to the files folder */
-		snprintf(info, sizeof info, "%.*s/info/%s.trashinfo", (int)(strlen(f->trash_files) - 6),
-		         f->trash_files, f->ents[i].name);
-		if (!strcmp(f->cwd, f->trash_files))
-			unlink(info);
-		done++;
+		fl_fd_remove(h->f->app, fd);
+		close(fd);
+		h->fd[i] = -1;
+		if (--h->open_n == 0)
+			hlp_done(h);
+		return;
 	}
-	refresh(f);
-	if (done && !failed)
-		say(f, 0, "Deleted %d item%s", done, done == 1 ? "" : "s");
+}
+
+/* run flmount VERB [DEV] in a child; NULL when that fails */
+static struct hlp *hlp_spawn(struct F *f, int kind, const char *verb, const char *dev)
+{
+	struct hlp *h = calloc(1, sizeof *h);
+	if (!h)
+		return NULL;
+	h->f = f;
+	h->kind = kind;
+	h->status = -1;
+	int p[3][2] = {{-1, -1}, {-1, -1}, {-1, -1}};
+	for (int i = 0; i < 3; i++)
+		if (pipe2(p[i], O_CLOEXEC) < 0)
+			goto fail;
+	const char *script = "flmount \"$@\"; printf '%d' \"$?\" >&3";
+	pid_t pid = fork();
+	if (pid < 0)
+		goto fail;
+	if (pid == 0) {
+		int dn = open("/dev/null", O_RDONLY);
+		if (dn >= 0)
+			dup2(dn, 0);
+		dup2(p[0][1], 1);
+		dup2(p[1][1], 2);
+		dup2(p[2][1], 3);
+		fcntl(3, F_SETFD, 0);
+		signal(SIGCHLD, SIG_DFL);
+		if (dev)
+			execl("/bin/sh", "sh", "-c", script, "flmount", verb, dev, (char *)NULL);
+		else
+			execl("/bin/sh", "sh", "-c", script, "flmount", verb, (char *)NULL);
+		_exit(127);
+	}
+	h->pid = pid;
+	for (int i = 0; i < 3; i++) {
+		close(p[i][1]);
+		p[i][1] = -1;
+		h->fd[i] = p[i][0];
+		fcntl(p[i][0], F_SETFL, O_NONBLOCK);
+		fl_fd_add(f->app, p[i][0], POLLIN, hlp_ready, h);
+	}
+	h->open_n = 3;
+	return h;
+fail:
+	for (int i = 0; i < 3; i++) {
+		if (p[i][0] >= 0)
+			close(p[i][0]);
+		if (p[i][1] >= 0)
+			close(p[i][1]);
+	}
+	free(h);
+	return NULL;
+}
+
+/* ask flmount for the drive list, unless a list is already on its way */
+static void drive_refresh(struct F *f)
+{
+	if (f->lst || !f->win)
+		return;
+	f->lst = hlp_spawn(f, HK_LIST, "list", NULL);
+	if (!f->lst)
+		drives_rebuild(f, NULL);
+}
+
+/* the mount table changed */
+static void mi_ready(void *ud, int fd, short rev)
+{
+	struct F *f = ud;
+	char b[512];
+	(void)rev;
+	lseek(fd, 0, SEEK_SET);
+	while (read(fd, b, sizeof b) > 0)
+		;
+	drive_refresh(f);
+}
+
+static void tick(void *ud)
+{
+	struct F *f = ud;
+	if (f->flm_ok)
+		drive_refresh(f);
+}
+
+static void do_paste(struct F *f)
+{
+	size_t n = 0;
+	char *clip = fl_clipboard_get(f->app, &n);
+	if (!clip) {
+		say(f, 0, "Nothing to paste");
+		return;
+	}
+	char *text = malloc(n + 1);
+	if (!text) {
+		free(clip);
+		return;
+	}
+	memcpy(text, clip, n);
+	text[n] = 0;
+	free(clip);
+	int lines = 1;
+	for (char *c = text; *c; c++)
+		lines += *c == '\n';
+	char *save = NULL;
+	char *line = strtok_r(text, "\n", &save);
+	if (!line || (strcmp(line, "x-flfiles/copy") && strcmp(line, "x-flfiles/cut"))) {
+		say(f, 0, "Nothing to paste");
+		free(text);
+		return;
+	}
+	int cut = !strcmp(line, "x-flfiles/cut");
+	struct jitem *it = calloc((size_t)lines, sizeof *it);
+	int k = 0;
+	while (it && (line = strtok_r(NULL, "\n", &save))) {
+		if (line[0] != '/' || !path_exists(line))
+			continue;
+		char dst[PATH_MAX];
+		snprintf(it[k].name, sizeof it[k].name, "%s", base_name(line));
+		it[k].src = strdup(line);
+		join(dst, sizeof dst, f->cwd, it[k].name);
+		it[k].dst = strdup(dst);
+		k++;
+	}
+	free(text);
+	if (!k) {
+		free(it);
+		say(f, 0, "Nothing to paste");
+		return;
+	}
+	request_job(f, cut ? JOB_MOVE : JOB_COPY, f->cwd, it, k, cut);
 }
 
 static void open_prompt(struct F *f, int act, const char *title, const char *text)
@@ -1447,6 +2323,188 @@ static void open_prompt(struct F *f, int act, const char *title, const char *tex
 	snprintf(f->prompt_text, sizeof f->prompt_text, "%s", text);
 	f->prompt_err[0] = 0;
 	f->ov_new = 1;
+}
+
+/* a terminal (flterm) in dir */
+static void open_terminal(struct F *f, const char *dir)
+{
+	pid_t pid = fork();
+	if (pid == 0) {
+		setsid();
+		signal(SIGCHLD, SIG_DFL);
+		if (chdir(dir) != 0)
+			_exit(1);
+		execlp("flterm", "flterm", (char *)NULL);
+		_exit(127);
+	}
+	if (pid < 0)
+		say(f, 1, "Cannot start a terminal: %s", strerror(errno));
+}
+
+/* an app for Open with: a .desktop file that is not hidden */
+static void add_choice(struct F *f, const char *path)
+{
+	if (f->nac >= (int)(sizeof f->ac / sizeof *f->ac))
+		return;
+	for (int i = 0; i < f->nac; i++)
+		if (!strcmp(f->ac[i].desk, path))
+			return;
+	FILE *fp = fopen(path, "r");
+	if (!fp)
+		return;
+	char name[96] = "", line[512];
+	int in = 0, hidden = 0;
+	while (fgets(line, sizeof line, fp)) {
+		line[strcspn(line, "\r\n")] = 0;
+		if (line[0] == '[') {
+			in = !strcmp(line, "[Desktop Entry]");
+			continue;
+		}
+		if (!in)
+			continue;
+		if (!strncmp(line, "Name=", 5) && !name[0])
+			snprintf(name, sizeof name, "%s", line + 5);
+		else if (!strcmp(line, "NoDisplay=true") || !strcmp(line, "Hidden=true"))
+			hidden = 1;
+	}
+	fclose(fp);
+	if (hidden)
+		return;
+	if (!name[0])
+		snprintf(name, sizeof name, "%s", base_name(path));
+	snprintf(f->ac[f->nac].desk, sizeof f->ac[f->nac].desk, "%s", path);
+	snprintf(f->ac[f->nac].name, sizeof f->ac[f->nac].name, "%s", name);
+	f->nac++;
+}
+
+static int desk_handles(const char *path, const char *mime)
+{
+	FILE *fp = fopen(path, "r");
+	if (!fp)
+		return 0;
+	char line[2048];
+	size_t ml = strlen(mime);
+	int hit = 0;
+	while (!hit && fgets(line, sizeof line, fp))
+		if (!strncmp(line, "MimeType=", 9)) {
+			for (char *s = line + 9; (s = strstr(s, mime)); s += ml)
+				if ((s == line + 9 || s[-1] == ';') && (s[ml] == ';' || s[ml] == '\n' || s[ml] == 0)) {
+					hit = 1;
+					break;
+				}
+			break;
+		}
+	fclose(fp);
+	return hit;
+}
+
+/* the apps named for mime in one mimeapps.list, Default first */
+static void mimeapps_collect(struct F *f, const char *file, const char *mime)
+{
+	FILE *fp = fopen(file, "r");
+	if (!fp)
+		return;
+	char line[1024], section[64] = "";
+	size_t ml = strlen(mime);
+	while (fgets(line, sizeof line, fp)) {
+		line[strcspn(line, "\r\n")] = 0;
+		if (line[0] == '[') {
+			snprintf(section, sizeof section, "%s", line);
+			continue;
+		}
+		if (strcmp(section, "[Default Applications]") && strcmp(section, "[Added Associations]"))
+			continue;
+		if (strncmp(line, mime, ml) || line[ml] != '=')
+			continue;
+		for (char *t = strtok(line + ml + 1, ";"); t; t = strtok(NULL, ";")) {
+			char desk[PATH_MAX];
+			if (*t && find_desktop(t, desk, sizeof desk) == 0)
+				add_choice(f, desk);
+		}
+	}
+	fclose(fp);
+}
+
+/* the apps that open the file: the lists' choices first, then any .desktop that lists the type */
+static int apps_for_file(struct F *f, const char *name, const char *path)
+{
+	char mime[128] = "";
+	if (mime_of_name(name, mime, sizeof mime) < 0)
+		snprintf(mime, sizeof mime, "%s", is_text_name(name) || sniff_text(path) ? "text/plain" : "");
+	snprintf(f->ac_mime, sizeof f->ac_mime, "%s", mime);
+	f->nac = 0;
+	if (!mime[0])
+		return 0;
+	char d[8][PATH_MAX], p[PATH_MAX], lists[10][PATH_MAX];
+	int nd, nl = 0;
+	data_dirs(d, &nd);
+	const char *home = getenv("HOME"), *cfg = getenv("XDG_CONFIG_HOME");
+	if (cfg && *cfg)
+		snprintf(lists[nl++], PATH_MAX, "%s/mimeapps.list", cfg);
+	else
+		snprintf(lists[nl++], PATH_MAX, "%s/.config/mimeapps.list", home ? home : "");
+	snprintf(lists[nl++], PATH_MAX, "/etc/xdg/mimeapps.list");
+	for (int i = 0; i < nd && nl < 10; i++)
+		snprintf(lists[nl++], PATH_MAX, "%s/applications/mimeapps.list", d[i]);
+	for (int i = 0; i < nl; i++)
+		mimeapps_collect(f, lists[i], mime);
+	for (int i = 0; i < nd; i++) {
+		snprintf(p, sizeof p, "%s/applications", d[i]);
+		DIR *dir = opendir(p);
+		struct dirent *e;
+		while (dir && (e = readdir(dir))) {
+			size_t l = strlen(e->d_name);
+			if (l < 9 || strcmp(e->d_name + l - 8, ".desktop") || !strcmp(e->d_name, "flfiles.desktop"))
+				continue;
+			char path2[PATH_MAX + 300];
+			snprintf(path2, sizeof path2, "%s/%s", p, e->d_name);
+			if (desk_handles(path2, mime))
+				add_choice(f, path2);
+		}
+		if (dir)
+			closedir(dir);
+	}
+	return f->nac;
+}
+
+static void mode_str(mode_t m, char *o)
+{
+	static const char t[] = "rwxrwxrwx";
+	for (int i = 0; i < 9; i++)
+		o[i] = (m & (0400 >> i)) ? t[i] : '-';
+	o[9] = 0;
+}
+
+/* the six lines of the Properties dialog for entry i */
+static void props_fill(struct F *f, int i)
+{
+	struct entry *e = &f->ents[i];
+	char p[PATH_MAX], sz[32];
+	struct stat st;
+	join(p, sizeof p, f->cwd, e->name);
+	memset(f->pr, 0, sizeof f->pr);
+	snprintf(f->pr[0], sizeof f->pr[0], "%s", e->name);
+	if (e->dir) {
+		snprintf(f->pr[1], sizeof f->pr[1], "Folder");
+		snprintf(f->pr[2], sizeof f->pr[2], "-");
+	} else {
+		char m[128];
+		if (mime_of_name(e->name, m, sizeof m) == 0)
+			snprintf(f->pr[1], sizeof f->pr[1], "%s", m);
+		else
+			snprintf(f->pr[1], sizeof f->pr[1], "%s", is_text_name(e->name) ? "text/plain" : "Unknown type");
+		fmt_size(e->size, sz, sizeof sz);
+		snprintf(f->pr[2], sizeof f->pr[2], "%s (%lld bytes)", sz, (long long)e->size);
+	}
+	struct tm tm;
+	localtime_r(&e->mtime, &tm);
+	strftime(f->pr[3], sizeof f->pr[3], "%-d %b %Y  %H:%M", &tm);
+	if (lstat(p, &st) == 0) {
+		char rwx[10];
+		mode_str(st.st_mode, rwx);
+		snprintf(f->pr[4], sizeof f->pr[4], "%s (%04o)", rwx, (unsigned)(st.st_mode & 07777));
+	}
+	snprintf(f->pr[5], sizeof f->pr[5], "%s", f->cwd);
 }
 
 static void run_action(struct F *f)
@@ -1474,29 +2532,83 @@ static void run_action(struct F *f)
 			say(f, 0, "Cannot create folders in the Trash");
 		else {
 			char nn[NAME_MAX + 1];
-			unique_name(f->cwd, "New folder", 1, nn, sizeof nn);
+			next_free(f->cwd, "New folder", nn, sizeof nn);
 			open_prompt(f, A_DO_MKDIR, "New folder", nn);
+		}
+		break;
+	case A_NEWFILE:
+		if (in_trash(f))
+			say(f, 0, "Cannot create files in the Trash");
+		else {
+			char nn[NAME_MAX + 1];
+			next_free(f->cwd, "New file", nn, sizeof nn);
+			open_prompt(f, A_DO_NEWFILE, "New empty file", nn);
 		}
 		break;
 	case A_RENAME:
 		if (count_sel(f) == 1 && f->cur >= 0 && f->sel[f->cur])
 			open_prompt(f, A_DO_RENAME, "Rename", f->ents[f->cur].name);
 		break;
-	case A_TRASH:
+	case A_TRASH: {
 		if (!count_sel(f))
 			break;
 		if (in_trash(f)) {
-			f->ov = OV_CONFIRM;
-			int c = count_sel(f);
-			if (c == 1)
-				snprintf(f->confirm_text, sizeof f->confirm_text, "Delete \"%s\" for good? This cannot be undone.",
-				         f->ents[f->cur].name);
-			else
-				snprintf(f->confirm_text, sizeof f->confirm_text, "Delete %d items for good? This cannot be undone.", c);
-		} else {
-			do_trash(f);
+			ask_permanent(f);
+			break;
+		}
+		if (!egg_ok_selection(f)) {
+			say(f, 0, "Left it where it is");
+			break;
+		}
+		int n = 0;
+		struct jitem *it = sel_items(f, NULL, &n);
+		if (n)
+			request_job(f, JOB_TRASH, NULL, it, n, 0);
+		else
+			free(it);
+		break;
+	}
+	case A_PERMDEL:
+		ask_permanent(f);
+		break;
+	case A_DO_DELETE: {
+		int n = 0;
+		struct jitem *it = sel_items(f, NULL, &n);
+		if (n)
+			request_job(f, JOB_DELETE, NULL, it, n, 0);
+		else
+			free(it);
+		break;
+	}
+	case A_EMPTY:
+		f->ov = OV_CONFIRM;
+		snprintf(f->confirm_title, sizeof f->confirm_title, "Empty Trash");
+		snprintf(f->confirm_text, sizeof f->confirm_text, "Everything in the Trash is deleted for good. This cannot be undone.");
+		snprintf(f->confirm_btn, sizeof f->confirm_btn, "Empty");
+		f->confirm_act = A_DO_EMPTY;
+		break;
+	case A_DO_EMPTY: {
+		int n = 0;
+		struct jitem *it = trash_all_items(f, &n);
+		if (n)
+			request_job(f, JOB_DELETE, NULL, it, n, 0);
+		else {
+			free(it);
+			say(f, 0, "The Trash is empty");
 		}
 		break;
+	}
+	case A_RESTORE: {
+		int n = 0;
+		struct jitem *it = restore_items(f, &n);
+		if (n)
+			request_job(f, JOB_RESTORE, NULL, it, n, 0);
+		else {
+			free(it);
+			say(f, 0, "Nothing selected");
+		}
+		break;
+	}
 	case A_COPY:
 		do_copy(f, 0);
 		break;
@@ -1506,6 +2618,40 @@ static void run_action(struct F *f)
 	case A_PASTE:
 		do_paste(f);
 		break;
+	case A_DROP:
+		drop_selection(f, f->act_path, f->dr_copy);
+		break;
+	case A_JOB_START:
+		job_start(f);
+		break;
+	case A_PROPS:
+		if (f->act_idx >= 0 && f->act_idx < f->n) {
+			props_fill(f, f->act_idx);
+			f->ov = OV_PROPS;
+		}
+		break;
+	case A_OPENWITH: {
+		int i = f->act_idx;
+		if (i < 0 || i >= f->n || f->ents[i].dir)
+			break;
+		join(f->ac_file, sizeof f->ac_file, f->cwd, f->ents[i].name);
+		if (!apps_for_file(f, f->ents[i].name, f->ac_file)) {
+			say(f, 0, "No app is set up to open %s", f->ents[i].name);
+			break;
+		}
+		f->ov = OV_OPENWITH;
+		break;
+	}
+	case A_TERMINAL: {
+		char dir[PATH_MAX];
+		int i = f->act_idx;
+		if (f->ctx_item && i >= 0 && i < f->n && f->ents[i].dir)
+			join(dir, sizeof dir, f->cwd, f->ents[i].name);
+		else
+			snprintf(dir, sizeof dir, "%s", f->cwd);
+		open_terminal(f, dir);
+		break;
+	}
 	case A_HIDDEN:
 		f->show_hidden = !f->show_hidden;
 		refresh(f);
@@ -1513,6 +2659,7 @@ static void run_action(struct F *f)
 	case A_REFRESH:
 		refresh(f);
 		places_load(f);
+		drive_refresh(f);
 		break;
 	case A_SELALL:
 		memset(f->sel, 1, (size_t)f->n);
@@ -1530,6 +2677,26 @@ static void run_action(struct F *f)
 			f->ov = OV_PROMPT;
 			break;
 		}
+		refresh(f);
+		select_name(f, f->prompt_text);
+		say(f, 0, "Created %s", f->prompt_text);
+		break;
+	}
+	case A_DO_NEWFILE: {
+		char why[160], p[PATH_MAX];
+		if (!valid_name(f->prompt_text, why, sizeof why)) {
+			snprintf(f->prompt_err, sizeof f->prompt_err, "%s", why);
+			f->ov = OV_PROMPT;
+			break;
+		}
+		join(p, sizeof p, f->cwd, f->prompt_text);
+		int fd = open(p, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0666);
+		if (fd < 0) {
+			snprintf(f->prompt_err, sizeof f->prompt_err, "%s", strerror(errno));
+			f->ov = OV_PROMPT;
+			break;
+		}
+		close(fd);
 		refresh(f);
 		select_name(f, f->prompt_text);
 		say(f, 0, "Created %s", f->prompt_text);
@@ -1562,15 +2729,30 @@ static void run_action(struct F *f)
 		select_name(f, f->prompt_text);
 		break;
 	}
-	case A_DO_DELETE:
-		do_delete(f);
-		break;
 	case A_FOCUS_PATH:
 		break;
 	case A_EXTRACT:
 	case A_COMPRESS:
 		archive_action(f, act == A_COMPRESS);
 		break;
+	case A_MOUNT:
+	case A_EJECT: {
+		if (f->act_idx < 0 || f->act_idx >= f->ndrv || !f->drv[f->act_idx].dev[0])
+			break;
+		if (f->opr) {
+			say(f, 0, "flmount is busy, try again in a moment");
+			break;
+		}
+		struct drive *d = &f->drv[f->act_idx];
+		int mount = act == A_MOUNT;
+		say(f, 0, "%s %s...", mount ? "Mounting" : "Ejecting", d->label);
+		f->opr = hlp_spawn(f, mount ? HK_MOUNT : HK_EJECT, mount ? "mount" : "eject", d->dev);
+		if (f->opr)
+			snprintf(f->opr->label, sizeof f->opr->label, "%s", d->label);
+		else
+			say(f, 1, "Cannot start flmount");
+		break;
+	}
 	}
 	fl_win_redraw(f->win);
 }
@@ -1580,27 +2762,42 @@ static void run_action(struct F *f)
 static void menu_open(struct F *f, int x, int y, int on_item)
 {
 	int k = 0;
-	int one = count_sel(f) == 1;
+	int c = count_sel(f), trash = in_trash(f), one = c == 1;
+	int ai = -1; /* the last selected entry */
+	for (int i = 0; i < f->n; i++)
+		if (f->sel && f->sel[i])
+			ai = i;
+	int file1 = one && ai >= 0 && !f->ents[ai].dir;
+	f->ctx_item = on_item;
 	if (on_item) {
-		f->menu[k++] = (struct menu_item){"Open", "Enter", A_OPEN, one, 1};
-		f->menu[k++] = (struct menu_item){"Cut", "Ctrl+X", A_CUT, 1, 0};
-		f->menu[k++] = (struct menu_item){"Copy", "Ctrl+C", A_COPY, 1, 0};
-		f->menu[k++] = (struct menu_item){"Paste", "Ctrl+V", A_PASTE, 1, 1};
-		f->menu[k++] = (struct menu_item){"Rename", "F2", A_RENAME, one, 0};
-		int ai = -1; /* the one selected entry, for "Extract here" */
-		for (int i = 0; one && i < f->n; i++)
-			if (f->sel && f->sel[i])
-				ai = i;
-		f->menu[k++] = (struct menu_item){"Extract here", "", A_EXTRACT, ai >= 0 && !f->ents[ai].dir && is_archive_name(f->ents[ai].name), 0};
-		f->menu[k++] = (struct menu_item){"Compress", "", A_COMPRESS, 1, 0};
-		f->menu[k++] = (struct menu_item){in_trash(f) ? "Delete for good" : "Move to Trash", "Del", A_TRASH, 1, 0};
+		if (trash) {
+			f->menu[k++] = (struct menu_item){"Restore", "", A_RESTORE, c > 0, 1};
+			f->menu[k++] = (struct menu_item){"Copy", "Ctrl+C", A_COPY, 1, 0};
+			f->menu[k++] = (struct menu_item){"Delete for good", "Del", A_PERMDEL, 1, 0};
+		} else {
+			f->menu[k++] = (struct menu_item){"Open", "Enter", A_OPEN, one, 0};
+			f->menu[k++] = (struct menu_item){"Open with...", "", A_OPENWITH, file1, 1};
+			f->menu[k++] = (struct menu_item){"Cut", "Ctrl+X", A_CUT, 1, 0};
+			f->menu[k++] = (struct menu_item){"Copy", "Ctrl+C", A_COPY, 1, 0};
+			f->menu[k++] = (struct menu_item){"Paste", "Ctrl+V", A_PASTE, 1, 1};
+			f->menu[k++] = (struct menu_item){"Rename", "F2", A_RENAME, one, 0};
+			f->menu[k++] = (struct menu_item){"Move to Trash", "Del", A_TRASH, 1, 0};
+			f->menu[k++] = (struct menu_item){"Delete permanently", "Shift+Del", A_PERMDEL, 1, 1};
+			f->menu[k++] = (struct menu_item){"Extract here", "", A_EXTRACT,
+			                                  file1 && is_archive_name(f->ents[ai].name), 0};
+			f->menu[k++] = (struct menu_item){"Compress", "", A_COMPRESS, 1, 1};
+		}
+		f->menu[k++] = (struct menu_item){"Properties", "", A_PROPS, one, 0};
+		f->menu[k++] = (struct menu_item){"Open terminal here", "", A_TERMINAL, 1, 0};
 	} else {
-		f->menu[k++] = (struct menu_item){"New folder", "Ctrl+Shift+N", A_NEWDIR, 1, 0};
+		f->menu[k++] = (struct menu_item){"New folder", "Ctrl+Shift+N", A_NEWDIR, !trash, 0};
+		f->menu[k++] = (struct menu_item){"New empty file", "", A_NEWFILE, !trash, 0};
 		f->menu[k++] = (struct menu_item){"Paste", "Ctrl+V", A_PASTE, 1, 1};
-		f->menu[k++] = (struct menu_item){"Select all", "Ctrl+A", A_SELALL, f->n > 0, 0};
+		f->menu[k++] = (struct menu_item){"Open terminal here", "", A_TERMINAL, 1, 1};
 		f->menu[k++] = (struct menu_item){f->show_hidden ? "Hide hidden files" : "Show hidden files", "Ctrl+H",
 		                                  A_HIDDEN, 1, 0};
-		f->menu[k++] = (struct menu_item){"Refresh", "F5", A_REFRESH, 1, 0};
+		if (trash)
+			f->menu[k++] = (struct menu_item){"Empty Trash", "", A_EMPTY, 1, 0};
 	}
 	f->nmenu = k;
 	f->menu_x = x;
@@ -1734,11 +2931,11 @@ static void draw_confirm(fl_ui *ui, struct F *f)
 	fl_rect box;
 	dialog_frame(ui, f, 440, 150, &box);
 	int x = box.x + 24, w = box.w - 48, y = box.y + 22;
-	fl_text(cv, ui->f_semi, x, y, fl_th.strong, "Delete for good", -1);
+	fl_text(cv, ui->f_semi, x, y, fl_th.strong, f->confirm_title, -1);
 	y += 28;
 	fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, f->confirm_text);
 	int by = box.y + box.h - 24 - 34;
-	int ok = fl_button(ui, ID_DLG + 1, fl_r(x + w - 96, by, 96, 34), "Delete", FL_BTN_ACCENT);
+	int ok = fl_button(ui, ID_DLG + 1, fl_r(x + w - 96, by, 96, 34), f->confirm_btn, FL_BTN_ACCENT);
 	int cancel = fl_button(ui, ID_DLG + 2, fl_r(x + w - 96 - 8 - 96, by, 96, 34), "Cancel", FL_BTN_OUTLINE);
 	if (ui->key == XKB_KEY_Escape) {
 		ui->key = 0;
@@ -1746,10 +2943,147 @@ static void draw_confirm(fl_ui *ui, struct F *f)
 	}
 	if (ok) {
 		f->ov = OV_NONE;
-		queue(f, A_DO_DELETE);
+		queue(f, f->confirm_act);
 	} else if (cancel) {
 		f->ov = OV_NONE;
 	}
+}
+
+/* a name clash: Replace, Keep both or Skip, for this item or for all the rest */
+static void draw_clash(fl_ui *ui, struct F *f)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_rect box;
+	dialog_frame(ui, f, 460, 196, &box);
+	int x = box.x + 24, w = box.w - 48, y = box.y + 22;
+	struct jitem *it = &f->pend[f->clash_idx];
+	char dir[PATH_MAX], line[PATH_MAX + 160], fit[PATH_MAX + 170];
+	snprintf(dir, sizeof dir, "%s", it->dst);
+	char *s = strrchr(dir, '/');
+	if (s == dir)
+		dir[1] = 0;
+	else if (s)
+		*s = 0;
+	fl_text(cv, ui->f_semi, x, y, fl_th.strong, "Name clash", -1);
+	y += 28;
+	snprintf(line, sizeof line, "\"%s\" is already in \"%s\".", it->name, dir);
+	fl_text_fit(ui->f_reg, line, w, fit, sizeof fit);
+	fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, fit);
+	y += 26;
+	fl_text_in(cv, f->small, fl_r(x, y, w, 18), FL_LEFT, 0, fl_th.dim, "Replace it, keep both, or skip it.");
+	y += 30;
+	fl_switch(ui, ID_DLG + 5, fl_r(x, y, 40, 22), &f->clash_all);
+	fl_text_in(cv, f->small, fl_r(x + 50, y, w - 50, 22), FL_LEFT, 0, fl_th.text, "Do the same for the rest");
+	int by = box.y + box.h - 24 - 34;
+	int rep = fl_button(ui, ID_DLG + 1, fl_r(x, by, 96, 34), "Replace", FL_BTN_ACCENT);
+	int keep = fl_button(ui, ID_DLG + 2, fl_r(x + 102, by, 96, 34), "Keep both", FL_BTN_OUTLINE);
+	int skip = fl_button(ui, ID_DLG + 3, fl_r(x + 204, by, 96, 34), "Skip", FL_BTN_OUTLINE);
+	int stop = fl_button(ui, ID_DLG + 4, fl_r(x + 306, by, 96, 34), "Cancel", FL_BTN_PLAIN);
+	if (ui->key == XKB_KEY_Escape) {
+		ui->key = 0;
+		stop = 1;
+	}
+	if (rep)
+		clash_answer(f, JA_REPLACE);
+	else if (keep)
+		clash_answer(f, JA_PROCEED);
+	else if (skip)
+		clash_answer(f, JA_SKIP);
+	else if (stop)
+		clash_cancel(f);
+}
+
+/* Open with: the apps for the file's type, one button each */
+static void draw_openwith(fl_ui *ui, struct F *f)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_rect box;
+	int rows = f->nac ? f->nac : 1;
+	dialog_frame(ui, f, 420, 150 + 38 * rows, &box);
+	int x = box.x + 24, w = box.w - 48, y = box.y + 22;
+	fl_text(cv, ui->f_semi, x, y, fl_th.strong, "Open with", -1);
+	y += 28;
+	char line[PATH_MAX + 80], fit[PATH_MAX + 90];
+	snprintf(line, sizeof line, "Choose an app for \"%s\" (%s).", base_name(f->ac_file), f->ac_mime);
+	fl_text_fit(ui->f_reg, line, w, fit, sizeof fit);
+	fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, fit);
+	y += 26;
+	int picked = -1;
+	for (int i = 0; i < f->nac; i++) {
+		if (fl_button(ui, ID_OW + (uint32_t)i, fl_r(x, y, w, 32), f->ac[i].name, i == 0 ? FL_BTN_ACCENT : FL_BTN_OUTLINE))
+			picked = i;
+		y += 38;
+	}
+	int by = box.y + box.h - 24 - 34;
+	int cancel = fl_button(ui, ID_DLG + 2, fl_r(x + w - 96, by, 96, 34), "Cancel", FL_BTN_OUTLINE);
+	if (ui->key == XKB_KEY_Escape) {
+		ui->key = 0;
+		cancel = 1;
+	}
+	if (picked >= 0) {
+		f->ov = OV_NONE;
+		spawn_desktop(f, f->ac[picked].desk, f->ac_file, base_name(f->ac_file));
+	} else if (cancel) {
+		f->ov = OV_NONE;
+	}
+}
+
+static void draw_props(fl_ui *ui, struct F *f)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_rect box;
+	dialog_frame(ui, f, 440, 262, &box);
+	int x = box.x + 24, w = box.w - 48, y = box.y + 22;
+	fl_text(cv, ui->f_semi, x, y, fl_th.strong, "Properties", -1);
+	y += 30;
+	static const char *const lab[6] = {"Name", "Type", "Size", "Modified", "Permissions", "Location"};
+	for (int i = 0; i < 6; i++) {
+		char fit[PATH_MAX + 80];
+		fl_text(cv, f->small, x, y + 3, fl_th.dim, lab[i], -1);
+		fl_text_fit(ui->f_reg, f->pr[i], w - 104, fit, sizeof fit);
+		fl_text_in(cv, ui->f_reg, fl_r(x + 104, y, w - 104, 20), FL_LEFT, 0, fl_th.text, fit);
+		y += 24;
+	}
+	int by = box.y + box.h - 24 - 34;
+	int close = fl_button(ui, ID_DLG + 1, fl_r(x + w - 96, by, 96, 34), "Close", FL_BTN_OUTLINE);
+	if (ui->key == XKB_KEY_Escape) {
+		ui->key = 0;
+		close = 1;
+	}
+	if (close)
+		f->ov = OV_NONE;
+}
+
+/* a message: a title and up to four lines */
+static void draw_msg(fl_ui *ui, struct F *f)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_rect box;
+	dialog_frame(ui, f, 440, 210, &box);
+	int x = box.x + 24, w = box.w - 48, y = box.y + 22;
+	char fit[sizeof f->dlg_text + 16], buf[sizeof f->dlg_text];
+	fl_text_fit(ui->f_semi, f->dlg_title, w, fit, sizeof fit);
+	fl_text_in(cv, ui->f_semi, fl_r(x, y, w, 24), FL_LEFT, 0, fl_th.strong, fit);
+	y += 32;
+	snprintf(buf, sizeof buf, "%s", f->dlg_text);
+	char *s = buf;
+	for (int ln = 0; ln < 4 && s && *s; ln++) {
+		char *e = strchr(s, '\n');
+		if (e)
+			*e = 0;
+		fl_text_fit(ui->f_reg, s, w, fit, sizeof fit);
+		fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, fit);
+		y += 22;
+		s = e ? e + 1 : NULL;
+	}
+	int by = box.y + box.h - 24 - 34;
+	int ok = fl_button(ui, ID_DLG + 1, fl_r(x + w - 96, by, 96, 34), "OK", FL_BTN_ACCENT);
+	if (ui->key == XKB_KEY_Escape || ui->key == XKB_KEY_Return || ui->key == XKB_KEY_KP_Enter) {
+		ui->key = 0;
+		ok = 1;
+	}
+	if (ok)
+		f->ov = OV_NONE;
 }
 
 /* ---- the main view ------------------------------------------------------------------------------------------ */
@@ -1980,44 +3314,179 @@ static void draw_toolbar(fl_ui *ui, struct F *f, fl_rect tb)
 	}
 }
 
+/* a row under the pointer while a drag is on: it becomes the drop target */
+static void sidebar_target(struct F *f, const char *path, int res, fl_rect r)
+{
+	if (f->dr_state == 2 && (res & FL_HOVER) && is_dir_path(path)) {
+		snprintf(f->dr_target, sizeof f->dr_target, "%s", path);
+		f->dr_rect = r;
+	}
+}
+
+/* the eject symbol: a triangle over a bar */
+static void draw_eject(fl_canvas *cv, fl_rect r, fl_color c)
+{
+	fl_path *p = fl_path_new();
+	if (p) {
+		float x = (float)r.x, y = (float)r.y, w = (float)r.w, h = (float)r.h;
+		fl_path_move(p, x, y + h * 0.6f);
+		fl_path_line(p, x + w / 2, y + h * 0.1f);
+		fl_path_line(p, x + w, y + h * 0.6f);
+		fl_path_close(p);
+		fl_path_fill(cv, p, c);
+		fl_path_free(p);
+	}
+	fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 3, r.w, 3), c);
+}
+
 static void draw_sidebar(fl_ui *ui, struct F *f, fl_rect sb)
 {
 	fl_canvas *cv = &ui->cv;
 	fl_fill_rect(cv, sb, fl_th.panel);
 	fl_fill_rect(cv, fl_r(sb.x + sb.w - 1, sb.y, 1, sb.h), fl_th.line);
 	int y = sb.y + 14;
-	for (int section = 0; section < 2; section++) {
-		fl_text_ex(cv, f->head, sb.x + 16, y, fl_th.dim, section ? "DRIVES" : "PLACES", -1, 56);
-		y += fl_font_height(f->head) + 8;
-		int any = 0;
-		for (int i = 0; i < f->nplaces; i++) {
-			struct place *p = &f->places[i];
-			if (p->drive != section)
-				continue;
-			any = 1;
-			fl_rect r = fl_r(sb.x, y, sb.w - 1, 30);
-			int res = fl_widget(ui, ID_SIDE + (uint32_t)i, r, 0);
-			int active = !strcmp(p->path, f->cwd);
-			if (active)
-				fl_fill_rect(cv, r, fl_th.select);
-			else if (res & (FL_HOVER | FL_DOWN))
-				fl_fill_rect(cv, r, fl_th.raised);
-			if (active)
-				fl_fill_rect(cv, fl_r(r.x, r.y, 3, r.h), fl_th.accent);
-			fl_icon_draw(cv, p->ic, r.x + 16, r.y + 7, 16, active ? fl_th.accent : fl_th.dim);
-			fl_text_in(cv, active ? ui->f_med : ui->f_reg, fl_r(r.x + 42, r.y, r.w - 48, r.h), FL_LEFT, 0,
-			           active ? fl_th.strong : fl_th.text, p->label);
-			if (res & FL_CLICK) {
-				snprintf(f->act_path, sizeof f->act_path, "%s", p->path);
+	fl_text_ex(cv, f->head, sb.x + 16, y, fl_th.dim, "PLACES", -1, 56);
+	y += fl_font_height(f->head) + 8;
+	for (int i = 0; i < f->nplaces; i++) {
+		struct place *p = &f->places[i];
+		fl_rect r = fl_r(sb.x, y, sb.w - 1, 30);
+		int res = fl_widget(ui, ID_SIDE + (uint32_t)i, r, 0);
+		int active = !strcmp(p->path, f->cwd);
+		sidebar_target(f, p->path, res, r);
+		if (active)
+			fl_fill_rect(cv, r, fl_th.select);
+		else if (res & (FL_HOVER | FL_DOWN))
+			fl_fill_rect(cv, r, fl_th.raised);
+		if (active)
+			fl_fill_rect(cv, fl_r(r.x, r.y, 3, r.h), fl_th.accent);
+		fl_icon_draw(cv, p->ic, r.x + 16, r.y + 7, 16, active ? fl_th.accent : fl_th.dim);
+		fl_text_in(cv, active ? ui->f_med : ui->f_reg, fl_r(r.x + 42, r.y, r.w - 48, r.h), FL_LEFT, 0,
+		           active ? fl_th.strong : fl_th.text, p->label);
+		if (res & FL_CLICK) {
+			snprintf(f->act_path, sizeof f->act_path, "%s", p->path);
+			queue(f, A_NAV);
+			ui->focus = ID_GRID;
+		}
+		y += 30;
+	}
+	y += 14;
+	fl_text_ex(cv, f->head, sb.x + 16, y, fl_th.dim, "DRIVES", -1, 56);
+	y += fl_font_height(f->head) + 8;
+	for (int i = 0; i < f->ndrv; i++) {
+		struct drive *d = &f->drv[i];
+		int eject = d->removable && d->dev[0];
+		fl_rect r = fl_r(sb.x, y, sb.w - 1 - (eject ? 30 : 0), 40);
+		int res = fl_widget(ui, ID_DRIVE + (uint32_t)i, r, 0);
+		int active = d->mounted && !strcmp(d->path, f->cwd);
+		if (d->mounted)
+			sidebar_target(f, d->path, res, r);
+		if (active)
+			fl_fill_rect(cv, r, fl_th.select);
+		else if (res & (FL_HOVER | FL_DOWN))
+			fl_fill_rect(cv, r, fl_th.raised);
+		if (active)
+			fl_fill_rect(cv, fl_r(r.x, r.y, 3, r.h), fl_th.accent);
+		fl_icon_draw(cv, FL_ICON_DRIVE, r.x + 16, r.y + 12, 16, active ? fl_th.accent : fl_th.dim);
+		fl_text_in(cv, active ? ui->f_med : ui->f_reg, fl_r(r.x + 42, r.y + 4, r.w - 48, 18), FL_LEFT, 0,
+		           active ? fl_th.strong : d->mounted ? fl_th.text : fl_th.dim, d->label);
+		char sub[80] = "", sz[32] = "";
+		if (d->size) {
+			fmt_size((off_t)d->size, sz, sizeof sz);
+			snprintf(sub, sizeof sub, "%s%s%s", sz, d->fstype[0] ? "  " : "", d->fstype);
+		} else if (d->system) {
+			snprintf(sub, sizeof sub, "%s", d->path);
+		} else if (!d->mounted) {
+			snprintf(sub, sizeof sub, "click to mount");
+		}
+		fl_text_in(cv, f->small, fl_r(r.x + 42, r.y + 21, r.w - 48, 14), FL_LEFT, 0, fl_th.dim, sub);
+		if (res & FL_CLICK) {
+			if (d->mounted) {
+				snprintf(f->act_path, sizeof f->act_path, "%s", d->path);
 				queue(f, A_NAV);
+			} else {
+				f->act_idx = i;
+				queue(f, A_MOUNT);
+			}
+			ui->focus = ID_GRID;
+		}
+		if (eject) {
+			fl_rect er = fl_r(sb.x + sb.w - 1 - 28, y + 9, 22, 22);
+			int eres = fl_widget(ui, ID_EJECT + (uint32_t)i, er, 0);
+			if (eres & FL_HOVER)
+				fl_fill_rect(cv, er, fl_th.raised);
+			draw_eject(cv, fl_inset(er, 5, 5), (eres & FL_HOVER) ? fl_th.text : fl_th.dim);
+			if (eres & FL_CLICK) {
+				f->act_idx = i;
+				queue(f, A_EJECT);
 				ui->focus = ID_GRID;
 			}
-			y += 30;
 		}
-		if (!any && section)
-			fl_text(cv, f->small, sb.x + 16, y + 6, fl_th.dim, "No other drives", -1);
-		y += (any ? 0 : 30) + 14;
+		y += 40;
 	}
+}
+
+/* the Stop card for the running job, at the bottom right of the grid; the folder stays usable */
+static fl_rect job_box(fl_rect area)
+{
+	return fl_r(area.x + area.w - 336, area.y + area.h - 116, 320, 100);
+}
+
+static void draw_job(fl_ui *ui, struct F *f, fl_rect area)
+{
+	struct job *j = f->job;
+	if (!j)
+		return;
+	fl_canvas *cv = &ui->cv;
+	fl_rect box = job_box(area);
+	fl_fill_rect(cv, box, fl_th.raised);
+	fl_stroke_rect(cv, box, 1, fl_th.line);
+	fl_text_in(cv, ui->f_med, fl_r(box.x + 14, box.y + 8, box.w - 28, 20), FL_LEFT, 0, fl_th.strong, j->title);
+	char fit[NAME_MAX + 64];
+	fl_text_fit(f->small, j->cur, box.w - 28, fit, sizeof fit);
+	fl_text_in(cv, f->small, fl_r(box.x + 14, box.y + 30, box.w - 28, 16), FL_LEFT, 0, fl_th.dim, fit);
+	fl_rect track = fl_r(box.x + 14, box.y + 52, box.w - 28, 6);
+	fl_fill_rect(cv, track, fl_th.line);
+	if (j->total > 0) {
+		long long d = j->done > j->total ? j->total : j->done;
+		int fw = (int)(track.w * d / j->total);
+		fl_fill_rect(cv, fl_r(track.x, track.y, fw, track.h), fl_th.accent);
+	}
+	if (fl_button(ui, ID_JOB, fl_r(box.x + box.w - 14 - 88, box.y + 66, 88, 28),
+	              j->cancel_req ? "Stopping" : "Stop", FL_BTN_OUTLINE))
+		job_stop(f);
+}
+
+/* the drag in progress: a label at the pointer, the target outlined, the drop on release */
+static void drag_update(fl_ui *ui, struct F *f)
+{
+	fl_canvas *cv = &ui->cv;
+	if (f->dr_state == 2 && (ui->release & FL_BTN_L)) {
+		if (f->dr_target[0]) {
+			snprintf(f->act_path, sizeof f->act_path, "%s", f->dr_target);
+			f->dr_copy = (fl_app_mods(f->app) & FL_MOD_CTRL) != 0;
+			queue(f, A_DROP);
+		}
+		f->dr_state = 0;
+		return;
+	}
+	if (f->dr_state == 1 && (ui->release & FL_BTN_L))
+		f->dr_state = 0;
+	if (f->dr_state == 1) {
+		int dx = ui->mx - f->dr_x, dy = ui->my - f->dr_y;
+		if (dx * dx + dy * dy > 36)
+			f->dr_state = 2;
+	}
+	if (f->dr_state != 2)
+		return;
+	if (f->dr_target[0])
+		fl_stroke_rect(cv, f->dr_rect, 2, fl_th.accent);
+	int c = count_sel(f);
+	char lab[64];
+	snprintf(lab, sizeof lab, "%s %d item%s", (fl_app_mods(f->app) & FL_MOD_CTRL) ? "Copy" : "Move", c, c == 1 ? "" : "s");
+	fl_rect g = fl_r(ui->mx + 14, ui->my + 14, fl_text_width(f->small, lab, -1) + 20, 24);
+	fl_fill_rect(cv, g, fl_th.raised);
+	fl_stroke_rect(cv, g, 1, fl_th.line);
+	fl_text_in(cv, f->small, g, FL_LEFT, 10, fl_th.text, lab);
 }
 
 static void draw_status(fl_ui *ui, struct F *f, fl_rect st)
@@ -2112,7 +3581,7 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 				}
 				break;
 			case XKB_KEY_BackSpace: queue(f, A_UP); break;
-			case XKB_KEY_Delete: queue(f, A_TRASH); break;
+			case XKB_KEY_Delete: queue(f, shift ? A_PERMDEL : A_TRASH); break;
 			case XKB_KEY_F2: queue(f, A_RENAME); break;
 			case XKB_KEY_F5: queue(f, A_REFRESH); break;
 			case XKB_KEY_Menu:
@@ -2149,6 +3618,12 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 	fl_rect save = cv->clip;
 	fl_clip(cv, g);
 	int rclick = -1, hit = -1;
+	fl_rect hit_r = {0};
+	/* the grid's own widget took the press (active) before the cells were met: give it back to the cells for
+	 * this loop (a cell takes it, else the grid keeps it), or no cell would ever see a click */
+	int grid_active = ui->active == ID_GRID;
+	if (grid_active)
+		ui->active = 0;
 	int first = f->scroll / CELL_H * cols;
 	int last = (f->scroll + g.h) / CELL_H * cols + cols;
 	for (int i = first; i < last && i < f->n; i++) {
@@ -2158,8 +3633,12 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 		draw_cell(ui, f, r, i, cr & FL_HOVER);
 		if (cr & FL_HOVER) {
 			hit = i;
+			hit_r = r;
 			if (ui->press & FL_BTN_L) {
 				click_select(f, i, mods);
+				f->dr_state = 1;
+				f->dr_x = ui->mx;
+				f->dr_y = ui->my;
 				if (ui->clicks >= 2 && !(mods & (FL_MOD_CTRL | FL_MOD_SHIFT))) {
 					f->act_idx = i;
 					queue(f, A_OPEN);
@@ -2170,6 +3649,12 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 		}
 	}
 	cv->clip = save;
+	if (grid_active && !ui->active)
+		ui->active = ID_GRID;
+	if (f->dr_state == 2 && hit >= 0 && f->ents[hit].dir && !f->sel[hit]) {
+		join(f->dr_target, sizeof f->dr_target, f->cwd, f->ents[hit].name);
+		f->dr_rect = hit_r;
+	}
 	if (hit < 0 && (res & FL_HOVER) && (ui->press & FL_BTN_L) && !(mods & (FL_MOD_CTRL | FL_MOD_SHIFT))) {
 		memset(f->sel, 0, (size_t)f->n);
 		f->cur = -1;
@@ -2210,10 +3695,18 @@ static void draw(fl_ui *ui, void *ud)
 	fl_rect st = fl_cut_bottom(&area, STATUS_H);
 	fl_rect sb = fl_cut_left(&area, SIDE_W);
 	fl_fill_rect(cv, c, fl_th.bg);
+	f->dr_target[0] = 0;
+	/* the job card is on top of the grid: the grid must not see the pointer there */
+	int saved_in = ui->mouse_in;
+	if (f->job && fl_in(job_box(area), ui->mx, ui->my))
+		ui->mouse_in = 0;
 	draw_grid(ui, f, area);
+	ui->mouse_in = saved_in;
 	draw_sidebar(ui, f, sb);
 	draw_toolbar(ui, f, tb);
 	draw_status(ui, f, st);
+	draw_job(ui, f, area);
+	drag_update(ui, f);
 
 	if (modal) {
 		unmask_input(ui, &im);
@@ -2223,6 +3716,14 @@ static void draw(fl_ui *ui, void *ud)
 			draw_prompt(ui, f);
 		else if (f->ov == OV_CONFIRM)
 			draw_confirm(ui, f);
+		else if (f->ov == OV_CLASH && f->npend)
+			draw_clash(ui, f);
+		else if (f->ov == OV_OPENWITH)
+			draw_openwith(ui, f);
+		else if (f->ov == OV_PROPS)
+			draw_props(ui, f);
+		else if (f->ov == OV_MSG)
+			draw_msg(ui, f);
 		if (f->ov == OV_NONE && ui->focus != ID_GRID && !f->act)
 			ui->focus = ID_GRID;
 		ui->key = 0;
@@ -2240,6 +3741,7 @@ static void on_focus(fl_win *w, int focused, void *ud)
 	struct F *f = ud;
 	if (focused) {
 		places_load(f);
+		drive_refresh(f);
 		fl_win_redraw(w);
 	}
 }
@@ -2270,10 +3772,19 @@ int main(int argc, char **argv)
 			snprintf(f->trash_files, sizeof f->trash_files, "%s/Trash/files", xdg);
 		else
 			snprintf(f->trash_files, sizeof f->trash_files, "%s/.local/share/Trash/files", home);
+		/* the freedesktop Trash: files/ and info/ side by side */
+		snprintf(f->trash_base, sizeof f->trash_base, "%.*s", (int)(strlen(f->trash_files) - 6), f->trash_files);
+		char info[PATH_MAX];
+		snprintf(info, sizeof info, "%s/info", f->trash_base);
+		mkdir_p(f->trash_files);
+		mkdir_p(info);
 	}
 	f->ino_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
 	f->ino_wd = -1;
+	f->mi_fd = open("/proc/self/mountinfo", O_RDONLY | O_CLOEXEC);
 	f->msg_timer = fl_timer_new(f->app, msg_clear, f);
+	f->tick = fl_timer_new(f->app, tick, f);
+	fl_timer_arm(f->tick, 3000, 3000);
 
 	fl_win_opts o = {
 		.title = "Files", .app_id = "flfiles", .w = 860, .h = 560, .min_w = 520, .min_h = 320,
@@ -2284,6 +3795,8 @@ int main(int argc, char **argv)
 		return 1;
 	if (f->ino_fd >= 0)
 		fl_fd_add(f->app, f->ino_fd, POLLIN, inotify_ready, f);
+	if (f->mi_fd >= 0)
+		fl_fd_add(f->app, f->mi_fd, POLLPRI, mi_ready, f);
 
 	const char *start = argc == 2 ? argv[1] : home && *home ? home : "/";
 	if (load_dir(f, start, 1) < 0) {
@@ -2292,6 +3805,8 @@ int main(int argc, char **argv)
 		if (load_dir(f, "/", 1) == 0)
 			say(f, 1, "%s", first);
 	}
+	drives_rebuild(f, NULL); /* System and mounts now; flmount's list follows */
+	drive_refresh(f);
 	fl_app_watch_conf(f->app, NULL, NULL);
 	fl_app_run(f->app);
 	fl_app_free(f->app);

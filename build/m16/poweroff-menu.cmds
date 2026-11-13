@@ -1,0 +1,10 @@
+@desktop
+@mouse 640 400
+@key meta_l
+@wait 2
+@mouse 448 731
+@click
+@wait 2
+@mouse 700 374
+@click
+@poweroffwait 60

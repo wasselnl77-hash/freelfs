@@ -203,6 +203,9 @@ int fl_textfield(fl_ui *ui, uint32_t id, fl_rect r, char *buf, size_t cap, const
 	if (focused && ui->_edit_id == id) {
 		if (ui->_cur > len)
 			ui->_cur = len;
+		/* a selection kept from an earlier, longer text must not run past the end */
+		if (ui->_sel > len)
+			ui->_sel = len;
 		/* the mouse places the caret; dragging selects */
 		if ((res & FL_HOVER) && (ui->press & FL_BTN_L)) {
 			ui->_cur = index_at(f, buf, len, ui->mx - (r.x + pad) + ui->_scroll);
@@ -241,11 +244,29 @@ int fl_textfield(fl_ui *ui, uint32_t id, fl_rect r, char *buf, size_t cap, const
 					del_range(buf, &len, lo, hi);
 					ui->_cur = lo;
 				}
-				for (size_t i = 0; i < n && len + 1 < (int)cap; i++) {
-					char ch = clip[i] == '\n' || clip[i] == '\r' || clip[i] == '\t' ? ' ' : clip[i];
-					memmove(buf + ui->_cur + 1, buf + ui->_cur, (size_t)(len - ui->_cur) + 1);
-					buf[ui->_cur++] = ch;
-					len++;
+				/* whole UTF-8 characters only: a character that does not fit is left out */
+				for (size_t i = 0; i < n;) {
+					unsigned char c0 = (unsigned char)clip[i];
+					if (c0 >= 0x80 && c0 < 0xc0) { /* stray continuation byte */
+						i++;
+						continue;
+					}
+					size_t cl = c0 >= 0xf0 ? 4 : c0 >= 0xe0 ? 3 : c0 >= 0xc0 ? 2 : 1, k2 = 1;
+					while (k2 < cl && i + k2 < n && ((unsigned char)clip[i + k2] & 0xc0) == 0x80)
+						k2++;
+					if (k2 < cl) { /* cut off at the end of the clipboard */
+						i++;
+						continue;
+					}
+					if (len + (int)cl + 1 > (int)cap)
+						break;
+					char ch = cl == 1 && (c0 == '\n' || c0 == '\r' || c0 == '\t') ? ' ' : 0;
+					memmove(buf + ui->_cur + cl, buf + ui->_cur, (size_t)(len - ui->_cur) + 1);
+					for (size_t b = 0; b < cl; b++)
+						buf[ui->_cur + b] = ch ? ch : clip[i + b];
+					ui->_cur += (int)cl;
+					len += (int)cl;
+					i += cl;
 				}
 				ui->_sel = -1;
 				ret |= FL_EDIT_CHANGED;

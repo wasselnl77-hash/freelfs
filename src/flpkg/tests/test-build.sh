@@ -11,7 +11,7 @@ flpkg=$PWD/flpkg
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 conf=$work/flpkg.conf
-printf 'builddir = %s/build\ncache = %s/cache\n' "$work" "$work" > "$conf"
+printf 'builddir = %s/build\ncache = %s/cache\nsignatures = never\n' "$work" "$work" > "$conf"
 fails=0
 
 ok() { printf '  %-50s ok\n' "$1"; }

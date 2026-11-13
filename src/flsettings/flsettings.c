@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
@@ -127,30 +128,34 @@ static void draw_accents(fl_ui *ui, struct settings *s, int x, int y, int w)
 	}
 }
 
-/* run `flsound NAME` (does nothing when sounds are off or it is not installed) */
-static void play_test(void)
+/* Fire and forget: the program runs as a grandchild, so the window never has to reap it. SIGCHLD keeps its
+ * default, which the waitpid calls of the pages (datetime, snapshots, about) need. The middle process exits
+ * at once and is reaped here; the grandchild is adopted by init. */
+static void spawn_detached(const char *prog, const char *a1, const char *a2)
 {
 	pid_t p = fork();
 	if (p == 0) {
-		setsid();
-		execlp("flsound", "flsound", "--force", "notification", (char *)NULL);
-		_exit(127);
+		if (fork() == 0) {
+			setsid();
+			execlp(prog, prog, a1, a2, (char *)NULL);
+			_exit(127);
+		}
+		_exit(0);
 	}
 	if (p > 0)
-		signal(SIGCHLD, SIG_IGN);
+		waitpid(p, NULL, 0);
+}
+
+/* run `flsound NAME` (does nothing when sounds are off or it is not installed) */
+static void play_test(void)
+{
+	spawn_detached("flsound", "--force", "notification");
 }
 
 /* run a program of the desktop without waiting for it (Themes, the GTK hints) */
 static void spawn(const char *prog, const char *a1, const char *a2)
 {
-	pid_t p = fork();
-	if (p == 0) {
-		setsid();
-		execlp(prog, prog, a1, a2, (char *)NULL);
-		_exit(127);
-	}
-	if (p > 0)
-		signal(SIGCHLD, SIG_IGN);
+	spawn_detached(prog, a1, a2);
 }
 
 static void draw_general(fl_ui *ui, struct settings *s, fl_rect c)

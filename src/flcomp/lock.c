@@ -238,6 +238,16 @@ static void body_text(struct rect clip, int x, int y, const char *s, uint32_t co
 	}
 }
 
+int ui_text_width(const char *s)
+{
+	return body_width(s);
+}
+
+void ui_text(struct rect clip, int x, int y, const char *s, uint32_t col)
+{
+	body_text(clip, x, y, s, col);
+}
+
 static int head_width(const char *s)
 {
 	int w = 0;

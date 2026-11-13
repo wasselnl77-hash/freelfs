@@ -1,7 +1,7 @@
 # The FreeLFS package manager, from src/flpkg in the FreeLFS tree.
 pkgname=flpkg
 version=0.1
-release=4
+release=5
 summary="The FreeLFS package manager"
 license=(MIT)
 arch=(x86_64)

@@ -136,11 +136,12 @@ static int exif_orientation(const unsigned char *d, size_t n)
 #define U16(p) (le ? (unsigned)((p)[0] | (p)[1] << 8) : (unsigned)((p)[0] << 8 | (p)[1]))
 #define U32(p) (le ? (unsigned)((p)[0] | (p)[1] << 8 | (p)[2] << 16 | (unsigned)(p)[3] << 24) \
 	               : (unsigned)((unsigned)(p)[0] << 24 | (p)[1] << 16 | (p)[2] << 8 | (p)[3]))
-	unsigned off = U32(t + 4);
-	if (off + 2 > tn)
+	/* offsets are checked before any addition: off + 2 in 32 bits wrapped for a hostile file */
+	size_t off = U32(t + 4);
+	if (off > tn || tn - off < 2)
 		return 1;
-	unsigned cnt = U16(t + off);
-	for (unsigned i = 0; i < cnt && off + 2 + (i + 1) * 12 <= tn; i++) {
+	size_t cnt = U16(t + off);
+	for (size_t i = 0; i < cnt && tn - off >= 2 + (i + 1) * 12; i++) {
 		const unsigned char *e = t + off + 2 + i * 12;
 		if (U16(e) == 0x0112) {
 			unsigned v = U16(e + 8);
@@ -316,6 +317,9 @@ static int load_webp(const char *path, int want, struct img *out, int *full_w, i
 	*full_w = cfg.input.width;
 	*full_h = cfg.input.height;
 	if (cfg.input.has_animation) {
+		/* the animation decoder keeps a full canvas and flview copies it: the same cap as a still */
+		if ((size_t)cfg.input.width * (size_t)cfg.input.height > MAX_PIXELS)
+			goto done;
 		WebPData wd = {data, len};
 		WebPAnimDecoderOptions ao;
 		WebPAnimDecoderOptionsInit(&ao);

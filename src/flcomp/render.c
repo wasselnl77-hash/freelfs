@@ -239,6 +239,8 @@ static void composite_rect(struct rect clip)
 		draw_tree(fs->surf, clip);
 		if (!clean) {
 			switcher_draw(clip);
+			snap_preview_draw(clip);
+			pmenu_draw(clip);
 			osd_draw(clip);
 			cursor_draw(clip);
 		}
@@ -292,6 +294,8 @@ static void composite_rect(struct rect clip)
 		return;
 	anim_draw_surf_ghosts(clip);	/* a menu or card that was just put away, fading */
 	switcher_draw(clip);
+	snap_preview_draw(clip);
+	pmenu_draw(clip);
 	osd_draw(clip);
 	cursor_draw(clip);
 }

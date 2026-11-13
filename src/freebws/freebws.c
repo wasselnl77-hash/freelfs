@@ -101,6 +101,10 @@ struct tab {
 	uint32_t last_active;	/* now_ms() when it stopped being the active tab */
 	uint8_t *snap;		/* last frame shown (shm mode), for the switch */
 	int snap_w, snap_h;
+	struct tab *opener;	/* the tab that opened this one with window.open (NULL: none, or it is gone) */
+	int want_fg;		/* a popup: it takes the front when its page is ready */
+	int shown;		/* ready-to-show came, or the fallback timer ran */
+	guint show_src;		/* the fallback timer that shows a popup whose ready-to-show never comes */
 };
 
 static struct B {
@@ -146,6 +150,7 @@ static struct B {
 	unsigned idle_s;	/* background tab idle this long: discard */
 	unsigned avail_mb;	/* MemAvailable below this: discard the oldest background tab */
 	const char *features;	/* WebKit features to set, "Name=0,Name=1" */
+	char *ua;		/* the user agent every page gets (useragent= in the config) */
 	int dssl_native;	/* 0: always use the JS engine (FREEBWS_DSSL=engine) */
 	int share_process;	/* tabs are related views: one web process for all (FREEBWS_SHARE=1) */
 	/* toolbar extras */
@@ -163,6 +168,7 @@ static struct B {
 } B;
 
 static void load_uri(struct tab *t, const char *uri);
+static void toast(const char *msg);
 static void pop_close(void);
 static void pop_close_hook(void);
 static void bookmark_toggle(void);
@@ -525,6 +531,7 @@ static void tab_unrealize(struct tab *t)
 	t->view = NULL;
 	t->ucm = NULL;
 	t->exp = NULL;
+	t->gating = 0;		/* the held navigation went with the ad blocker's state: it is run again when selected */
 }
 
 static void snap_store(struct tab *t)
@@ -545,6 +552,8 @@ static void snap_store(struct tab *t)
 static void tab_free(struct tab *t)
 {
 	tab_unrealize(t);
+	if (t->show_src)
+		g_source_remove(t->show_src);
 	if (t->tls_cert)
 		g_object_unref(t->tls_cert);
 	if (t->saved)
@@ -609,10 +618,32 @@ static void tab_activate(struct tab *t)
 	fl_win_redraw(B.win);
 }
 
+/* every slot is in use: the oldest background tab that is not loading and is not the opener of the
+ * new popup is closed (it stays in the closed list, Ctrl-Shift-T). 0 when there is no such tab. */
+static void tab_close(struct tab *t);
+
+static int make_room(WebKitWebView *related)
+{
+	struct tab *old = NULL;
+	for (int i = 0; i < B.ntabs; i++) {
+		struct tab *t = B.tabs[i];
+		if (t == B.cur || t->loading || (related && t->view == related))
+			continue;
+		if (!old || (int32_t)(t->last_active - old->last_active) < 0)
+			old = t;
+	}
+	if (!old)
+		return 0;
+	tab_close(old);
+	return 1;
+}
+
 static struct tab *tab_create(WebKitWebView *related, const char *uri, int activate)
 {
-	if (B.ntabs >= MAX_TABS)
+	if (B.ntabs >= MAX_TABS && !make_room(related)) {
+		toast("Too many tabs: close one first");
 		return NULL;
+	}
 	struct tab *t = calloc(1, sizeof(*t));
 	if (!t)
 		return NULL;
@@ -648,8 +679,16 @@ static void tab_close(struct tab *t)
 		g_strlcpy(B.closed[B.nclosed++], u, sizeof B.closed[0]);
 	}
 	struct tab *next = NULL;
-	if (t == B.cur && B.ntabs > 1)
-		next = B.tabs[i + 1 < B.ntabs ? i + 1 : i - 1];
+	if (t == B.cur && B.ntabs > 1) {
+		/* a popup closed by window.close() goes back to the page that opened it */
+		if (t->opener && tab_index(t->opener) >= 0)
+			next = t->opener;
+		else
+			next = B.tabs[i + 1 < B.ntabs ? i + 1 : i - 1];
+	}
+	for (int j = 0; j < B.ntabs; j++)
+		if (B.tabs[j]->opener == t)
+			B.tabs[j]->opener = NULL;
 	for (int j = i; j + 1 < B.ntabs; j++)
 		B.tabs[j] = B.tabs[j + 1];
 	B.ntabs--;
@@ -1009,8 +1048,18 @@ static void dark_navigate(struct tab *t, const char *uri)
  * still being made); a notice page stands in and fb_adb_changed goes on with the load. */
 static int navigate_hook(struct tab *t, const char *uri)
 {
-	if (!t->view || !uri || t->gating)
+	if (!t->view || !uri)
 		return 0;
+	if (t->gating) {
+		/* a navigation waits for the filters: the newest address replaces the held one, so
+		 * fb_adb_changed never loads a stale URL over the page the user is on. The same address
+		 * (the notice page's own load) goes on as it is. */
+		if (t->adb.deferred && !strcmp(t->adb.deferred, uri))
+			return 0;
+		g_free(t->adb.deferred);
+		t->adb.deferred = g_strdup(uri);
+		return 1;
+	}
 	if (adb_navigate(&t->adb, t->ucm, uri)) {
 		t->gating = 1;
 		if (!adb_building())	/* the compiled filters are only being loaded: a moment, no notice */
@@ -1996,14 +2045,46 @@ static gboolean on_tls_failed(WebKitWebView *v, const char *uri, GTlsCertificate
 	return TRUE;
 }
 
-/* target=_blank, window.open: a new tab (related to the opener, so window.opener works) */
+/* the popup's page is ready (or the fallback timer ran): it takes the front unless it was a background one */
+static gboolean popup_show_late(gpointer p)
+{
+	struct tab *t = p;
+	t->show_src = 0;
+	if (!t->shown) {
+		t->shown = 1;
+		if (t->want_fg)
+			tab_activate(t);
+	}
+	return G_SOURCE_REMOVE;
+}
+
+static void on_ready(WebKitWebView *v, struct tab *t)
+{
+	if (t->shown)
+		return;
+	t->shown = 1;
+	if (t->show_src) {
+		g_source_remove(t->show_src);
+		t->show_src = 0;
+	}
+	if (t->want_fg)
+		g_idle_add(idle_activate, t);
+}
+
+/* target=_blank, window.open (also an OAuth popup): a new tab related to the opener (so window.opener
+ * works). It is made hidden and shown when WebKit says its page is ready (ready-to-show). */
 static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *na, struct tab *t)
 {
 	guint btn = webkit_navigation_action_get_mouse_button(na);
 	guint mods = webkit_navigation_action_get_modifiers(na);
 	int bg = btn == 2 || (mods & wpe_input_keyboard_modifier_control);
-	struct tab *n = tab_create(v, NULL, !bg);
-	return n ? n->view : NULL;
+	struct tab *n = tab_create(v, NULL, 0);
+	if (!n)
+		return NULL;
+	n->opener = t;
+	n->want_fg = !bg;
+	n->show_src = g_timeout_add_seconds(5, popup_show_late, n);
+	return n->view;
 }
 
 /* window.close() */
@@ -2096,6 +2177,7 @@ static void tab_signals(struct tab *t)
 	g_signal_connect(v, "load-failed", G_CALLBACK(on_load_failed), t);
 	g_signal_connect(v, "load-failed-with-tls-errors", G_CALLBACK(on_tls_failed), t);
 	g_signal_connect(v, "create", G_CALLBACK(on_create), t);
+	g_signal_connect(v, "ready-to-show", G_CALLBACK(on_ready), t);
 	g_signal_connect(v, "close", G_CALLBACK(on_close_req), t);
 	g_signal_connect(v, "decide-policy", G_CALLBACK(on_policy), t);
 	g_signal_connect(v, "web-process-terminated", G_CALLBACK(on_terminated), t);
@@ -2285,8 +2367,37 @@ static void sandbox_paths(void)
 	}
 }
 
+/* useragent= in the config replaces it. The default is a Chrome on Linux string with WebKit's own
+ * version: sign-in pages (Google) refuse browsers they do not know, and an embedded WebKit's default
+ * string (with its WPE token) is one of them. The Chrome version is a constant to move up now and then. */
+#define CHROME_UA_VERSION "146.0.0.0"
+static void user_agent_setup(void)
+{
+	const char *c = cfg_get("useragent", "");
+	if (*c)
+		B.ua = g_strdup(c);
+	else
+		B.ua = g_strdup_printf("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/%u.%u.%u (KHTML, like Gecko) "
+				       "Chrome/%s Safari/537.36", webkit_get_major_version(), webkit_get_minor_version(),
+				       webkit_get_micro_version(), CHROME_UA_VERSION);
+}
+
+/* cookies=always (default) or cookies=no-third-party. The default keeps every cookie: WebKit's
+ * no-third-party policy is what breaks some sign-in flows (a Google or Cloudflare frame, a popup
+ * that sets cookies for the page that opened it). See src/freebws/README, "Cookies". */
+static void cookies_setup(void)
+{
+	const char *c = getenv("FREEBWS_COOKIES");
+	if (!c || !*c)
+		c = cfg_get("cookies", "always");
+	WebKitCookieManager *cm = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_set_accept_policy(cm, !strcmp(c, "no-third-party") ? WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY
+										 : WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS);
+}
+
 static void tune_webkit(void)
 {
+	user_agent_setup();
 	const char *e = getenv("FREEBWS_MP");	/* limit_mb,conservative,strict,kill,poll_s */
 	if (!e && mem_total_mb() < 3072)	/* cleans up a web process that holds many tabs */
 		e = "300,0.5,0.7,0,10";
@@ -2333,7 +2444,7 @@ static void tune_webkit(void)
 	e = getenv("FREEBWS_SHARE");
 	B.share_process = e ? atoi(e) : mem_total_mb() < 3072;
 	e = getenv("FREEBWS_DISCARD_IDLE");
-	B.idle_s = e ? (unsigned)atoi(e) : 600;
+	B.idle_s = e ? (unsigned)atoi(e) : 1800;
 	e = getenv("FREEBWS_DISCARD_MB");
 	if (e) {
 		B.avail_mb = (unsigned)atoi(e);
@@ -2345,6 +2456,11 @@ static void tune_webkit(void)
 
 static void settings_apply(WebKitSettings *st)
 {
+	/* window.open from a script (after an await, a few seconds after the click): WebKit drops it unless
+	 * this is set; the popup is then a tab (on_create) that keeps window.opener */
+	webkit_settings_set_javascript_can_open_windows_automatically(st, TRUE);
+	if (B.ua)
+		webkit_settings_set_user_agent(st, B.ua);
 	char **p = g_strsplit(B.features, ",", 0);
 	WebKitFeatureList *fl = webkit_settings_get_all_features();
 	for (int i = 0; p[i]; i++) {	/* Name=0,Name=1 */
@@ -2387,13 +2503,22 @@ static void discard_log(struct tab *t, const char *why)
 	fprintf(stderr, "freebws: discarding tab \"%s\" (%s)\n", t->title[0] ? t->title : t->uri, why);
 }
 
+/* the opener of a popup that is still open: its script waits for the popup, so it stays */
+static int has_popup(struct tab *t)
+{
+	for (int i = 0; i < B.ntabs; i++)
+		if (B.tabs[i]->opener == t)
+			return 1;
+	return 0;
+}
+
 static gboolean mem_tick(gpointer d)
 {
 	uint32_t now = now_ms();
 	struct tab *oldest = NULL;
 	for (int i = 0; i < B.ntabs; i++) {
 		struct tab *t = B.tabs[i];
-		if (t == B.cur || !t->view || t->loading || webkit_web_view_is_playing_audio(t->view))
+		if (t == B.cur || !t->view || t->loading || has_popup(t) || webkit_web_view_is_playing_audio(t->view))
 			continue;
 		if (B.idle_s && now - t->last_active > B.idle_s * 1000u) {
 			discard_log(t, "unused");
@@ -2986,6 +3111,7 @@ int main(int argc, char **argv)
 	pages_init(B.ctx);
 	bm_load();
 	dl_init(webkit_network_session_get_default(), on_dl_changed);
+	cookies_setup();
 	adb_init();
 
 	fl_win_opts o = {

@@ -9,7 +9,7 @@ case $HARDWARECLOCK in
 	localtime) clock=--localtime ;;
 	*) clock=--utc ;;
 esac
-step "Saving the system clock" hwclock --systohc "$clock"
+step "Saving the system clock" timeout 10 hwclock --systohc "$clock"
 
 stat_busy "Stopping remaining processes"
 killall5 -15
@@ -17,11 +17,11 @@ sleep 2
 killall5 -9
 stat_done
 
-step "Deactivating swap" swapoff -a
-step "Unmounting file systems" umount -a -r -O no_netdev \
+step "Deactivating swap" timeout 20 swapoff -a
+step "Unmounting file systems" timeout 30 umount -a -r -O no_netdev \
 	-t notmpfs,nosysfs,noproc,nodevtmpfs,nodevpts,nocgroup2
-step "Remounting root read-only" remount_root ro
-sync
+step "Remounting root read-only" timeout 10 bash -c ". /etc/rc.d/functions; remount_root ro"
+timeout 15 sync
 
 if [ "$1" = 6 ]; then
 	echo "Rebooting."

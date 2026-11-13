@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT */
 #include "comp.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -342,6 +343,10 @@ void seat_refocus(void)
 static void motion_common(uint32_t ms)
 {
 	cursor_damage();
+	if (pmenu_active()) {	/* the compositor's popup (popup.c) owns the pointer */
+		pmenu_motion();
+		return;
+	}
 	if (grab_active()) {
 		grab_motion();
 		return;
@@ -402,6 +407,8 @@ static void press_outside(struct surface *t)
 
 void seat_button(uint32_t ms, uint32_t button, bool pressed)
 {
+	if (pmenu_button(button, pressed))
+		return;
 	if (button == 272 && overview_button(pressed))	/* BTN_LEFT on the workspace overview */
 		return;
 	if (pressed) {
@@ -418,6 +425,8 @@ void seat_button(uint32_t ms, uint32_t button, bool pressed)
 				return;
 			}
 			struct window *w = t ? window_of_surface(t) : NULL;
+			if (w && (button == 273 || button == 274) && title_click(w, button, (int)C.px, (int)C.py))
+				return;	/* right: window menu, middle: close (popup.c) */
 			if (w)
 				window_focus(w);
 			if (!grab_active() && t != C.ptr_focus)
@@ -478,6 +487,8 @@ void seat_axis(uint32_t ms, int axis, double value, int discrete, int source)
 }
 
 /* ---- clipboard ------------------------------------------------------------ */
+
+static void capture_selection(void);
 
 struct mime { char *s; struct wl_list link; };
 struct dsource {
@@ -673,6 +684,7 @@ void seat_set_foreign_selection(const char *const *mimes, int n, const struct fs
 	if (old)
 		selection_cancel(old);
 	selection_broadcast();
+	capture_selection();
 }
 
 void seat_clear_foreign_selection(void *data)
@@ -705,6 +717,188 @@ bool seat_wayland_selection_send(const char *mime, int fd)
 	return true;
 }
 
+/* ---- clipboard history: the last 20 text entries, in RAM only ---------------------------------- */
+
+#define HIST_N 20
+#define HIST_MAX (32 * 1024)		/* longer text is not kept */
+static char *hist[HIST_N];
+static int hist_n;
+static bool hist_off;			/* FLCOMP_NO_CLIPHIST=1: no history, Ctrl+V is never delayed */
+
+int cliphist_count(void)
+{
+	return hist_n;
+}
+
+const char *cliphist_get(int i)
+{
+	return i >= 0 && i < hist_n ? hist[i] : "";
+}
+
+static void hist_push(char *t)
+{
+	size_t k = 0;
+	while (t[k] == ' ' || t[k] == '\n' || t[k] == '\t' || t[k] == '\r')
+		k++;
+	if (!t[k]) {
+		free(t);
+		return;
+	}
+	for (int i = 0; i < hist_n; i++)
+		if (!strcmp(hist[i], t)) {
+			free(hist[i]);
+			memmove(&hist[i], &hist[i + 1], (size_t)(hist_n - i - 1) * sizeof hist[0]);
+			hist_n--;
+			break;
+		}
+	if (hist_n == HIST_N)
+		free(hist[--hist_n]);
+	memmove(&hist[1], &hist[0], (size_t)hist_n * sizeof hist[0]);
+	hist[0] = t;
+	hist_n++;
+}
+
+/* what the current owner of the clipboard offers, read through a pipe while it is still alive */
+static struct {
+	int fd;
+	char *buf;
+	size_t len;
+	struct wl_event_source *src, *timer;
+} cap = { .fd = -1 };
+
+static void cap_end(bool keep)
+{
+	if (cap.src)
+		wl_event_source_remove(cap.src);
+	if (cap.timer)
+		wl_event_source_timer_update(cap.timer, 0);
+	cap.src = NULL;
+	if (cap.fd >= 0)
+		close(cap.fd);
+	cap.fd = -1;
+	if (keep && cap.buf && cap.len) {
+		char *t = realloc(cap.buf, cap.len + 1);
+		if (t) {
+			t[cap.len] = 0;
+			hist_push(t);
+			cap.buf = NULL;
+		}
+	}
+	free(cap.buf);
+	cap.buf = NULL;
+	cap.len = 0;
+}
+
+static int cap_cb(int fd, uint32_t mask, void *data)
+{
+	char tmp[4096];
+	for (;;) {
+		ssize_t n = read(fd, tmp, sizeof tmp);
+		if (n > 0) {
+			if (cap.len + (size_t)n > HIST_MAX) {
+				cap_end(false);	/* too big: not kept */
+				return 0;
+			}
+			char *nb = realloc(cap.buf, cap.len + (size_t)n);
+			if (!nb) {
+				cap_end(false);
+				return 0;
+			}
+			cap.buf = nb;
+			memcpy(cap.buf + cap.len, tmp, (size_t)n);
+			cap.len += (size_t)n;
+			continue;
+		}
+		if (n < 0 && errno == EAGAIN)
+			return 0;
+		cap_end(n == 0);
+		return 0;
+	}
+}
+
+static int cap_timeout(void *data)
+{
+	cap_end(false);
+	return 0;
+}
+
+static const struct fsel_ops hist_ops;
+
+static void capture_selection(void)
+{
+	cap_end(false);
+	if (hist_off || !selection || (selection->foreign && selection->fops == &hist_ops) || !C.loop)
+		return;
+	const char *want[] = { "text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING", NULL };
+	const char *mime = NULL;
+	for (int i = 0; want[i] && !mime; i++) {
+		struct mime *m;
+		wl_list_for_each(m, &selection->mimes, link)
+			if (!strcmp(m->s, want[i])) {
+				mime = m->s;
+				break;
+			}
+	}
+	if (!mime)
+		return;
+	int p[2];
+	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) < 0)
+		return;
+	if (selection->foreign) {
+		fcntl(p[1], F_SETFL, 0);
+		selection->fops->send(selection->fdata, mime, p[1]);	/* takes it */
+	} else {
+		wl_data_source_send_send(selection->res, mime, p[1]);
+		close(p[1]);
+	}
+	cap.fd = p[0];
+	cap.src = wl_event_loop_add_fd(C.loop, p[0], WL_EVENT_READABLE, cap_cb, NULL);
+	if (!cap.timer)
+		cap.timer = wl_event_loop_add_timer(C.loop, cap_timeout, NULL);
+	if (cap.timer)
+		wl_event_source_timer_update(cap.timer, 1500);
+}
+
+/* the history's own clipboard source */
+static char *self_text;
+
+static void hs_send(void *d, const char *mime, int fd)
+{
+	if (self_text) {
+		size_t n = strlen(self_text), off = 0;
+		fcntl(fd, F_SETFL, O_NONBLOCK);
+		while (off < n) {
+			ssize_t w = write(fd, self_text + off, n - off);
+			if (w <= 0 && errno != EINTR)
+				break;
+			if (w > 0)
+				off += (size_t)w;
+		}
+	}
+	close(fd);
+}
+
+static void hs_cancelled(void *d) { }
+
+static const struct fsel_ops hist_ops = { .send = hs_send, .cancelled = hs_cancelled };
+
+static uint32_t paste_code = 47;	/* the key code of the V that opened the popup */
+
+static void synth_paste(void);
+
+void cliphist_paste(int i)
+{
+	if (i < 0 || i >= hist_n)
+		return;
+	free(self_text);
+	self_text = strdup(hist[i]);
+	if (!self_text)
+		return;
+	static const char *const mimes[] = { "text/plain;charset=utf-8", "text/plain" };
+	seat_set_foreign_selection(mimes, 2, &hist_ops, NULL);
+	synth_paste();
+}
+
 static void dd_start_drag(struct wl_client *c, struct wl_resource *r, struct wl_resource *src,
 			  struct wl_resource *origin, struct wl_resource *icon, uint32_t serial)
 {
@@ -723,6 +917,7 @@ static void dd_set_selection(struct wl_client *c, struct wl_resource *r, struct 
 		selection_cancel(old);
 	selection_broadcast();
 	sel_changed();
+	capture_selection();
 }
 
 static void dd_release(struct wl_client *c, struct wl_resource *r)
@@ -838,6 +1033,8 @@ static bool mod_active(const char *name)
 
 static bool handle_binding(xkb_keysym_t sym, bool pressed)
 {
+	if (pmenu_active())
+		return pmenu_key(sym, pressed);
 	int ma = media_action(sym);
 	if (ma >= 0) {
 		media_key(ma, pressed);	/* volume, brightness, microphone: media.c */
@@ -871,11 +1068,11 @@ static bool handle_binding(xkb_keysym_t sym, bool pressed)
 			cycle_next();
 		return true;
 	}
-	if (alt && ctrl && !logo && low == XKB_KEY_t) {	/* Ctrl-Alt-T: a terminal */
+	if (alt && ctrl && !logo && low == XKB_KEY_t && !C.nolock) {	/* Ctrl-Alt-T: a terminal */
 		run_program("flterm");
 		return true;
 	}
-	if (ctrl && shift && !alt && !logo && sym == XKB_KEY_Escape) {	/* Ctrl-Shift-Esc: General Manager */
+	if (ctrl && shift && !alt && !logo && sym == XKB_KEY_Escape && !C.nolock) {	/* Ctrl-Shift-Esc: General Manager */
 		run_program("general-manager");
 		return true;
 	}
@@ -903,8 +1100,8 @@ static bool handle_binding(xkb_keysym_t sym, bool pressed)
 		case XKB_KEY_Right: window_action(WA_SNAP_RIGHT); return true;
 		case XKB_KEY_Up: window_action(WA_MAXIMIZE); return true;
 		case XKB_KEY_Down: window_action(WA_RESTORE_OR_MINIMIZE); return true;
-		case XKB_KEY_e: run_program("flfiles"); return true;
-		case XKB_KEY_t: run_program("flterm"); return true;
+		case XKB_KEY_e: if (C.nolock) break; run_program("flfiles"); return true;
+		case XKB_KEY_t: if (C.nolock) break; run_program("flterm"); return true;
 		case XKB_KEY_l:		/* only where there is something to lock with (the panel's Lock button too) */
 			if (lock_available()) {
 				lock_start();	/* locks at once; the lock program shows the clock and the password field */
@@ -960,12 +1157,101 @@ static bool locked_binding(xkb_keysym_t sym, bool pressed)
 	return false;
 }
 
+static void forward_key(uint32_t ms, uint32_t key, bool pressed)
+{
+	if (!C.kb_focus)
+		return;
+	struct wl_client *cl = wl_resource_get_client(C.kb_focus->res);
+	uint32_t serial = wl_display_next_serial(C.dpy);
+	struct reslink *k;
+	wl_list_for_each(k, &keyboards, link)
+		if (wl_resource_get_client(k->res) == cl)
+			wl_keyboard_send_key(k->res, serial, ms, key,
+				pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+}
+
+/* Ctrl+V and the clipboard history: the press of V is held back for up to 450 ms. Released before that, the
+ * press and the release go to the program unchanged (a quick Ctrl+V pastes as always, only a little later);
+ * still held after that, the history popup opens and the key is not sent at all. */
+#define HOLD_MS 450
+static struct {
+	bool on;
+	uint32_t key, ms;
+} pend;
+static struct wl_event_source *pend_timer;
+
+static void pend_flush(void)	/* hand the held press on */
+{
+	if (!pend.on)
+		return;
+	pend.on = false;
+	if (pend_timer)
+		wl_event_source_timer_update(pend_timer, 0);
+	forward_key(pend.ms, pend.key, true);
+}
+
+static int pend_cb(void *data)
+{
+	if (!pend.on)
+		return 0;
+	pend.on = false;
+	paste_code = pend.key;
+	consumed[pend.key] = true;	/* its release is the popup's */
+	cliphist_menu_open();
+	if (!pmenu_active())
+		forward_key(pend.ms, pend.key, true), consumed[pend.key] = false;
+	return 0;
+}
+
+/* Ctrl+V into the focused window, whatever the keys held now: the program sees Control down, V down, V up */
+static void synth_paste(void)
+{
+	if (!C.kb_focus || !xstate)
+		return;
+	struct wl_client *cl = wl_resource_get_client(C.kb_focus->res);
+	xkb_mod_index_t ci = xkb_keymap_mod_get_index(xkb_state_get_keymap(xstate), XKB_MOD_NAME_CTRL);
+	if (ci == XKB_MOD_INVALID)
+		return;
+	struct reslink *k;
+	wl_list_for_each(k, &keyboards, link) {
+		if (wl_resource_get_client(k->res) != cl)
+			continue;
+		uint32_t ctrl = 1u << ci;
+		wl_keyboard_send_modifiers(k->res, wl_display_next_serial(C.dpy), ctrl, 0, 0,
+			xkb_state_serialize_layout(xstate, XKB_STATE_LAYOUT_EFFECTIVE));
+		uint32_t t = now_ms();
+		wl_keyboard_send_key(k->res, wl_display_next_serial(C.dpy), t, paste_code, WL_KEYBOARD_KEY_STATE_PRESSED);
+		wl_keyboard_send_key(k->res, wl_display_next_serial(C.dpy), t, paste_code, WL_KEYBOARD_KEY_STATE_RELEASED);
+		send_modifiers_to(k->res);
+	}
+}
+
 void seat_key(uint32_t ms, uint32_t key, bool pressed)
 {
 	if (key >= sizeof(consumed))
 		return;
 	xkb_keysym_t sym = xstate ? xkb_state_key_get_one_sym(xstate, key + 8) : XKB_KEY_NoSymbol;
 	bool eat = false;
+	if (pend.on && key != pend.key)
+		pend_flush();	/* another key: it was a plain Ctrl+V after all */
+	if (pend.on && key == pend.key && !pressed) {
+		pend_flush();	/* released in time: press, then the release below */
+	} else if (pressed && !hist_off && !C.locked && !pmenu_active() && C.kb_focus && !pend.on &&
+		   (sym == XKB_KEY_v || sym == XKB_KEY_V) && mod_active(XKB_MOD_NAME_CTRL) &&
+		   !mod_active(XKB_MOD_NAME_ALT) && !mod_active(XKB_MOD_NAME_SHIFT) && !mod_active(XKB_MOD_NAME_LOGO) &&
+		   C.loop) {
+		pend.on = true;
+		pend.key = key;
+		pend.ms = ms;
+		if (!pend_timer)
+			pend_timer = wl_event_loop_add_timer(C.loop, pend_cb, NULL);
+		if (pend_timer) {
+			wl_event_source_timer_update(pend_timer, HOLD_MS);
+			xkb_state_update_key(xstate, key + 8, XKB_KEY_DOWN);
+			return;
+		}
+		pend.on = false;
+	}
 	if (pressed) {
 		eat = C.locked ? locked_binding(sym, true) : handle_binding(sym, true);
 		consumed[key] = eat;
@@ -991,16 +1277,8 @@ void seat_key(uint32_t ms, uint32_t key, bool pressed)
 	}
 	if (!C.kb_focus)
 		return;
-	struct wl_client *cl = wl_resource_get_client(C.kb_focus->res);
-	struct reslink *k;
-	if (!eat) {
-		uint32_t serial = wl_display_next_serial(C.dpy);
-		wl_list_for_each(k, &keyboards, link)
-			if (wl_resource_get_client(k->res) == cl)
-				wl_keyboard_send_key(k->res, serial, ms, key,
-					pressed ? WL_KEYBOARD_KEY_STATE_PRESSED
-						: WL_KEYBOARD_KEY_STATE_RELEASED);
-	}
+	if (!eat)
+		forward_key(ms, key, pressed);
 	if (mods_changed) {
 		for_focus_keyboards(send_modifiers_to);
 		update_leds();
@@ -1111,6 +1389,7 @@ static void seat_bind(struct wl_client *c, void *data, uint32_t version, uint32_
 
 void seat_init(void)
 {
+	hist_off = getenv("FLCOMP_NO_CLIPHIST") != NULL;
 	wl_list_init(&pointers);
 	wl_list_init(&keyboards);
 	wl_list_init(&data_devices);

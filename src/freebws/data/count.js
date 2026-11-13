@@ -1,6 +1,7 @@
 /* FreeBWS: an estimate of how many requests the ad blocker stopped on the page. WebKit's content
  * blockers do not report what they block, so this counts third-party sub-resources that failed
- * to load without ever reaching the network (no resource timing entry). Runs in every frame. */
+ * to load without ever reaching the network (no resource timing entry). Runs in every frame. Does not
+ * touch window.fetch. */
 (function () {
 	'use strict';
 	if (window.__fbCnt) return;
@@ -22,11 +23,6 @@
 		if (!t || t === window || !t.tagName) return;
 		if (/^(SCRIPT|IMG|IFRAME|LINK|VIDEO|AUDIO|SOURCE|EMBED|OBJECT)$/.test(t.tagName)) hit(t.currentSrc || t.src || t.href);
 	}, true);
-	var of = window.fetch;
-	if (of) window.fetch = function (inp) {
-		var u = typeof inp === 'string' ? inp : (inp && inp.url) || '';
-		var p = of.apply(this, arguments);
-		p.catch(function (err) { if (err && err.name === 'TypeError' && navigator.onLine) try { hit(new URL(u, location.href).href); } catch (e) {} });
-		return p;
-	};
+	/* no fetch() wrapper: replacing window.fetch made it visibly non-native to bot checks, and the
+	 * sub-resource count above is what the shield shows */
 })();

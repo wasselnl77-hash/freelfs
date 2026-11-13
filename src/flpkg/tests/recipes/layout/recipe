@@ -2,7 +2,7 @@
 pkgname=layout
 version=1.0
 release=1
-summary="Moves /var and /etc into /sysflfs"
+summary="Moves /var and /etc into /usr (the layout test: any real directory as target)"
 license=(MIT)
 arch=(any)
 source=()
@@ -10,7 +10,7 @@ sha256=()
 
 package() {
 	cd "$pkgdir"
-	install -d sysflfs/data sysflfs/settings
-	ln -s sysflfs/data var
-	ln -s sysflfs/settings etc
+	install -d usr/data usr/settings
+	ln -s usr/data var
+	ln -s usr/settings etc
 }

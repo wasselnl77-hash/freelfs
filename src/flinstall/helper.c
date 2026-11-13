@@ -27,6 +27,7 @@
  * is filled with mtools from a staged directory that flboot-install made.
  */
 #include <crypt.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ftw.h>
@@ -467,8 +468,29 @@ static void mark_fs(struct disk *d)
 	}
 }
 
+/* something sits on the device: an unlocked LUKS, an LVM or md set (/sys/class/block/NAME/holders) */
+static int has_holders(const char *dev)
+{
+	const char *n = strrchr(dev, '/');
+	n = n ? n + 1 : dev;
+	char path[PATH_MAX];
+	snprintf(path, sizeof path, "/sys/class/block/%s/holders", n);
+	DIR *d = opendir(path);
+	if (!d)
+		return 0;
+	int r = 0;
+	struct dirent *e;
+	while ((e = readdir(d)))
+		if (e->d_name[0] != '.')
+			r = 1;
+	closedir(d);
+	return r;
+}
+
 static int mounted_source(const char *dev)
 {
+	if (has_holders(dev))
+		return 1;
 	FILE *f = fopen("/proc/mounts", "r");
 	char line[512];
 	int r = 0;
@@ -581,6 +603,8 @@ static void load_dump_for(struct disk *d)
 		d->p[i].busy = mounted_source(d->p[i].dev);
 		d->busy |= d->p[i].busy;
 	}
+	if (!fake_dir[0])
+		d->busy |= has_holders(d->dev);	/* LUKS/LVM/md on the whole disk */
 }
 
 static void load_disks(void)

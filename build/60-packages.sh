@@ -73,7 +73,7 @@ build_one() {
 	# build on each other, so each one goes into it too (and so do the live ISO
 	# tools, group "live": build/53-iso.sh runs them in the chroot).
 	if recipe_list "$1" groups | grep -Eqx "desktop|live"; then
-		flpkg install -y --nodeps "$OUT/$1"-[0-9]*.flpkg
+		flpkg install -y --nodeps --unsigned "$OUT/$1"-[0-9]*.flpkg
 	fi
 }
 

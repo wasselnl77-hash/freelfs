@@ -1408,6 +1408,10 @@ void notify_free(struct panel *p)
 		return;
 	history_save(nt);
 	bus_close(nt);
+	/* the timers are the panel's fl_app's: freed here, or their fd entries would point at freed memory */
+	fl_timer_free(nt->tick);
+	fl_timer_free(nt->retry);
+	fl_timer_free(nt->save);
 	free(nt);
 	p->nt = NULL;
 }

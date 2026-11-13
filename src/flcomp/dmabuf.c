@@ -205,6 +205,15 @@ static struct wl_resource *make_buffer(struct wl_client *c, struct wl_resource *
 				       "stride or offset outside the buffer");
 		return NULL;
 	}
+	for (int i = 1; i < np; i++) {	/* the other planes: at least one row has to lie inside their buffer */
+		off_t psz = lseek(p->pl[i].fd, 0, SEEK_END);
+		if (psz < 0 || p->pl[i].stride == 0 ||
+		    (uint64_t)p->pl[i].offset + (uint64_t)p->pl[i].stride > (uint64_t)psz) {
+			wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_OUT_OF_BOUNDS,
+					       "plane %d outside the buffer", i);
+			return NULL;
+		}
+	}
 	if (!gl_modifier_ok(format, p->modifier, np)) {
 		*fail = true;
 		return NULL;

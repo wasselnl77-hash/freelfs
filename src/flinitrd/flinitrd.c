@@ -53,7 +53,8 @@
 #define MAX_DIRENTS 20000
 
 static int timeout_s = 20;
-static int debug;
+static int debug, no_persist;
+static char persist_img[PATH_MAX], persist_dev[272];
 static const char *iso_pattern = "freelfs-live*.iso";
 
 static void say(const char *fmt, ...)
@@ -104,6 +105,8 @@ static void read_cmdline(void)
 			iso_pattern = pat;
 		} else if (!strcmp(w, "flive.debug"))
 			debug = 1;
+		else if (!strcmp(w, "flive.nopersist"))
+			no_persist = 1;
 	}
 }
 
@@ -189,6 +192,10 @@ static int list_devs(struct dev *out, int max)
 
 /* Make the kernel refuse every write to the device, then it is safe to
  * mount whatever is on it. Returns 0 when it is read-only. */
+#define MAX_RO 512
+static char ro_devs[MAX_RO][64];
+static int n_ro;
+
 static int make_readonly(const char *path)
 {
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
@@ -196,7 +203,25 @@ static int make_readonly(const char *path)
 		return -1;
 	int one = 1, rc = ioctl(fd, BLKROSET, &one);
 	close(fd);
+	if (rc == 0 && n_ro < MAX_RO)
+		snprintf(ro_devs[n_ro++], sizeof ro_devs[0], "%s", path);
 	return rc;
+}
+
+/* The flag was only for probing: clear it on every device we set it on, so the disks of the machine and
+ * the stick are writable again once the live system runs (the file systems we mounted stay read-only until
+ * flmount remounts the stick). */
+static void clear_readonly(void)
+{
+	for (int i = 0; i < n_ro; i++) {
+		int fd = open(ro_devs[i], O_RDONLY | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+		int zero = 0;
+		(void)!ioctl(fd, BLKROSET, &zero);
+		close(fd);
+	}
+	n_ro = 0;
 }
 
 /* ---- mounting ----------------------------------------------------------------- */
@@ -224,7 +249,7 @@ static int try_mount(const char *src, const char *dir, const char *type)
 
 /* A loop device over FILE, read-only; returns the device path in OUT. */
 /* No LO_FLAGS_AUTOCLEAR: the device would be cleared when we close it, before the mount holds it. */
-static int loop_attach(const char *file, char *out, size_t outsz)
+static int loop_attach_ex(const char *file, char *out, size_t outsz, int rw)
 {
 	int ctl = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
 	if (ctl < 0)
@@ -236,10 +261,10 @@ static int loop_attach(const char *file, char *out, size_t outsz)
 	snprintf(out, outsz, "/dev/loop%d", nr);
 	for (int i = 0; i < 50 && access(out, F_OK); i++)
 		msleep(20);
-	int ffd = open(file, O_RDONLY | O_CLOEXEC);
+	int ffd = open(file, (rw ? O_RDWR : O_RDONLY) | O_CLOEXEC);
 	if (ffd < 0)
 		return -1;
-	int lfd = open(out, O_RDONLY | O_CLOEXEC);
+	int lfd = open(out, (rw ? O_RDWR : O_RDONLY) | O_CLOEXEC);
 	if (lfd < 0) {
 		close(ffd);
 		return -1;
@@ -247,13 +272,13 @@ static int loop_attach(const char *file, char *out, size_t outsz)
 	struct loop_config cfg;
 	memset(&cfg, 0, sizeof cfg);
 	cfg.fd = ffd;
-	cfg.info.lo_flags = LO_FLAGS_READ_ONLY;
+	cfg.info.lo_flags = rw ? 0 : LO_FLAGS_READ_ONLY;
 	snprintf((char *)cfg.info.lo_file_name, LO_NAME_SIZE, "%s", file);
 	int rc = ioctl(lfd, LOOP_CONFIGURE, &cfg);
 	if (rc && errno == EINVAL) { /* kernels before 5.8: not ours, but cheap */
 		struct loop_info64 info;
 		memset(&info, 0, sizeof info);
-		info.lo_flags = LO_FLAGS_READ_ONLY;
+		info.lo_flags = rw ? 0 : LO_FLAGS_READ_ONLY;
 		rc = ioctl(lfd, LOOP_SET_FD, ffd);
 		if (!rc)
 			rc = ioctl(lfd, LOOP_SET_STATUS64, &info);
@@ -273,6 +298,11 @@ static int loop_attach(const char *file, char *out, size_t outsz)
 			close(l);
 	}
 	return rc;
+}
+
+static int loop_attach(const char *file, char *out, size_t outsz)
+{
+	return loop_attach_ex(file, out, outsz, 0);
 }
 
 /* ---- finding the live system -------------------------------------------- */
@@ -381,6 +411,18 @@ static int try_device_files(const struct dev *d)
 			if (loop_attach(s.iso, loop, sizeof loop) == 0 &&
 			    try_mount(loop, LIVE "/iso", "iso9660") == 0) {
 				if (use_iso(LIVE "/iso") == 0) {
+					/* Live persistence: freelfs-persist.img at the top of the stick, or beside the ISO */
+					char beside[PATH_MAX];
+					snprintf(beside, sizeof beside, "%s", s.iso);
+					char *sl = strrchr(beside, '/');
+					if (sl) {
+						snprintf(sl + 1, sizeof beside - (size_t)(sl + 1 - beside), "freelfs-persist.img");
+						if (exists(beside))
+							snprintf(persist_img, sizeof persist_img, "%s", beside);
+					}
+					if (!persist_img[0] && exists(LIVE "/src/freelfs-persist.img"))
+						snprintf(persist_img, sizeof persist_img, "%s", LIVE "/src/freelfs-persist.img");
+					snprintf(persist_dev, sizeof persist_dev, "%s", d->path);
 					say("flinitrd: live system in %s on %s (%s)", s.iso + strlen(LIVE "/src"),
 					    d->path, types[i]);
 					return 0;
@@ -469,6 +511,39 @@ static int start_live(void)
 		  "lowerdir=" LIVE "/rom,upperdir=" LIVE "/rw/up,workdir=" LIVE "/rw/work")) {
 		say("flinitrd: cannot mount the overlay: %s", strerror(errno));
 		return -1;
+	}
+	/* the flag was only for probing (the disk's flag and the partitions' own: a partition stays read-only while
+	 * its disk is) */
+	clear_readonly();
+	if (persist_img[0] && !no_persist) {
+		/* the stick's data partition has to be writable for this */
+		char loop[64];
+		int fd = open(persist_dev, O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			int zero = 0;
+			(void)!ioctl(fd, BLKROSET, &zero);
+			close(fd);
+		}
+		int ok = 0;
+		if (mount(NULL, LIVE "/src", NULL, MS_REMOUNT | MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL))
+			say("flinitrd: persistence: cannot make the stick writable: %s", strerror(errno));
+		else if (loop_attach_ex(persist_img, loop, sizeof loop, 1))
+			say("flinitrd: persistence: cannot open %s: %s", persist_img, strerror(errno));
+		else {
+			mkdir(LIVE "/persist", 0755);
+			static const char *const types[] = { "ext4", "btrfs", NULL };
+			for (int i = 0; types[i] && !ok; i++)
+				ok = mount(loop, LIVE "/persist", types[i], MS_NOSUID | MS_NODEV, NULL) == 0;
+			if (!ok)
+				say("flinitrd: persistence: %s is neither ext4 nor btrfs", persist_img);
+		}
+		if (ok) {
+			mkdir("/newroot/home", 0755);
+			if (mount(LIVE "/persist", "/newroot/home", NULL, MS_BIND, NULL))
+				say("flinitrd: persistence: cannot use it as /home: %s", strerror(errno));
+			else
+				say("flinitrd: your files are kept: /home is on %s", persist_img + strlen(LIVE "/src"));
+		}
 	}
 	if (access("/newroot/sbin/init", X_OK)) {
 		say("flinitrd: the live system has no /sbin/init");

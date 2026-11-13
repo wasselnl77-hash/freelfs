@@ -11,6 +11,8 @@
  * option or file name can reach flpkg (a name never starts with "-" or ends
  * in ".flpkg", which flpkg would take for a file).
  * SPDX-License-Identifier: MIT */
+#include "flauth-check.h"
+
 #include <fcntl.h>
 #include <grp.h>
 #include <signal.h>
@@ -63,6 +65,34 @@ int main(int argc, char **argv)
 	if (geteuid() != 0) {
 		fputs("flpkg-seat: not installed setuid root\n", stderr);
 		return 1;
+	}
+	/* Changing the system asks for the person's password (flauth; no question on the live system's
+	 * passwordless tester). Without a fresh stamp this program starts itself again through flauth, as
+	 * the person, which finds the stamp the second time; FLAUTH_TRIED stops a loop. */
+	if (!flauth_ok(getuid())) {
+		uid_t u = getuid();
+		gid_t g = getgid();
+		if (getenv("FLAUTH_TRIED") || setresgid(g, g, g) < 0 || setresuid(u, u, u) < 0) {
+			fputs("flpkg-seat: your password is needed (flauth)\n", stderr);
+			return 77;
+		}
+		setenv("FLAUTH_TRIED", "1", 1);
+		char reason[256];
+		snprintf(reason, sizeof reason, "%s the package%s %s%s.", !strcmp(argv[1], "install") ? "Install" : "Remove",
+			 argc > 3 ? "s" : "", argv[2], argc > 3 ? " and more" : "");
+		char *args[MAX_NAMES + 10];
+		int k = 0;
+		args[k++] = "flauth";
+		args[k++] = "--reason";
+		args[k++] = reason;
+		args[k++] = "--";
+		args[k++] = "/usr/bin/flpkg-seat";
+		for (int i = 1; i < argc; i++)
+			args[k++] = argv[i];
+		args[k] = NULL;
+		execv("/usr/bin/flauth", args);
+		fputs("flpkg-seat: your password is needed, and flauth is not installed\n", stderr);
+		return 77;
 	}
 	/* real ids to root too, and none of the caller's groups */
 	if (setgroups(0, NULL) < 0 || setgid(0) < 0 || setuid(0) < 0) {

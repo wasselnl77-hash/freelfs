@@ -27,6 +27,8 @@ struct glyph {
 #define CACHE_MAX 1400
 #define NFALL 4
 
+#define MISS_N 64 /* code points remembered as missing from every font */
+
 struct fl_font {
 	FT_Face face;
 	hb_font_t *hb;
@@ -38,8 +40,8 @@ struct fl_font {
 	int ncache;
 	fl_font *fall[NFALL];
 	int nfall;
-	uint32_t miss[16]; /* code points no font has */
-	int nmiss;
+	uint32_t miss[MISS_N]; /* code points no font has: a ring */
+	int nmiss, miss_pos;
 	int ui;            /* made by fl_font_ui: follows the look (family, scale), see fl_text_set_look */
 	float base;        /* the size asked for, before the scale */
 	fl_font *ui_next;
@@ -168,6 +170,7 @@ static void flush_cache(fl_font *f)
 		fl_font_close(f->fall[i]);
 	f->nfall = 0;
 	f->nmiss = 0;
+	f->miss_pos = 0;
 	for (int i = 0; i < CACHE_SLOTS; i++)
 		free(f->cache[i].bits);
 	memset(f->cache, 0, CACHE_SLOTS * sizeof(struct glyph));
@@ -270,9 +273,10 @@ void fl_font_close(fl_font *f)
 	free(f);
 }
 
-int fl_font_ascent(const fl_font *f) { return f->ascent; }
-int fl_font_height(const fl_font *f) { return f->ascent + f->descent; }
-int fl_font_cell(const fl_font *f) { return f->cell; }
+/* a NULL font (no usable font was found) measures as 0, so callers draw nothing instead of crashing */
+int fl_font_ascent(const fl_font *f) { return f ? f->ascent : 0; }
+int fl_font_height(const fl_font *f) { return f ? f->ascent + f->descent : 0; }
+int fl_font_cell(const fl_font *f) { return f ? f->cell : 0; }
 
 /* ---- glyph cache ------------------------------------------------------------- */
 
@@ -402,7 +406,10 @@ static fl_font *make_fallback(fl_font *f, uint32_t cp)
 	}
 	if (nf)
 		fl_font_close(nf);
-	f->miss[f->nmiss++ % 16] = cp;
+	f->miss[f->miss_pos] = cp;
+	f->miss_pos = (f->miss_pos + 1) % MISS_N;
+	if (f->nmiss < MISS_N)
+		f->nmiss++;
 	return NULL;
 }
 
@@ -498,6 +505,8 @@ void fl_text_in(fl_canvas *cv, fl_font *f, fl_rect r, int align, int pad, fl_col
 
 int fl_glyph(fl_canvas *cv, fl_font *f, int x, int y, fl_color c, uint32_t cp)
 {
+	if (!f)
+		return 0;
 	fl_font *rf = font_for(f, cp);
 	uint32_t gid = FT_Get_Char_Index(rf->face, cp);
 	if (!gid && cp != ' ')

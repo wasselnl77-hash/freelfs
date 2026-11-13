@@ -91,6 +91,8 @@ struct window {
 	struct window *parent;
 	int x, y;			/* top left of the window geometry */
 	bool mapped, announced, minimized, maximized, fullscreen, resizing;
+	bool above;			/* always on top (the window menu, popup.c) */
+	int deco_ours;			/* 0 not asked, 1 a FreeLFS program draws its title bar (popup.c), 2 not */
 	int ws;				/* workspace it is on (0 .. C.ws_cols * C.ws_rows - 1) */
 	int snap;			/* -1 left half, 1 right half of the work area, 0 not snapped (restore has the old place) */
 	int min_w, min_h, max_w, max_h;
@@ -172,6 +174,27 @@ bool notify_visible(void);
 bool desktop_visible(void);
 bool popup_visible(struct popup *p);		/* not dismissed, and its window is on the workspace in view */
 
+/* popup.c: window menu, clipboard history popup, snap preview */
+bool pmenu_active(void);
+void pmenu_close(void);
+bool pmenu_key(uint32_t sym, bool pressed);
+void pmenu_motion(void);
+bool pmenu_button(uint32_t button, bool pressed);
+void pmenu_draw(struct rect clip);
+void window_menu_open(struct window *w, int x, int y);
+void cliphist_menu_open(void);
+bool title_click(struct window *w, uint32_t button, int x, int y);
+void snap_preview_set(int kind);		/* 0 none, -1 left half, 1 right half, 2 whole work area */
+int snap_preview_kind(void);
+void snap_preview_draw(struct rect clip);
+/* lock.c: the built-in font */
+int ui_text_width(const char *s);
+void ui_text(struct rect clip, int x, int y, const char *s, uint32_t col);
+/* seat.c: clipboard history (RAM only, the last 20 text entries) */
+int cliphist_count(void);
+const char *cliphist_get(int i);		/* 0 = newest */
+void cliphist_paste(int i);			/* make it the clipboard and paste it into the focused window */
+
 /* xdg.c */
 void xdg_init(void);
 void xdg_surface_commit(struct surface *s, bool was_mapped);
@@ -196,8 +219,12 @@ void cycle_prev(void);
 void cycle_end(void);
 bool cycling(void);
 struct window **cycle_windows(int *n, int *sel);	/* the Alt-Tab list, newest first; entries of closed windows are NULL */
-enum { WA_SNAP_LEFT, WA_SNAP_RIGHT, WA_MAXIMIZE, WA_RESTORE_OR_MINIMIZE };
+enum { WA_SNAP_LEFT, WA_SNAP_RIGHT, WA_MAXIMIZE, WA_RESTORE_OR_MINIMIZE, WA_TOGGLE_MAXIMIZE };
 void window_action(int act);				/* keyboard: the focused window */
+void window_action_on(struct window *w, int act);	/* the same for any window (popup.c, flshell.c) */
+void window_set_above(struct window *w, bool on);
+struct rect window_rect(struct window *w);
+int window_geom_h_pub(struct window *w);				/* keyboard: the focused window */
 
 /* workspaces (xdg.c): a grid of virtual desktops; a window is on exactly one. Only the
  * windows of C.ws_cur are drawn, picked, focused and in Alt-Tab. */

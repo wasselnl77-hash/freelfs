@@ -1,0 +1,27 @@
+# flmount and flpersist, from src/flmount in the FreeLFS tree: mounting removable drives for the
+# person at the machine (Files uses flmount), the udev rule that mounts a plugged-in stick, and
+# the live session's persistent home (flpersist create SIZE, used by flinitrd at the next boot).
+pkgname=flmount
+version=0.1
+release=1
+summary="Mount, unmount and eject USB drives; automount on plug-in; live persistence"
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc util-linux e2fsprogs btrfs-progs flpanel)
+# both run as root for the group seat, like flpower in flpanel
+owner=("/usr/bin/flmount 0 98 4750" "/usr/bin/flpersist 0 98 4750")
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flmount" "$srcdir/flmount"
+	cd "$srcdir/flmount"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flmount"
+	make DESTDIR="$pkgdir" install
+}

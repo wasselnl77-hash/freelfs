@@ -6,11 +6,12 @@
 
 #include <flui.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/types.h>
 
 #include "fl-shell-client-protocol.h"
 
-enum { CAT_ALL, CAT_INTERNET, CAT_OFFICE, CAT_SYSTEM, CAT_SETTINGS, CAT_COUNT };
+enum { CAT_ALL, CAT_INTERNET, CAT_OFFICE, CAT_SYSTEM, CAT_SETTINGS, CAT_RECENT, CAT_COUNT };
 
 struct entry {
 	char name[64], what[96], exec[256], glyph[8];
@@ -91,7 +92,7 @@ static inline void panel_hide(fl_win *w)
 }
 
 /* which flyout is open; one at a time (panel.c) */
-enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC, FLY_WS };
+enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC, FLY_WS, FLY_CTX };
 void panel_flyouts_close(struct panel *p, int except);
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx); /* closes the others, then shows w */
 
@@ -141,6 +142,48 @@ void wsmenu_open(struct panel *p);
 void wsmenu_close(struct panel *p);
 void wsmenu_toggle(struct panel *p);
 int wsmenu_is_open(const struct panel *p);
+
+/* ---- ctxmenu.c: right-click menus (taskbar, desktop, desktop icons), a flyout above the panel ---- */
+struct ctx_item {
+	const char *label; /* NULL: a separator line */
+	int on;            /* 0: shown, not chosen */
+	int code;          /* what the pick callback gets */
+};
+typedef void (*ctx_pick_cb)(struct panel *p, uintptr_t ud, int code);
+void ctx_open(struct panel *p, int cx, const struct ctx_item *items, int n, ctx_pick_cb pick, uintptr_t ud);
+void ctx_close(struct panel *p);
+
+/* ---- dialog.c: the power confirmation (30 s countdown, then flpower), an error with the command's
+ * stderr, and a name (new folder, new file, rename). Decorated windows, one at a time. ---- */
+enum { POW_OFF, POW_RESTART, POW_LOGOUT };
+typedef void (*dlg_name_cb)(struct panel *p, int kind, const char *ctx, const char *name);
+void dlg_power(struct panel *p, int what);
+void dlg_error(struct panel *p, const char *title, const char *text);
+void dlg_name(struct panel *p, const char *title, const char *initial, int kind, const char *ctx, dlg_name_cb done);
+
+/* A shell command for launch(): the string in single quotes, and % doubled, because launch()
+ * drops the Exec field codes. 0 when it does not fit in cap. */
+static inline int fl_shq(char *out, size_t cap, const char *in)
+{
+	size_t n = 0;
+	if (n + 1 >= cap)
+		return 0;
+	out[n++] = '\'';
+	for (const char *s = in; *s; s++) {
+		const char *rep = *s == '\'' ? "'\\''" : *s == '%' ? "%%" : NULL;
+		size_t k = rep ? strlen(rep) : 1;
+		if (n + k + 2 >= cap)
+			return 0;
+		if (rep)
+			memcpy(out + n, rep, k);
+		else
+			out[n] = *s;
+		n += k;
+	}
+	out[n++] = '\'';
+	out[n] = 0;
+	return 1;
+}
 
 void menu_init(struct panel *p);
 void desk_reposition(struct panel *p); /* the panel moved or changed height: the icons keep clear of it */

@@ -195,22 +195,26 @@ int battery_read(struct panel *p)
 		double cap;
 		if (read_num(dir, "capacity", &cap) < 0)
 			continue;
-		double now, full_v, r1, volt;
+		double now, full_v, r1 = 0, volt = 0;
+		/* every battery goes into energy (uWh) and power (uW) first: a battery that reports charge
+		 * (uAh, uA) is converted with its voltage (uAh * uV is pWh), so units are never mixed */
 		int ok = read_num(dir, "energy_now", &now) == 0 && read_num(dir, "energy_full", &full_v) == 0;
 		if (ok) {
 			if (read_num(dir, "power_now", &r1) < 0)
 				r1 = 0;
-			volts_w += r1 / 1e6;
-		} else if (read_num(dir, "charge_now", &now) == 0 && read_num(dir, "charge_full", &full_v) == 0) {
+		} else if (read_num(dir, "charge_now", &now) == 0 && read_num(dir, "charge_full", &full_v) == 0 &&
+		           read_num(dir, "voltage_now", &volt) == 0 && volt > 0) {
 			ok = 1;
 			if (read_num(dir, "current_now", &r1) < 0)
 				r1 = 0;
-			if (read_num(dir, "voltage_now", &volt) == 0)
-				volts_w += r1 * volt / 1e12;
+			now = now * volt / 1e6;
+			full_v = full_v * volt / 1e6;
+			r1 = r1 * volt / 1e6;
 		}
 		if (ok && full_v > 0) {
 			e_now += now;
 			e_full += full_v;
+			volts_w += r1 / 1e6;
 			rate += r1 < 0 ? -r1 : r1;
 			have_energy = 1;
 		}
@@ -261,10 +265,14 @@ int battery_read(struct panel *p)
 	}
 	b->secs = -1;
 	if (have_energy && b->ema > 0 && b->ema_n >= 2) {
+		/* uWh over uW is hours; a tiny rate gives a number too big for an int: no estimate then */
+		double secs = -1;
 		if (st == BS_DISCHARGING)
-			b->secs = (int)(e_now / b->ema * 3600.0);
+			secs = e_now / b->ema * 3600.0;
 		else if (st == BS_CHARGING)
-			b->secs = (int)((e_full - e_now) / b->ema * 3600.0);
+			secs = (e_full - e_now) / b->ema * 3600.0;
+		if (secs >= 0 && secs < 366.0 * 24 * 3600)
+			b->secs = (int)secs;
 	}
 	p->bat_pct = pct;
 	p->bat_charging = st == BS_CHARGING;

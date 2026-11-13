@@ -1,0 +1,45 @@
+@desktop
+echo 'readme text' > /home/tester/readme.txt; chown 1000:999 /home/tester/readme.txt
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid fledit >/tmp/fledit.log 2>&1 </dev/null &'
+@wait 5
+@mouse 640 300
+@click
+@type alpha
+@keys ctrl-a ctrl-c
+@key right
+@keys ret
+@type beta
+@keys ctrl-a ctrl-c
+@key right
+@keys ret
+@key ctrl-v
+@wait 1
+@shot @OUT@/d-quickpaste.ppm
+@key ctrl-v 900
+@wait 1
+@shot @OUT@/d-hist.ppm
+@key down
+@key ret
+@wait 1
+@shot @OUT@/d-hist-picked.ppm
+@key esc
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flfiles >/tmp/files.log 2>&1 </dev/null &'
+@wait 5
+@shot @OUT@/d-files-open.ppm
+@click right
+@mouse 500 56
+@click right
+@wait 1
+@shot @OUT@/d-winmenu.ppm
+@key esc
+@mouse 40 57
+@drag 500 56 2 300 @OUT@/d-snap-preview.ppm
+@wait 2
+@shot @OUT@/d-snapped.ppm
+@drag 200 100 640 1 @OUT@/d-max-preview.ppm
+@wait 2
+@shot @OUT@/d-maxed.ppm
+@mouse 900 400
+@click middle
+@wait 2
+@shot @OUT@/d-closed.ppm

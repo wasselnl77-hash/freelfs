@@ -240,6 +240,48 @@ void manifest_free(struct manifest *m)
 	memset(m, 0, sizeof(*m));
 }
 
+/* In place: "a//b/./c" -> "a/b/c", "sysflfs/x" -> "usr/x". False for "..", or an empty name. */
+static bool canon_manifest_path(char **pp)
+{
+	const char *in = *pp;
+	char *out = malloc(strlen(in) + 8);
+	if (!out)
+		return false;
+	size_t n = 0;
+	while (*in) {
+		while (*in == '/')
+			in++;
+		const char *e = in;
+		while (*e && *e != '/')
+			e++;
+		size_t len = (size_t)(e - in);
+		if (len == 2 && in[0] == '.' && in[1] == '.') {
+			free(out);
+			return false;
+		}
+		if (len && !(len == 1 && in[0] == '.')) {
+			const char *word = in;
+			if (n == 0 && len == 7 && !memcmp(in, "sysflfs", 7) && e[strspn(e, "/")]) {	/* the link itself stays */
+				word = "usr";
+				len = 3;
+			}
+			if (n)
+				out[n++] = '/';
+			memcpy(out + n, word, len);
+			n += len;
+		}
+		in = e;
+	}
+	out[n] = 0;
+	if (!n) {
+		free(out);
+		return false;
+	}
+	free(*pp);
+	*pp = out;
+	return true;
+}
+
 int manifest_parse(const char *text, struct manifest *m, char **error)
 {
 	char *copy = xstrdup(text), *save = NULL;
@@ -283,6 +325,13 @@ int manifest_parse(const char *text, struct manifest *m, char **error)
 		}
 		if (!(e.path = unescape_path(f[6]))) {
 			free(e.target);
+			goto bad;
+		}
+		/* one name per file: no "..", "." or empty parts, no leading "/", and the old /sysflfs
+		 * alias spelled usr/ (it is a link to usr now), so ownership checks compare like with like */
+		if (!canon_manifest_path(&e.path)) {
+			free(e.target);
+			free(e.path);
 			goto bad;
 		}
 		manifest_add(m, &e);

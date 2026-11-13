@@ -82,7 +82,7 @@ static int panel_restarts;
 static bool panel_respawn;	/* killed on purpose (the output changed): start it again */
 static bool firstboot;
 
-static pid_t spawn(const char *prog)
+static pid_t spawn_keep(const char *prog, int keep)
 {
 	pid_t pid = fork();
 	if (pid < 0)
@@ -92,6 +92,9 @@ static pid_t spawn(const char *prog)
 		sigemptyset(&none);
 		sigprocmask(SIG_SETMASK, &none, NULL);
 		signal(SIGPIPE, SIG_DFL);
+		for (int fd = 3; fd < 1024; fd++)	/* no inherited descriptors, except the greeter's pipe for flgreet-ui */
+			if (fd != keep)
+				close(fd);
 		execlp(prog, prog, (char *)NULL);
 		fprintf(stderr, "flcomp: cannot run %s: %s\n", prog, strerror(errno));
 		_exit(127);
@@ -99,9 +102,16 @@ static pid_t spawn(const char *prog)
 	return pid;
 }
 
+static pid_t spawn(const char *prog)
+{
+	return spawn_keep(prog, -1);
+}
+
 /* flfiles, flterm, fllock for the keyboard shortcuts (seat.c); it is reaped like any child */
 void run_program(const char *prog)
 {
+	if (C.nolock)	/* login screen / first boot runs as root: launch nothing */
+		return;
 	spawn(prog);
 }
 
@@ -290,7 +300,10 @@ int main(int argc, char **argv)
 		sound_play("login");	/* the session starts (sounds=0 or a headless run: silent) */
 	if (firstboot) {
 		const char *cmd = getenv("FLCOMP_SETUP");
-		setup_pid = spawn(cmd && *cmd ? cmd : "flsetup");
+		{
+			const char *fdv = getenv("FLGREET_FD");
+			setup_pid = spawn_keep(cmd && *cmd ? cmd : "flsetup", fdv ? atoi(fdv) : -1);
+		}
 		if (setup_pid < 0)
 			die("cannot run flsetup");
 	} else {

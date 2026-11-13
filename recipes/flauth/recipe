@@ -1,0 +1,27 @@
+# flauth, from src/flauth in the FreeLFS tree: the password prompt for root actions (installing
+# and removing programs, going back to a snapshot). A setuid helper for the group seat that checks
+# the person's password against /etc/shadow with crypt(), and its flui window.
+pkgname=flauth
+version=0.1
+release=1
+summary="Password prompt for root actions (setuid helper and dialog)"
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc flui wayland libxcrypt libxkbcommon)
+owner=("/usr/bin/flauth 0 98 4750")
+makedepends=(flui libxcrypt libxkbcommon)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flauth" "$srcdir/flauth"
+	cd "$srcdir/flauth"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flauth"
+	make DESTDIR="$pkgdir" install
+}

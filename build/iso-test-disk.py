@@ -64,7 +64,7 @@ esp_sectors = esp_last - esp_first + 1
 
 iso_size = os.path.getsize(iso)
 MB = 1 << 20
-data_mb = (iso_size + 96 * MB + MB - 1) // MB  # room for the file system's own structures
+data_mb = (iso_size + (96 + int(os.environ.get("FLFS_DISK_EXTRA_MB", "0"))) * MB + MB - 1) // MB  # room for the file system's own structures
 ventoy = fs == "ventoy"
 VT = WORK + "/cache/ventoy/x/ventoy-1.1.18/ventoy/ventoy.disk.img"
 hdr = "label: gpt\nlabel-id: f1ee1f50-0000-4000-8000-0000000000e1\nunit: sectors\nfirst-lba: 2048\n\n"
