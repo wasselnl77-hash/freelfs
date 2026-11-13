@@ -186,7 +186,7 @@ cmd_library() {
 	[ -n "$1" ] || die "usage: flgaming steam-library PATH"
 	case $1 in
 	/usr | /usr/* | /sysflfs | /sysflfs/* | /etc | /etc/* | /proc | /proc/* | /sys | /sys/* | /dev | /dev/* | /boot | /boot/*)
-		# a home in /usr/NAME is fine, the rest of /usr and the system directories are
+		# a home inside one of these is fine (homes were /usr/NAME before 2026-11-13), the rest of /usr and the system directories are
 		# not something Flatpak can export
 		case $1 in "$HOME" | "$HOME"/*) ;; *) die "$1 is a system directory: Flatpak cannot share it" ;; esac
 		;;

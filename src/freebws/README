@@ -135,6 +135,7 @@ Web process sandbox (docs/SECURITY.md)
   (exit 0: usable). A page that crashes the web process at once on a machine where the sandbox is on
   is a sandbox problem to look for in the log first (FREEBWS_SANDBOX=off to compare).
   The probe binds what WebKit binds (/usr/lib, /usr/bin, /lib, /lib64, /bin one by one, never /usr as a
-  whole) plus the directory of its own real executable: on FreeLFS /usr is the homes directory and
-  /usr/bin is a link to ../sysflfs/bin, so /proc/self/exe is /sysflfs/bin/freebws (release 10 did not bind
-  that and reported "bwrap: execvp /sysflfs/bin/freebws: No such file or directory").
+  whole) plus the directory of its own real executable. Up to base-files release 3, /usr on FreeLFS was
+  the homes directory and /usr/bin a link to ../sysflfs/bin, so /proc/self/exe was /sysflfs/bin/freebws
+  (release 10 did not bind that and reported "bwrap: execvp /sysflfs/bin/freebws: No such file or
+  directory"). Now /usr is the real system directory and /sysflfs a link to it.

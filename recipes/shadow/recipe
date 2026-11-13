@@ -2,7 +2,7 @@
 # the installer creates them with pwconv and grpconv.
 pkgname=shadow
 version=4.20.2
-release=1
+release=2
 summary="Password and account management (login, passwd, useradd, ...)"
 url=https://github.com/shadow-maint/shadow
 license=(BSD-3-Clause)
@@ -38,7 +38,7 @@ package() {
 	cat > "$pkgdir/etc/default/useradd" <<-EOF
 		# useradd defaults
 		GROUP=999
-		HOME=/usr
+		HOME=/home
 		INACTIVE=-1
 		EXPIRE=
 		SHELL=/usr/bin/flsh

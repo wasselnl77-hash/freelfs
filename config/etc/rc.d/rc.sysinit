@@ -8,7 +8,7 @@
 # (Esc, or a failing step, shows them). It needs nothing but /dev.
 mountpoint -q /proc || mount -n -t proc proc /proc -o nosuid,noexec,nodev
 mountpoint -q /run || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
-[ -x /sysflfs/sbin/flsplash ] && /sysflfs/sbin/flsplash
+[ -x /usr/sbin/flsplash ] && /usr/sbin/flsplash
 
 . /etc/os-release
 printf '\n\033[1;34m%s\033[0m\n\n' "$PRETTY_NAME"
@@ -108,7 +108,7 @@ step "Setting the system clock" set_clock
 first_boot() {
 	splash_handover
 	HOME=/root flcomp --firstboot && return 0
-	/sysflfs/sbin/flsplash --text 2> /dev/null
+	/usr/sbin/flsplash --text 2> /dev/null
 	echo LAYOUT=us > /etc/keyboard.conf
 }
 if [ ! -e /etc/keyboard.conf ] && command -v flcomp > /dev/null; then

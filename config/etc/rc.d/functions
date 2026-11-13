@@ -15,7 +15,7 @@ splash_text() {
 	return 0
 }
 splash_handover() {
-	[ -x /sysflfs/sbin/flsplash ] && /sysflfs/sbin/flsplash --handover
+	[ -x /usr/sbin/flsplash ] && /usr/sbin/flsplash --handover
 	return 0
 }
 

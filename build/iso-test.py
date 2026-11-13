@@ -55,7 +55,7 @@ PROFILE = [  # shell lines run as root on the serial console, output kept verbat
     ("free -m", "free -m"),
     ("mounts of tmpfs, overlay, squashfs", "grep -E ' (tmpfs|overlay|squashfs) ' /proc/mounts"),
     ("df -k (tmpfs, overlay, squashfs)", "df -k | grep -E 'tmpfs|overlay|squashfs|Filesystem'"),
-    ("what the overlay holds in RAM (the upper layer, du -k, biggest first)", "du -k -d 3 /run/live/rw/up 2>/dev/null | sort -rn | head -n 12; du -sk /tmp /dev/shm; du -k -d 4 /run/live/rw/up/sysflfs/data/lib /run/live/rw/up/usr/tester/.local 2>/dev/null | sort -rn | head -n 12"),
+    ("what the overlay holds in RAM (the upper layer, du -k, biggest first)", "du -k -d 3 /run/live/rw/up 2>/dev/null | sort -rn | head -n 12; du -sk /tmp /dev/shm; du -k -d 4 /run/live/rw/up/var/lib /run/live/rw/up/home/tester/.local 2>/dev/null | sort -rn | head -n 12"),
     ("per-process PSS, top 15 (Pss Pss_Anon Pss_File Pss_Shmem in kB, name, pid)",
      "for p in /proc/[0-9]*; do [ -r $p/smaps_rollup ] || continue; echo \"$(awk '/^Pss:/{a=$2} /^Pss_Anon:/{b=$2} /^Pss_File:/{c=$2} /^Pss_Shmem:/{d=$2} END{print a+0, b+0, c+0, d+0}' $p/smaps_rollup 2>/dev/null) $(cat $p/comm) ${p#/proc/}\"; done | sort -rn | head -n 15"),
     ("sum of all PSS (kB) and number of processes", "for p in /proc/[0-9]*; do [ -r $p/smaps_rollup ] && awk '/^Pss:/{print $2}' $p/smaps_rollup 2>/dev/null; done | awk '{s+=$1; n++} END{print s, n}'"),
@@ -144,7 +144,7 @@ def main():
                 ("grep ' / ' /proc/mounts", " / overlay "),
                 ("grep -c squashfs /proc/mounts", "1"),
                 ("id tester", "uid=1000(tester)"),
-                ("ls -ld /usr/tester", "tester"),
+                ("ls -ld /home/tester", "tester"),
                 ("test ! -e /boot/vmlinuz* && echo noboot-ok", "noboot-ok"),
                 ("cat /etc/fstab | grep -c btrfs; true", "0"),
                 ("free -m | sed -n 2p", "Mem:"),
@@ -193,7 +193,7 @@ def main():
                     gui("flstore", 8)
                     shot("live-store")
                     run("pkill -x flstore; echo gone", "gone")
-                    run("ls -d /run/live/rw/up/usr/tester/.local/share/flatpak 2>&1 | tail -1; du -sk /run/live/rw/up | cut -f1", "")
+                    run("ls -d /run/live/rw/up/home/tester/.local/share/flatpak 2>&1 | tail -1; du -sk /run/live/rw/up | cut -f1", "")
                     gui("flvideo", 4)
                     monitor("sendkey ctrl-o")
                     time.sleep(8)

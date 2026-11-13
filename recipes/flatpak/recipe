@@ -15,7 +15,9 @@
 # come from their own packages (no bundled copies, which would be
 # subprojects fetched from git).
 #
-# Homes in FreeLFS are under /usr (/usr/NAME), and Flatpak refuses to export
+# Since base-files release 4 (2026-11-13) homes are /home/NAME and the patch below does nothing
+# (it only acts when $HOME is under /usr); drop it at the next rebuild of flatpak.
+# Homes in FreeLFS were under /usr (/usr/NAME), and Flatpak refuses to export
 # anything inside /usr into a sandbox ("Path /usr is reserved by Flatpak"):
 # apps ran, but --filesystem=home and the per-app data directory
 # ~/.var/app/ID were not bound into the sandbox. See docs/PLAN.md, M8.

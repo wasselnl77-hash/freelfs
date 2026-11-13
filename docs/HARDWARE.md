@@ -12,9 +12,16 @@ FreeLFS targets typical laptops and desktops from about 2015 to now, x86_64, UEF
 | NVIDIA | nouveau and NVK planned, proprietary driver later; today the machine runs on the firmware framebuffer (simpledrm) or the integrated GPU |
 | QEMU/KVM, virtio-gpu | tested every round |
 
-Nothing in the 2026-11-12 hardware round (kernel options, firmware, Mesa Intel drivers, microcode) was built or run
-on any Intel or AMD machine. The kernel config was only checked with `make olddefconfig` against the 7.3.4 and 6.18.63
-source trees (every option is applied in both); firmware pruning was tried on the unpacked tarball.
+The 2026-11-12 hardware round was **built on 2026-11-13** (round 15: linux 7.3.4 release 2, linux-lts 6.18.63 release 2,
+linux-firmware release 2, sof-firmware, microcode, gmmlib, intel-media-driver, Mesa release 3 without the Intel drivers,
+backlight preference in flcomp/flsettings) and run in QEMU only. Nothing of it has run on any Intel or AMD machine yet.
+
+**Deferred to the 16 GB build machine (about January 2027): Mesa's Intel 3D drivers.** iris, crocus, anv and hasvk all
+need clang, spirv-llvm-translator and libclc at build time (Mesa 26.1 compiles their built-in OpenCL C kernels with
+mesa_clc), and linking clang needs about 8 GB of RAM; the build host has 7 GB. The recipes llvm (release 2 with clang
+described in its header), spirv-llvm-translator and libclc (group "deferred") are ready but not built. Until then an Intel
+GPU gets kernel modesetting (i915/xe), software OpenGL (llvmpipe) and lavapipe, and hardware video decoding through
+intel-media-driver.
 
 ## Kernel (config/kernel/freelfs.config, linux 7.x and linux-lts 6.18)
 
@@ -55,11 +62,13 @@ Atheros ath10k/11k/12k and Broadcom Wi-Fi, webcams (no camera app), NVIDIA nouve
   one has it. An existing install keeps its flboot.conf (no ucode) until `initrd=\ucode.img` and the file on the ESP are added by hand.
   Check: `dmesg | grep -i microcode`.
 
-## Graphics userspace (recipe mesa release 3)
+## Graphics userspace (recipe mesa release 3, built 2026-11-13)
 
-* OpenGL: radeonsi (AMD), iris (Intel Gen8 and newer), crocus (Gen4 to Haswell), llvmpipe and softpipe (software), virgl (QEMU), zink.
-* Vulkan: radv (AMD), anv (Intel Gen9 and newer), hasvk (Ivy Bridge to Broadwell), lavapipe (software).
-* Build needs clang (llvm recipe release 2), spirv-llvm-translator and libclc for the Intel shader compiler; not tested to build yet.
+* OpenGL: radeonsi (AMD), llvmpipe and softpipe (software), virgl (QEMU), zink. **Intel iris (Gen8 and newer) and crocus (Gen4
+  to Haswell): deferred**, see above; an Intel GPU draws with llvmpipe until then.
+* Vulkan: radv (AMD), lavapipe (software). **Intel anv (Gen9 and newer) and hasvk (Ivy Bridge to Broadwell): deferred.**
+* The Intel drivers need clang (llvm recipe release 2), spirv-llvm-translator and libclc for the shader compiler: they wait
+  for the 16 GB build machine.
 * Video decode: libva 2.24 (DRM and Wayland), AMD through Mesa's `radeonsi_drv_video.so` (video-codecs=all), Intel through
   `intel-media-driver` (iHD, Broadwell and newer, needs gmmlib; older Intel GPUs have no VA-API driver). flvideo and mpv use
   `hwdec=auto-copy-safe`, which takes VA-API when a driver works and software decoding otherwise. FreeBWS (WPE/GStreamer) decodes in software:
@@ -75,7 +84,9 @@ Atheros ath10k/11k/12k and Broadcom Wi-Fi, webcams (no camera app), NVIDIA nouve
 | Item | Where | Result |
 |---|---|---|
 | Boot, desktop, Wi-Fi (rtw89_8852BE), amdgpu on Radeon 610M | Ryzen 5 7520U laptop | partly, earlier rounds |
-| Kernel config applies (olddefconfig) | host, 7.3.4 and 6.18.63 trees | yes, nothing built |
+| Kernel config applies (olddefconfig) | host, 7.3.4 and 6.18.63 trees | yes |
+| Kernels, firmware, microcode, gmmlib, intel-media-driver, Mesa 3 build | build host, 2026-11-13 | built |
+| Boot with the new kernel and `initrd=\ucode.img`, desktop, installer | QEMU/KVM | see docs/ROADMAP-NEXT.md, round 15 |
 | Everything else in this document | nowhere | untested |
 
 ## Wanted testers

@@ -3,7 +3,7 @@
 #
 #   live/root.sfs         squashfs (zstd) of the installed root (base + desktop)
 #                         with the user "tester" (empty password, home
-#                         /usr/tester), a live fstab (no @home, @snapshots or
+#                         /home/tester), a live fstab (no @home, @snapshots or
 #                         ESP: nothing mounts or writes the host's disks)
 #   EFI/BOOT/BOOTX64.EFI  flboot (also in the ESP image below)
 #   El Torito + GPT       a FAT ESP image (flboot, kernel, initrd.img,
@@ -102,7 +102,7 @@ squash_step() {
 		[ ! -e "$settings/keyboard.conf" ] || { echo "the root has a keyboard preset" >&2; exit 1; }
 		grp=$(awk -F: "\$1 == \"users\" {print \$3}" "$settings/group")
 		[ -n "$grp" ] || { echo "no group users" >&2; exit 1; }
-		echo "tester:x:1000:$grp:Tester:/usr/tester:/usr/bin/flsh" >> "$settings/passwd"
+		echo "tester:x:1000:$grp:Tester:/home/tester:/usr/bin/flsh" >> "$settings/passwd"
 		echo "tester::20454:0:99999:7:::" >> "$settings/shadow"
 		python3 -I - "$settings/group" "$settings/gshadow" <<-"PY"
 		import sys
@@ -117,20 +117,20 @@ squash_step() {
 		PY
 		# the home; the build runs as one uid, so rows in flpkg database tell
 		# the first boot (flpkg fix-owners in rc.sysinit) who owns it
-		home=$w/stage/usr/tester
+		home=$w/stage/home/tester
 		mkdir "$home"
 		cp -a "$settings/skel/." "$home/"
 		chmod 700 "$home"
-		python3 -I - "$data/lib/flpkg/db.sqlite" "$w/stage/usr" "$grp" <<-"PY"
+		python3 -I - "$data/lib/flpkg/db.sqlite" "$w/stage/home" "$grp" <<-"PY"
 		import os, sqlite3, sys
-		db, usr, gid = sys.argv[1], sys.argv[2], int(sys.argv[3])
+		db, homes, gid = sys.argv[1], sys.argv[2], int(sys.argv[3])
 		c = sqlite3.connect(db)
-		top = os.path.join(usr, "tester")
+		top = os.path.join(homes, "tester")
 		for dirpath, dirs, files in os.walk(top):
 		    for n in dirs + files + ["."]:
 		        p = os.path.normpath(os.path.join(dirpath, n))
 		        mode = 0o700 if p == top else os.lstat(p).st_mode & 0o7777
-		        rel = "usr/" + os.path.relpath(p, usr)
+		        rel = "home/" + os.path.relpath(p, homes)
 		        c.execute("INSERT OR REPLACE INTO pending_owners VALUES(?,?,?,?)", (rel, 1000, gid, mode))
 		c.commit()
 		c.close()

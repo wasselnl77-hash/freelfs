@@ -5,7 +5,7 @@
 #                EFI/BOOT/BOOTX64.EFI, the kernels from /boot, and
 #                flboot/flboot.conf; mounted at /boot on the system
 #   partition 2  btrfs (label freelfs) with subvolumes @ (the default one,
-#                mounted at /), @home (mounted at /usr: the homes) and
+#                mounted at /), @home (mounted at /home: the homes) and
 #                @snapshots
 #
 # Every tool comes from the FreeLFS root itself (sfdisk, mkfs.fat, mtools,
@@ -81,10 +81,14 @@ done
 # the console in the FreeLFS colours (flboot's palette): background,
 # red, green, yellow, blue, magenta, cyan, text, then the bright ones
 VT_COLORS="vt.default_red=29,224,63,216,111,198,86,216,122,239,95,232,143,215,127,240 vt.default_grn=33,108,155,181,168,120,182,220,129,128,191,201,192,160,208,242 vt.default_blu=37,108,99,106,220,221,194,224,137,128,131,138,236,232,218,244"
+# CPU microcode (package microcode, copied to the ESP above with the rest of /boot): the kernel's
+# EFI stub loads it as the first initrd, as on an installed system (flinstall writes the same)
+ucode=
+[ ! -f "$ROOT/boot/ucode.img" ] || ucode='initrd=\ucode.img '
 cat > "$work/flboot.conf" <<-EOF
 	# flboot.conf -- written by build/50-image.sh for this image
 	timeout 3
-	cmdline root=PARTUUID=$ROOT_PARTUUID rootwait ro quiet panic=30 console=tty0 console=ttyS0,115200 $VT_COLORS
+	cmdline ${ucode}root=PARTUUID=$ROOT_PARTUUID rootwait ro quiet panic=30 console=tty0 console=ttyS0,115200 $VT_COLORS
 EOF
 tool mcopy -i "$work/esp.img" "$work/flboot.conf" ::/flboot/flboot.conf
 
@@ -98,9 +102,7 @@ unshare --map-root-user --mount /bin/bash -euo pipefail -c '
 	mount -t tmpfs -o mode=0755 tmpfs "$stage"
 	mkdir "$stage/@" "$stage/@home" "$stage/@snapshots"
 	mount --rbind "$root" "$stage/@"
-	# @home is mounted at /usr: it carries the links in /usr (bin -> the
-	# system, ...) as well, so /usr/bin works with it mounted
-	cp -a "$root/usr/." "$stage/@home/"
+	# @home is mounted at /home and starts empty (the root has no homes)
 	# /boot is the ESP on the running system: leave the mount point empty
 	mount -t tmpfs -o mode=0755 tmpfs "$stage/@/boot"
 	# build/52-usb.sh adds a preset user here: it may bind-mount changed

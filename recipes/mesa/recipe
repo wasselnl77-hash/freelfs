@@ -1,22 +1,25 @@
 # OpenGL, OpenGL ES, EGL, GBM, Vulkan and VA-API. Wayland and X11 (release 2: the X11 platform,
 # DRI3/Present and GLX, because Xwayland's GLX links libGL and X11 programs on the host
 # need it; the compositor itself is still Wayland only).
-# Release 3 (hardware support round, nothing of it built or run yet): drivers for Intel and AMD.
-#   OpenGL:  radeonsi (AMD GCN and RDNA), iris (Intel Broadwell/Gen8 and newer, Xe), crocus
-#            (Intel Gen4 to Haswell), llvmpipe and softpipe (software, QEMU), virgl (QEMU 3D),
+# Release 3 (2026-11-13, built): the AMD-only/fallback set plus VA-API.
+#   OpenGL:  radeonsi (AMD GCN and RDNA), llvmpipe and softpipe (software, QEMU), virgl (QEMU 3D),
 #            zink (GL on Vulkan)
-#   Vulkan:  radv (AMD), anv (Intel Gen9 and newer; Gen8 runs best on iris), hasvk (Intel Ivy
-#            Bridge to Broadwell), lavapipe (software)
+#   Vulkan:  radv (AMD), lavapipe (software)
 #   VA-API:  radeonsi_drv_video.so (gallium-va, all codecs Mesa has: H.264/HEVC/AV1/VP9 decode,
 #            H.264/HEVC/AV1 encode; the patent-encumbered ones too, video-codecs=all) for AMD;
 #            Intel's iHD driver is the separate package intel-media-driver
-# The Intel drivers compile their built-in OpenCL C kernels at build time (mesa_clc, built in
-# this tree): that needs clang (package llvm, release 2), spirv-llvm-translator and libclc, which
-# is why those three are makedepends. If this fails to build on the first attempt, the quick way
-# back to an AMD-only Mesa is: gallium-drivers=radeonsi,llvmpipe,softpipe,virgl,zink,
-# vulkan-drivers=amd,swrast and drop the three makedepends (that was release 2).
-# Games from Flathub run on the Mesa of their own Flatpak runtime; only Vulkan programs on the
-# host itself use this Mesa.
+# DEFERRED until the 16 GB build machine (about January 2027): the Intel drivers iris (Gen8 and
+# newer, Xe), crocus (Gen4 to Haswell), anv (Gen9 and newer) and hasvk (Ivy Bridge to Broadwell).
+# In Mesa 26.1 all four compile built-in OpenCL C kernels at build time (meson.build:
+# with_driver_using_cl turns on mesa_clc for iris, crocus, intel and intel_hasvk alike), so none of
+# them builds without clang (recipe llvm with LLVM_ENABLE_PROJECTS=clang, which needs about 8 GB of
+# RAM to link), spirv-llvm-translator and libclc. When those exist: gallium-drivers +=
+# iris,crocus, vulkan-drivers += intel,intel_hasvk, -D intel-rt=disabled, makedepends +=
+# spirv-llvm-translator libclc. Until then an Intel GPU gets llvmpipe (software OpenGL) and
+# lavapipe, on top of the kernel's i915/xe modesetting; video decoding still works through
+# intel-media-driver (VA-API needs no Mesa driver). See docs/HARDWARE.md.
+# Games from Flathub run on the Mesa of their own Flatpak runtime (which has iris and anv); only
+# Vulkan programs on the host itself use this Mesa.
 pkgname=mesa
 version=26.1.7
 release=3
@@ -26,15 +29,14 @@ license=(MIT)
 arch=(x86_64)
 groups=(desktop)
 depends=(glibc gcc libdrm libva wayland llvm expat zlib zstd libelf vulkan-loader spirv-tools libxcb libX11 libXext libXfixes libXdamage libXxf86vm libXrandr libxshmfence)
-makedepends=(meson ninja python mako pyyaml wayland-protocols glslang vulkan-headers bison flex xorgproto libva spirv-llvm-translator libclc pkgconf)
+makedepends=(meson ninja python mako pyyaml wayland-protocols glslang vulkan-headers bison flex xorgproto libva pkgconf)
 source=(https://mesa.freedesktop.org/archive/mesa-$version.tar.xz)
 sha256=(25e0a669e6638c3563e7be32a0a09f1888317e6eed0d047dc41d49dc8de26c7d)
 build_style=meson
 configure_args=(
 	-D platforms=wayland,x11
-	-D gallium-drivers=radeonsi,iris,crocus,llvmpipe,softpipe,virgl,zink
-	-D vulkan-drivers=amd,intel,intel_hasvk,swrast
-	-D intel-rt=disabled
+	-D gallium-drivers=radeonsi,llvmpipe,softpipe,virgl,zink
+	-D vulkan-drivers=amd,swrast
 	-D gallium-va=enabled
 	-D video-codecs=all
 	-D vulkan-layers=

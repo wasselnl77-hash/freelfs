@@ -28,13 +28,14 @@ CHECKS = [
     ("grep ' / ' /proc/mounts", " / btrfs rw"),
     # the M4 disk layout: ESP on /boot, btrfs subvolumes
     ("grep ' /boot ' /proc/mounts", " /boot vfat"),
-    ("grep ' /usr ' /proc/mounts", "subvol=/@home"),
-    # the FreeLFS layout: the system in /sysflfs, homes in /usr
-    ("readlink /etc /var /bin /usr/bin | tr '\\n' ' '",
-     "sysflfs/settings sysflfs/data sysflfs/bin ../sysflfs/bin"),
-    ("ls /sysflfs | tr '\\n' ' '",
-     "bin data include lib libexec local opt root sbin settings share src srv"),
-    ("command -v ls; /usr/bin/env true && echo env-ok", "/sysflfs/bin/ls\r\nenv-ok"),
+    ("grep ' /home ' /proc/mounts", "subvol=/@home"),
+    # the FreeLFS layout (base-files 4): /usr is the system, /sysflfs a link to it, homes in /home
+    ("readlink /sysflfs /bin /lib /sbin | tr '\\n' ' '", "usr usr/bin usr/lib usr/sbin"),
+    ("stat -c %F /usr /etc /var /home /root | tr '\\n' ' '",
+     "directory directory directory directory directory"),
+    ("readlink -f /sysflfs/bin/ls; ls /usr | tr '\\n' ' '",
+     "/usr/bin/ls\r\nbin include lib libexec local sbin share src"),
+    ("command -v ls; /usr/bin/env true && echo env-ok", "/usr/bin/ls\r\nenv-ok"),
     ("btrfs subvolume get-default /", "path @"),
     ("ls /boot/EFI/BOOT", "BOOTX64.EFI"),
     ("/etc/rc.d/init.d/syslog status", "is running"),
@@ -63,8 +64,8 @@ CHECKS = [
     ("flsh -c 'echo $((6 * 7)) $FLSH_VERSION'", "42 0.1"),
     ("{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null"
      " && getent passwd tester",
-     ":/usr/tester:/usr/bin/flsh"),
-    ("ls /usr/tester | tr '\\n' ' '", "desktop documents downloads music pictures videos"),
+     ":/home/tester:/usr/bin/flsh"),
+    ("ls /home/tester | tr '\\n' ' '", "desktop documents downloads music pictures videos"),
     # M7: the Packages app's setuid helper. As tester (group seat) it must reach flpkg as root: `remove`
     # takes the database lock before it says the name is not installed. Anything else is refused.
     ("stat -c %U:%G:%a /usr/bin/flpkg-seat", "root:seat:4750"),
@@ -105,7 +106,7 @@ CHECKS = [
 ]
 # A USB image (build/52-usb.sh, FLFS_BOOT_USB=1) has tester already, and its home belongs to them
 if os.environ.get("FLFS_BOOT_USB"):
-    CHECKS.insert(1, ("stat -c %U:%G:%a /usr/tester; id -nG tester", "tester:users:700"))
+    CHECKS.insert(1, ("stat -c %U:%G:%a /home/tester; id -nG tester", "tester:users:700"))
     CHECKS.insert(2, ("id -nG tester", "seat"))
 
 # Typed into flsh after logging in as tester: (keys, expected output). The

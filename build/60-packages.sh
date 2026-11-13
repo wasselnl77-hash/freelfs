@@ -108,7 +108,10 @@ run_step p.1-setup setup_step
 recipes=("$@")
 if [ ${#recipes[@]} -eq 0 ]; then
 	for r in "$FLFS_TOP"/recipes/*/; do
-		recipes+=("$(basename "$r")")
+		r=$(basename "$r")
+		# group "deferred": recipes kept for later that cannot build here yet (named, they still build)
+		recipe_list "$r" groups | grep -qx deferred && continue
+		recipes+=("$r")
 	done
 else
 	for r in "${recipes[@]}"; do

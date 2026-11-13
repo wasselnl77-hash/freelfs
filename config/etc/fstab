@@ -1,13 +1,12 @@
 # /etc/fstab -- FreeLFS
 #
 # The root file system is btrfs: subvolume @ (the default one) is /, @home is
-# /usr, where people's homes are (/home is a link to it), @snapshots holds
-# snapshots of /. The EFI system partition (FAT, label ESP) is /boot, where
-# the kernels live for flboot.
+# /home, where people's homes are, @snapshots holds snapshots of /. The EFI
+# system partition (FAT, label ESP) is /boot, where the kernels live for flboot.
 #
 # file system   mount point     type      options                      dump pass
 LABEL=freelfs   /               btrfs     defaults,noatime,compress=zstd:1 0  0
-LABEL=freelfs   /usr            btrfs     defaults,noatime,compress=zstd:1,subvol=@home,nofail 0 0
+LABEL=freelfs   /home           btrfs     defaults,noatime,compress=zstd:1,subvol=@home,nofail 0 0
 LABEL=freelfs   /.snapshots     btrfs     defaults,noatime,subvol=@snapshots,nofail 0 0
 LABEL=ESP       /boot           vfat      defaults,umask=0022,quiet,nofail 0 2
 proc            /proc           proc      nosuid,noexec,nodev          0    0

@@ -36,9 +36,8 @@ The steps
                              new GPT. One disk at a time. / is always btrfs with the layout,
                              /boot is FAT32 (an existing one may be kept), data is ext4 or
                              btrfs (or kept).
-  Account     full name, user name, password twice. Names are refused if they are a link in
-              /usr (bin include lib libexec local sbin share src), already a user or group of
-              the system, or not [a-z_][a-z0-9_-]{0,31}. The password needs 4 characters; the
+  Account     full name, user name, password twice. Names are refused if they are already a user, a group
+              or a folder in /home of the system, or not [a-z_][a-z0-9_-]{0,31}. The password needs 4 characters; the
               window draws it as squares and wipes it after sending it; root gets the same
               password. The user is in users (primary) and seat, audio, video, render,
               wheel, netdev.
@@ -55,14 +54,13 @@ What the helper does (everything is checked again there)
      helper finds their nodes by PARTUUID afterwards.
   2  wipefs and mkfs.fat / mkswap / mkfs.ext4 / mkfs.btrfs for the extra partitions.
   3  in a private mount namespace: tmpfs stage dir, an overlay of the live squashfs
-     (/run/live/rom) with the changes below, @home filled with the links of /usr and the new
-     home, then one `mkfs.btrfs --rootdir --subvol default:@ --subvol @home --subvol @snapshots`
+     (/run/live/rom) with the changes below, @home holding only the new home (/home of the live system is left out of @), then one `mkfs.btrfs --rootdir --subvol default:@ --subvol @home --subvol @snapshots`
      (as build/50-image.sh does): no mounting of the new disk, no per-file copying.
      Progress is the helper's read count over the size of the source.
      The changes: fstab (file systems by UUID/PARTUUID, three btrfs lines, ESP, swap, data),
      keyboard.conf, profile.d/20-lang.sh, timezone + localtime, flpkg.conf snapshots = 5
      again, the live notes taken out of /etc/issue, the live user "tester" removed from
-     passwd/shadow/group/gshadow, the new user added (sha512 crypt), root's hash, /usr/NAME
+     passwd/shadow/group/gshadow, the new user added (sha512 crypt), root's hash, /home/NAME
      from /etc/skel owned by the new uid.
   4  the ESP: flboot.conf (root=PARTUUID=...) written first, `flboot-install --esp DIR` into a
      staging directory, the kernel next to it, then mcopy (mtools) writes it into the

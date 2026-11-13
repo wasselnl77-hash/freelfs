@@ -270,8 +270,8 @@ What FreeBWS does:
   `bwrap ... freebws --sandbox-child`) and checks that `xdg-dbus-proxy` exists. WebKit does not check this and
   *aborts the browser* at the first web process if bwrap cannot start.
 * **The probe and the FreeLFS folder layout.** The first probe (freebws release 10) failed in the image with
-  `bwrap: execvp /sysflfs/bin/freebws: No such file or directory`. On FreeLFS `/usr` is the *homes* directory (the
-  `@home` subvolume) and `/usr/bin`, `/usr/lib`, `/usr/share` are relative links to `../sysflfs/...`. The probe bound `/usr`
+  `bwrap: execvp /sysflfs/bin/freebws: No such file or directory`. On FreeLFS (until base-files 4, 2026-11-13) `/usr` was the *homes* directory (the
+  `@home` subvolume) and `/usr/bin`, `/usr/lib`, `/usr/share` were relative links to `../sysflfs/...`. The probe bound `/usr`
   as a whole and then ran `/proc/self/exe`, whose real path is `/sysflfs/bin/freebws`, which does not exist in bwrap's
   new root. That was a bug of the probe, not a sign that bwrap cannot work; binding `/usr` would also have shown every
   user's home inside the sandbox. The probe now makes the binds WebKit makes itself (`/usr/lib`, `/usr/bin`, `/lib`,

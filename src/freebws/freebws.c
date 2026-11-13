@@ -2195,13 +2195,14 @@ static int sandbox_probe(char *why, size_t n)
 	 * ipc namespaces, the usual mounts; the program is this one, in a mode that just exits.
 	 *
 	 * The binds are the ones WebKit makes (BubblewrapLauncher.cpp): /usr/lib, /usr/bin, /lib, /lib64,
-	 * /bin one by one, never /usr as a whole. That matters on FreeLFS: /usr is the homes directory
-	 * (the @home subvolume) and /usr/bin, /usr/lib are relative links to ../sysflfs/..., so
-	 *  - binding /usr would show every user's home inside the sandbox and leave those links dangling
-	 *    (the first version of this probe did that: "execvp /sysflfs/bin/freebws: No such file");
-	 *  - /proc/self/exe is the real path (/sysflfs/bin/freebws), which only exists in the new root if
-	 *    the directory it is in is bound too. bwrap resolves the links of a source path itself, so
-	 *    binding the directory of the real executable at its real path is all it takes. */
+	 * /bin one by one, never /usr as a whole. Up to base-files release 3 FreeLFS had the homes in
+	 * /usr (the @home subvolume) and /usr/bin, /usr/lib were relative links to ../sysflfs/...:
+	 * binding /usr would have shown every home in the sandbox, and /proc/self/exe was
+	 * /sysflfs/bin/freebws, which only exists in the new root if its directory is bound too
+	 * ("execvp /sysflfs/bin/freebws: No such file" in the first version of this probe). Since
+	 * release 4 /usr is the real system directory and /sysflfs a link to it; binding the directory
+	 * of the real executable at its real path stays, for builds run from elsewhere (bwrap resolves
+	 * the links of a source path itself). */
 	char exedir[400];
 	snprintf(exedir, sizeof exedir, "%s", self);
 	char *slash = strrchr(exedir, '/');

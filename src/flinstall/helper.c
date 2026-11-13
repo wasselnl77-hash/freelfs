@@ -1073,7 +1073,7 @@ static int check_config(char *why, size_t cap)
 		fi_reserved_file(r, rp);
 	if (rpath(source_root, "/etc/group", rp, sizeof rp) == 0)
 		fi_reserved_file(r, rp);
-	if (rpath(source_root, "/usr", rp, sizeof rp) == 0)
+	if (rpath(source_root, "/home", rp, sizeof rp) == 0)
 		fi_reserved_dir(r, rp);
 	const char *e = fi_user_error(cfg.user, r, buf, sizeof buf);
 	free(r);
@@ -1443,11 +1443,11 @@ static int customise(void)
 	/* fstab: file systems by UUID, never by label (a second FreeLFS must not clash) */
 	snprintf(buf, sizeof buf,
 	         "# /etc/fstab -- FreeLFS (written by the installer)\n#\n"
-	         "# The root file system is btrfs: subvolume @ (the default one) is /, @home is /usr, where\n"
+	         "# The root file system is btrfs: subvolume @ (the default one) is /, @home is /home, where\n"
 	         "# people's homes are, @snapshots holds snapshots of /. The EFI system partition is /boot.\n#\n"
 	         "# file system   mount point     type      options                      dump pass\n"
 	         "UUID=%s  /     btrfs  defaults,noatime,compress=zstd:1 0 0\n"
-	         "UUID=%s  /usr  btrfs  defaults,noatime,compress=zstd:1,subvol=@home,nofail 0 0\n"
+	         "UUID=%s  /home  btrfs  defaults,noatime,compress=zstd:1,subvol=@home,nofail 0 0\n"
 	         "UUID=%s  /.snapshots  btrfs  defaults,noatime,subvol=@snapshots,nofail 0 0\n"
 	         "PARTUUID=%s  /boot  vfat  defaults,umask=0022,quiet,nofail 0 2\n",
 	         plan.btrfs_uuid, plan.btrfs_uuid, plan.btrfs_uuid, b->uuid);
@@ -1568,7 +1568,7 @@ static int customise(void)
 		for (char *c = full; *c; c++)
 			if (*c == ':' || *c == ',' || *c == '\n')
 				*c = ' ';
-		snprintf(line, sizeof line, "%s:x:%u:%u:%s:/usr/%s:%s\n", cfg.user, (unsigned)new_uid, (unsigned)new_gid, full,
+		snprintf(line, sizeof line, "%s:x:%u:%u:%s:/home/%s:%s\n", cfg.user, (unsigned)new_uid, (unsigned)new_gid, full,
 		         cfg.user, shell);
 		if (edit_accounts("/etc/passwd", line, NULL, 0) < 0)
 			return err("cannot edit /etc/passwd"), -1;
@@ -1581,8 +1581,8 @@ static int customise(void)
 			return err("cannot edit /etc/gshadow"), -1;
 	}
 	explicit_bzero(hash, sizeof hash);
-	/* the home (in @home, which is /usr) */
-	cmdf("# make /usr/%s from /etc/skel, owned by uid %u", cfg.user, (unsigned)new_uid);
+	/* the home (in @home, which is /home) */
+	cmdf("# make /home/%s from /etc/skel, owned by uid %u", cfg.user, (unsigned)new_uid);
 	if (!dry) {
 		char skel[PATH_MAX], home[PATH_MAX];
 		snprintf(home, sizeof home, "%s/%s", stage_home, cfg.user);
@@ -2004,29 +2004,12 @@ static int populate_root(void)
 	snprintf(boot, sizeof boot, "%s/boot", stage_at);
 	fail |= !fail && x_mount("tmpfs", boot, "tmpfs", 0, "mode=0755") < 0; /* /boot is the ESP: no files of it in @ */
 	fail |= !fail && x_mount("tmpfs", stage_home, "tmpfs", 0, "mode=0755") < 0;
+	/* /home is @home on the installed system: the live user's home stays out of @ */
+	char lhome[PATH_MAX];
+	snprintf(lhome, sizeof lhome, "%s/home", stage_at);
+	cmdf("# leave /home of the live system (the live user's home) out of @");
+	fail |= !fail && x_mount("tmpfs", lhome, "tmpfs", 0, "mode=0755") < 0;
 	if (!fail) {
-		/* @home carries the links of /usr (bin -> the system, ...) as well as the homes */
-		cmdf("# copy the links and files of /usr of the live system into @home (not the live user's home)");
-		if (!dry) {
-			char usr[PATH_MAX];
-			if (rpath(source_root, "/usr", usr, sizeof usr) == 0) {
-				DIR *d = opendir(usr);
-				struct dirent *e;
-				while (d && (e = readdir(d))) {
-					if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
-						continue;
-					char s2[PATH_MAX], d2[PATH_MAX];
-					struct stat st;
-					snprintf(s2, sizeof s2, "%s/%s", usr, e->d_name);
-					if (lstat(s2, &st) < 0 || S_ISDIR(st.st_mode))
-						continue;
-					snprintf(d2, sizeof d2, "%s/%s", stage_home, e->d_name);
-					copy_tree(s2, d2, 0);
-				}
-				if (d)
-					closedir(d);
-			}
-		}
 		fail |= customise() < 0;
 	}
 	if (!fail) {

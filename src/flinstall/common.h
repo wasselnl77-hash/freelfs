@@ -32,10 +32,6 @@
 #define FI_PW_MIN 4
 #define FI_PW_MAX 128
 
-/* The folders of /usr that are links into the system (base-files). A home
- * called one of these would be /usr/bin: it cannot exist. */
-static const char *const fi_usr_links[] = {"bin", "include", "lib", "libexec", "local", "sbin", "share", "src", NULL};
-
 #define FI_RESERVED_MAX 512
 struct fi_reserved {
 	int n;
@@ -94,11 +90,6 @@ static inline const char *fi_user_error(const char *name, const struct fi_reserv
 		if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'))
 			return "Use only lowercase letters, digits, - and _.";
 	}
-	for (int i = 0; fi_usr_links[i]; i++)
-		if (!strcmp(name, fi_usr_links[i])) {
-			snprintf(buf, cap, "\"%s\" is a folder the system keeps in /usr. Pick another name.", name);
-			return buf;
-		}
 	if (name[0] == '_' && n == 1)
 		return "Pick a longer name.";
 	if (r)

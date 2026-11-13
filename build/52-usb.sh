@@ -26,7 +26,7 @@ if [ "${1:-}" = --image-hook ]; then
 	done
 	grp=$(awk -F: '$1 == "users" {print $3}' "$settings/group")
 	[ -n "$grp" ] || die "no group users"
-	echo "tester:x:1000:$grp:Tester:/usr/tester:/usr/bin/flsh" >> "$w/passwd"
+	echo "tester:x:1000:$grp:Tester:/home/tester:/usr/bin/flsh" >> "$w/passwd"
 	echo "tester::20454:0:99999:7:::" >> "$w/shadow"
 	# the groups a new user gets from /etc/default/useradd
 	python3 -I - "$w/group" "$w/gshadow" <<'PY'
@@ -43,7 +43,7 @@ PY
 	for f in passwd shadow group gshadow; do
 		chmod --reference="$settings/$f" "$w/$f"
 	done
-	# the home is /usr/tester: /usr is the @home subvolume. The build runs as one
+	# the home is /home/tester: /home is the @home subvolume. The build runs as one
 	# uid, so the files are made as root; flpkg fix-owners (rc.sysinit) sets
 	# the real owner at the first boot, from rows added to a copy of its database.
 	mkdir "$stage/@home/tester"
@@ -60,7 +60,7 @@ for dirpath, dirs, files in os.walk(top):
     for n in dirs + files + ["."]:
         p = os.path.normpath(os.path.join(dirpath, n))
         mode = 0o700 if p == top else os.lstat(p).st_mode & 0o7777
-        rel = "usr/" + os.path.relpath(p, home)
+        rel = "home/" + os.path.relpath(p, home)
         c.execute("INSERT OR REPLACE INTO pending_owners VALUES(?,?,?,?)", (rel, 1000, gid, mode))
 c.commit()
 c.close()

@@ -1,11 +1,15 @@
 # LLVM, for Mesa: radeonsi (AMD GPUs), llvmpipe (fast software rendering)
-# and lavapipe. Release 2 adds clang (libclang-cpp.so and clang itself): Mesa's Intel drivers
-# (iris, crocus, anv, hasvk) compile their built-in shaders with it at build time (mesa_clc,
-# together with spirv-llvm-translator and libclc). Linking runs one job at a time, so 8 GB of
-# memory is enough; clang adds about a third to the build time.
+# and lavapipe. Core libraries only, no clang (see DEFERRED below). Linking
+# runs one job at a time, so 8 GB of memory is enough.
+# DEFERRED (release 2, waits for the 16 GB build machine, about January 2027): clang for Mesa's
+# Intel drivers (iris, crocus, anv, hasvk compile built-in shaders with it at build time:
+# mesa_clc, with spirv-llvm-translator and libclc). The change: -D LLVM_ENABLE_PROJECTS=clang
+# -D CLANG_LINK_CLANG_DYLIB=ON -D CLANG_INCLUDE_TESTS=OFF -D CLANG_INCLUDE_DOCS=OFF, and in
+# package() rm -f "$pkgdir"/usr/lib/libclang*.a (Mesa links libclang-cpp.so). Linking clang
+# needs about 8 GB of RAM, more than the 7 GB build host has. See recipes/mesa and docs/HARDWARE.md.
 pkgname=llvm
 version=22.1.8
-release=2
+release=1
 worksrc=llvm-project-$version.src
 summary="Compiler infrastructure (for Mesa's AMD and software drivers)"
 url=https://llvm.org/
@@ -29,11 +33,7 @@ build() {
 		-D CMAKE_INSTALL_PREFIX=/usr \
 		-D CMAKE_BUILD_TYPE=Release \
 		-D CMAKE_SKIP_INSTALL_RPATH=ON \
-		-D LLVM_ENABLE_PROJECTS=clang \
 		-D LLVM_TARGETS_TO_BUILD="host;AMDGPU" \
-		-D CLANG_LINK_CLANG_DYLIB=ON \
-		-D CLANG_INCLUDE_TESTS=OFF \
-		-D CLANG_INCLUDE_DOCS=OFF \
 		-D LLVM_BUILD_LLVM_DYLIB=ON \
 		-D LLVM_LINK_LLVM_DYLIB=ON \
 		-D LLVM_ENABLE_RTTI=ON \
@@ -49,6 +49,4 @@ build() {
 
 package() {
 	DESTDIR="$pkgdir" ninja -C build install
-	# Mesa links libclang-cpp.so; the static clang libraries (hundreds of MB) are not needed
-	rm -f "$pkgdir"/usr/lib/libclang*.a
 }

@@ -8,8 +8,10 @@
 >   changes without notice.
 > - **Nothing is stable yet:** not the package format, not the repo, not the
 >   config files.
-> - **No security support:** there are no security updates yet and no CVE
->   handling. The browser is not sandboxed yet.
+> - **No real security support:** known vulnerabilities are tracked
+>   ([docs/SECURITY.md](docs/SECURITY.md)) and the browser's web processes run
+>   in a bubblewrap sandbox, but there is no security team, no advisories and
+>   no guaranteed update schedule.
 > - **The installer erases the disk you pick.** Only try it on a spare machine
 >   or in a VM.
 > - Don't rely on it to keep your data safe.
@@ -40,7 +42,10 @@ See [docs/PLAN.md](docs/PLAN.md) for the full plan and milestones.
 - M5 (`flsh`, our own shell): done. New users log in to flsh: POSIX syntax,
   colours as you type, grey suggestions from history, Tab menus, "did you
   mean". See [docs/flsh-screenshot.png](docs/flsh-screenshot.png).
-- The FreeLFS folder layout: the system in `/sysflfs`, homes in `/usr`.
+- The FreeLFS folder layout: the system in `/usr` (FHS), also reachable as
+  `/sysflfs` (a link to it), homes in `/home/NAME`, disks in `/drives`.
+  Until 2026-11-13 it was the other way round (system in `/sysflfs`, homes in
+  `/usr`); see docs/PLAN.md for moving an older install.
 - M6 (graphics and audio base): done. Mesa, Wayland, libinput, seatd, PipeWire,
   iwd and firmware; a normal user draws on the screen with EGL on KMS
   ([docs/m6-drawtest.png](docs/m6-drawtest.png)).
@@ -54,8 +59,8 @@ See [docs/PLAN.md](docs/PLAN.md) for the full plan and milestones.
   fixed, but the whole desktop has not been run on that laptop again. The
   kernel has USB storage built in, so a USB stick image can boot
   (`build/52-usb.sh`).
-- M8 (FreeBWS, the browser on WPE WebKit): built, runs in QEMU at 1 GB; no
-  sandbox yet.
+- M8 (FreeBWS, the browser on WPE WebKit): built, runs in QEMU at 1 GB; the
+  web processes run in WebKit's bubblewrap sandbox (since 2026-11-12).
 - M10 integration round (2026-11-11): workspaces, screenshot tool, task
   manager, accent colours and wallpapers, system sounds, editor with syntax
   colours, archive tool, image/PDF/music/video apps, Software Store (Flathub

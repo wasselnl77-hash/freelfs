@@ -6,7 +6,7 @@
 # Log out in the panel make flcomp exit 0, which ends the session too.
 # Set FLCOMP_NOSTART=1 (or log in on another tty) to stay in the shell.
 # Every program of the desktop (the panel and what it starts, the terminal) inherits this directory:
-# start in the home directory, never in what the login chain left (flgreet runs in root's /sysflfs/root,
+# start in the home directory, never in what the login chain left (flgreet runs in root's /root,
 # which a user cannot read: the terminal's prompt showed it and `ls` said "Permission denied")
 [ "$(id -u)" != 0 ] && [ -n "${HOME:-}" ] && [ -d "$HOME" ] && cd "$HOME" 2>/dev/null
 # flgreet makes /run/user/UID before login; sessions and the desktop use it

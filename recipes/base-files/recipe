@@ -1,11 +1,15 @@
-# The FreeLFS file system layout (/sysflfs for the system, /usr for people's
-# homes, the classic names as links), the standard system accounts and the
-# basic files in /etc. The files come from config/etc in the FreeLFS tree. The
+# The FreeLFS file system layout, the standard system accounts and the basic files in /etc.
+# Release 4: the normal FHS layout underneath. /usr is the real system directory (bin, lib,
+# share, ...), /sysflfs is a link to it (the FreeLFS name for the system, and every old
+# /sysflfs/... path keeps working), /etc and /var are real directories, and people's homes are
+# /home/NAME (the btrfs subvolume @home). Releases 1 to 3 had it the other way round: the system
+# in a real /sysflfs, /usr a link farm on @home holding the homes (docs/PLAN.md, "Folder layout").
+# The files come from config/etc in the FreeLFS tree. The
 # accounts are declared, not shipped: /etc/passwd and /etc/group belong to
 # no package, so upgrades never drop users.
 pkgname=base-files
 version=0.1
-release=3
+release=4
 summary="FreeLFS file system layout, system accounts and basic /etc files"
 license=(MIT)
 arch=(any)
@@ -25,46 +29,37 @@ source=()
 sha256=()
 
 package() {
-	local etc=$startdir/../../config/etc d S=sysflfs
+	local etc=$startdir/../../config/etc d
 	cd "$pkgdir"
-	# The system itself lives in /sysflfs; people's homes are in /usr.
-	install -d boot dev drives proc run sys usr \
-		$S/{bin,include,lib,libexec,sbin,src,opt,srv} $S/lib/{firmware,locale} \
-		$S/local/{bin,include,lib,sbin,src} \
-		$S/settings/{opt,sysconfig,profile.d} \
-		$S/data/{cache,local,log,mail,opt,spool} $S/data/lib/{color,misc,locate,hwclock}
-	for d in $S/share $S/local/share; do
+	install -d boot dev drives home proc run sys etc var opt srv \
+		usr/{bin,include,lib,libexec,sbin,src} usr/lib/{firmware,locale} \
+		usr/local/{bin,include,lib,sbin,src} \
+		etc/{opt,sysconfig,profile.d} \
+		var/{cache,local,log,mail,opt,spool} var/lib/{color,misc,locate,hwclock}
+	for d in usr/share usr/local/share; do
 		install -d $d/{color,dict,doc,info,locale,man,misc,terminfo,zoneinfo} $d/man/man{1..8}
 	done
-	# The classic names stay as links, for every program that expects them:
-	# /usr/bin, /etc, /var, /bin/sh, /home, ... They are relative, so they
-	# also work in a root that is not mounted at /.
-	for d in bin include lib libexec local sbin share src; do
-		ln -s ../$S/$d usr/$d
-	done
-	ln -s $S/settings etc
-	ln -s $S/data var
-	ln -s $S/bin bin
-	ln -s $S/lib lib
-	ln -s $S/sbin sbin
-	ln -s $S/opt opt
-	ln -s $S/srv srv
-	ln -s usr home
+	# /sysflfs is the FreeLFS name for the system: a link to /usr. The merged-/usr links
+	# (/bin, /lib, /sbin) as everywhere else. All relative, so they also work in a root that
+	# is not mounted at /.
+	ln -s usr sysflfs
+	ln -s usr/bin bin
+	ln -s usr/lib lib
+	ln -s usr/sbin sbin
 	ln -s drives mnt
 	ln -s drives media
-	install -d -m 0750 $S/root
-	ln -s $S/root root
+	install -d -m 0750 root
 	# glibc's dynamic linker path is fixed by the ABI: a real directory
 	[ "$CARCH" != x86_64 ] || install -d lib64
-	ln -s /run $S/data/run
-	ln -s /run/lock $S/data/lock
-	ln -s /proc/self/mounts $S/settings/mtab
+	ln -s /run var/run
+	ln -s /run/lock var/lock
+	ln -s /proc/self/mounts etc/mtab
 	install -d -m 0700 .snapshots
-	install -d -m 1777 tmp $S/data/tmp
-	install -m644 "$etc"/{fstab,hostname,hosts,inputrc,issue,os-release,profile,shells} $S/settings/
+	install -d -m 1777 tmp var/tmp
+	install -m644 "$etc"/{fstab,hostname,hosts,inputrc,issue,os-release,profile,shells} etc/
 	# New users get lowercase folders (useradd copies skel)
-	install -d $S/settings/skel/{desktop,documents,downloads,music,pictures,videos,.config}
-	cat > $S/settings/skel/.config/user-dirs.dirs <<-'EOF'
+	install -d etc/skel/{desktop,documents,downloads,music,pictures,videos,.config}
+	cat > etc/skel/.config/user-dirs.dirs <<-'EOF'
 		XDG_DESKTOP_DIR="$HOME/desktop"
 		XDG_DOCUMENTS_DIR="$HOME/documents"
 		XDG_DOWNLOAD_DIR="$HOME/downloads"
@@ -74,7 +69,7 @@ package() {
 		XDG_TEMPLATES_DIR="$HOME"
 		XDG_PUBLICSHARE_DIR="$HOME"
 	EOF
-	# What file managers leave out (the .hidden convention)
-	printf '%s\n' bin dev etc home lib lib64 media mnt opt proc root run sbin srv sys tmp var > .hidden
-	printf '%s\n' bin include lib libexec local sbin share src > usr/.hidden
+	# What file managers leave out (the .hidden convention): / shows boot, drives, home and
+	# sysflfs (the system, which is /usr under its classic name)
+	printf '%s\n' bin dev etc lib lib64 media mnt opt proc root run sbin srv sys tmp usr var > .hidden
 }

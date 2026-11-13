@@ -35,7 +35,7 @@ shot /tmp/flfs-m9-datetime-@MEM@.ppm
 click 865 210
 wait 3
 shot /tmp/flfs-m9-datetime-click-@MEM@.ppm
-run readlink /etc/localtime; cat /etc/timezone; date; grep tz_changed /usr/tester/.config/freelfs/desktop.conf
+run readlink /etc/localtime; cat /etc/timezone; date; grep tz_changed /home/tester/.config/freelfs/desktop.conf
 wait 70
 shot /tmp/flfs-m9-datetime-tokyo-@MEM@.ppm
 run ps -eo rss,comm | grep -E "flsettings|flpanel|flcomp"; free -m | sed -n 2p
@@ -43,7 +43,7 @@ run su -s /bin/sh tester -c 'fltime-set zone Europe/Berlin; echo rc=$?'; readlin
 # --- FreeBWS: first start, ad blocker build
 run pkill -x flsettings
 run (setsid m9sample > /tmp/memlog 2>/dev/null &) ; sleep 2; free -m | sed -n 2p
-run pgrep -c WPEWebProcess; ls /usr/tester/.cache/freebws 2>&1 | head -3
+run pgrep -c WPEWebProcess; ls /home/tester/.cache/freebws 2>&1 | head -3
 key meta_l
 wait 1
 type web
@@ -56,7 +56,7 @@ run m8mem BROWSER-START-25S
 run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | head -20
 run m9peak; free -m | sed -n 2p; dmesg | grep -ci "out of memory\|oom-kill"; pgrep -a "freebws|adblock" | head
 wait 15
-run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | head -20; ls -la /usr/tester/.cache/freebws/filters 2>&1 | head
+run grep "freebws:" /tmp/freebws.err | grep -v "^libEGL\|^MESA" | head -20; ls -la /home/tester/.cache/freebws/filters 2>&1 | head
 key ctrl-l
 wait 1
 type http://nonexistent.invalid\n

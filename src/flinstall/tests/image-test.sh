@@ -22,8 +22,9 @@ case $scratch in /dev/*) echo "refusing a path under /dev" >&2; exit 2 ;; esac
 mkdir -p "$scratch"
 scratch=$(cd "$scratch" && pwd)
 [ -x "$helper" ] || { echo "no helper at $helper (make first)" >&2; exit 2; }
-# where a FreeLFS root keeps things: /sysflfs/... (new layout) or /usr/... (packages)
-d() { for b in sysflfs usr; do if [ -e "$ROOT/$b/$1" ]; then echo "$ROOT/$b/$1"; return 0; fi; done; return 0; }
+# where a FreeLFS root keeps things: /usr/... (base-files 4 on; /sysflfs is a link to it) or
+# /sysflfs/... (base-files 1 to 3)
+d() { for b in usr sysflfs; do if [ -e "$ROOT/$b/$1" ]; then echo "$ROOT/$b/$1"; return 0; fi; done; return 0; }
 loader=$(d lib/ld-linux-x86-64.so.2)
 libs=$(dirname "$loader")
 [ -x "$loader" ] || { echo "no dynamic loader in $ROOT" >&2; exit 2; }
@@ -49,19 +50,19 @@ if [ "${FULL:-0}" = 1 ]; then
 else
 	chmod -R u+w "$src" 2> /dev/null || true
 	rm -rf "$src"; mkdir -p "$src"
-	S=$src/sysflfs
-	mkdir -p "$S"/{bin,sbin,lib,libexec,include,src,opt,srv,root,share/zoneinfo/Europe,settings/skel/{desktop,documents,downloads,music,pictures,videos,.config},settings/profile.d,data}
-	mkdir -p "$src"/{boot,dev,proc,sys,run,tmp,drives,.snapshots,lib64,usr}
-	for x in bin include lib libexec sbin share src; do ln -s ../sysflfs/$x "$src/usr/$x"; done
-	ln -s sysflfs/settings "$src/etc"; ln -s sysflfs/data "$src/var"; ln -s sysflfs/bin "$src/bin"
-	ln -s sysflfs/lib "$src/lib"; ln -s sysflfs/sbin "$src/sbin"; ln -s usr "$src/home"; ln -s drives "$src/mnt"
+	S=$src/usr
+	mkdir -p "$S"/{bin,sbin,lib,libexec,include,src,share/zoneinfo/Europe}
+	mkdir -p "$src"/{boot,dev,proc,sys,run,tmp,drives,.snapshots,lib64,home,root,opt,srv,var}
+	mkdir -p "$src"/etc/{skel/{desktop,documents,downloads,music,pictures,videos,.config},profile.d}
+	ln -s usr "$src/sysflfs"; ln -s usr/bin "$src/bin"; ln -s usr/lib "$src/lib"; ln -s usr/sbin "$src/sbin"
+	ln -s drives "$src/mnt"
 	zi=$(dirname "$(d share/zoneinfo/UTC)")
 	cp "$zi/UTC" "$S/share/zoneinfo/UTC"; cp "$zi/Europe/Berlin" "$S/share/zoneinfo/Europe/Berlin"
-	ln -s /usr/share/zoneinfo/UTC "$S/settings/localtime"
+	ln -s /usr/share/zoneinfo/UTC "$src/etc/localtime"
 	printf '#!/bin/sh\n' > "$S/bin/flsh"; chmod +x "$S/bin/flsh"
-	s=$S/settings
+	s=$src/etc
 	printf '%s\n' "root:x:0:0:root:/root:/bin/bash" "bin:x:1:1:bin:/dev/null:/usr/bin/false" \
-		"nobody:x:65534:65534:Nobody:/dev/null:/usr/bin/false" "tester:x:1000:999:Tester:/usr/tester:/usr/bin/flsh" > "$s/passwd"
+		"nobody:x:65534:65534:Nobody:/dev/null:/usr/bin/false" "tester:x:1000:999:Tester:/home/tester:/usr/bin/flsh" > "$s/passwd"
 	printf '%s\n' "root::20454:0:99999:7:::" "tester::20454:0:99999:7:::" > "$s/shadow"; chmod 600 "$s/shadow"
 	printf '%s\n' "root:x:0:" "audio:x:11:tester" "video:x:12:tester" "render:x:30:tester" "netdev:x:86:" "wheel:x:97:" \
 		"seat:x:98:tester" "users:x:999:" > "$s/group"
@@ -73,8 +74,7 @@ else
 	printf '%s\n' "proc /proc proc nosuid 0 0" "tmpfs /tmp tmpfs defaults 0 0" > "$s/fstab"
 	echo freelfs > "$s/hostname"
 	printf 'XDG_DESKTOP_DIR="$HOME/desktop"\n' > "$s/skel/.config/user-dirs.dirs"
-	mkdir -p "$src/usr/tester"; echo hi > "$src/usr/tester/note"
-	printf '%s\n' bin include lib libexec local sbin share src > "$src/usr/.hidden"
+	mkdir -p "$src/home/tester"; echo hi > "$src/home/tester/note"
 fi
 echo test-kernel > "$scratch/vmlinuz-test"
 
@@ -130,22 +130,24 @@ grep -E '^(STEP|DONE|FAIL|ERR)' "$scratch/run1.txt" | cut -c1-200
 grep -q '^DONE' "$scratch/run1.txt" && ok "install reported DONE" || bad "install did not finish"
 [ "$(sub sfdisk -d "$img" | grep -c start=)" = 2 ] && ok "GPT with two partitions" || bad "GPT with two partitions"
 extract_subvol "$img" 513 7679 "$scratch/out-root" 258
-S=$scratch/out-root/sysflfs/settings
-check "user anna in passwd, uid 1000"       grep -q '^anna:x:1000:999:Anna Test:/usr/anna:' "$S/passwd"
+S=$scratch/out-root/etc
+check "user anna in passwd, uid 1000"       grep -q '^anna:x:1000:999:Anna Test:/home/anna:' "$S/passwd"
 check "live user tester removed everywhere"  bash -c "! grep -q tester '$S/passwd' '$S/shadow' '$S/group' '$S/gshadow'"
 check "password stored as a sha512 hash"     bash -c "grep '^anna:' '$S/shadow' | grep -q '^anna:[$]6[$]' && ! grep -q secret1 '$S/shadow'"
 check "root has the same password as anna"   bash -c "[ \"\$(grep ^root: '$S/shadow' | cut -d: -f2)\" = \"\$(grep ^anna: '$S/shadow' | cut -d: -f2)\" ]"
 check "anna in seat and wheel"               bash -c "grep -q '^seat:.*anna' '$S/group' && grep -q '^wheel:.*anna' '$S/group'"
 check "keyboard.conf has LAYOUT=de"          grep -qx 'LAYOUT=de' "$S/keyboard.conf"
-check "fstab: three btrfs UUID lines"        bash -c "[ \$(grep -c '^UUID=.*btrfs' '$S/fstab') = 3 ] && grep -q subvol=@home '$S/fstab'"
+check "fstab: three btrfs UUID lines"        bash -c "[ \$(grep -c '^UUID=.*btrfs' '$S/fstab') = 3 ] && grep -q ' /home  btrfs.*subvol=@home' '$S/fstab'"
 check "localtime -> Europe/Berlin"           bash -c "[ \"\$(readlink '$S/localtime')\" = /usr/share/zoneinfo/Europe/Berlin ]"
-check "zoneinfo/UTC not damaged"             bash -c "[ -f '$scratch/out-root/sysflfs/share/zoneinfo/UTC' ] && [ ! -L '$scratch/out-root/sysflfs/share/zoneinfo/UTC' ]"
+check "zoneinfo/UTC not damaged"             bash -c "[ -f '$scratch/out-root/usr/share/zoneinfo/UTC' ] && [ ! -L '$scratch/out-root/usr/share/zoneinfo/UTC' ]"
 check "language script"                      grep -q 'LANG=de_DE.UTF-8' "$S/profile.d/20-lang.sh"
 check "snapshots turned on again"            grep -q '^snapshots = 5' "$S/flpkg.conf"
 check "live notes gone from issue"           bash -c "! grep -q -E 'Live system|Development image' '$S/issue'"
 check "/boot is empty in @"                  bash -c "[ -z \"\$(ls -A '$scratch/out-root/boot')\" ]"
+check "/home is empty in @ (no live home)"   bash -c "[ -d '$scratch/out-root/home' ] && [ -z \"\$(ls -A '$scratch/out-root/home')\" ]"
+check "/sysflfs is a link to usr"            bash -c "[ \"\$(readlink '$scratch/out-root/sysflfs')\" = usr ]"
 extract_subvol "$img" 513 7679 "$scratch/out-home" 257
-check "@home: anna's folders, links, no tester" bash -c "[ -d '$scratch/out-home/anna/documents' ] && [ -L '$scratch/out-home/bin' ] && [ ! -e '$scratch/out-home/tester' ]"
+check "@home: only anna's home"              bash -c "[ -d '$scratch/out-home/anna/documents' ] && [ \"\$(ls -A '$scratch/out-home')\" = anna ]"
 dd if="$img" of="$scratch/esp.part" bs=1M skip=1 count=512 status=none
 export MTOOLS_SKIP_CHECK=1 MTOOLSRC=/dev/null
 esp_ls=$(sub mdir -i "$scratch/esp.part" -/ ::/ 2>&1 || true)
@@ -158,7 +160,7 @@ rm -f "$scratch/esp.part"
 
 # ---- 2: refusals ------------------------------------------------------------------------------------------
 echo "== 2. refusals (nothing is written)"
-for n in bin share local root Anna "a b" "" nobody; do
+for n in bin users root Anna "a b" "" nobody; do
 	r=$(USERNAME=$n NOINSTALL=1 MODE=whole request "$img" --dry-run 2>&1 | grep '^ERR' | tail -1 || true)
 	if [ -n "$r" ]; then ok "name '$n' refused: ${r#ERR	}"; else bad "name '$n' accepted"; fi
 done
@@ -208,7 +210,7 @@ grep -E '^(PLAN|DONE|FAIL|ERR)' "$scratch/run4.txt" | cut -c1-160
 grep -q '^DONE' "$scratch/run4.txt" && ok "manual install DONE" || bad "manual install failed"
 [ "$(sub sfdisk -d "$img3" | grep -c start=)" = 4 ] && ok "four partitions" || bad "four partitions"
 extract_subvol "$img3" 514 6144 "$scratch/out-root3" 258
-F=$scratch/out-root3/sysflfs/settings/fstab
+F=$scratch/out-root3/etc/fstab
 check "fstab has swap and /drives/stuff, folder made" bash -c "grep -q ' none  swap' '$F' && grep -q '/drives/stuff  ext4' '$F' && [ -d '$scratch/out-root3/drives/stuff' ]"
 echo "-- bad manual layouts are refused"
 tryops() { MODE=manual NOINSTALL=1 OPS="$(printf '%s\n' "$@")" request "$img3" --dry-run 2>&1 | grep '^ERR' | tail -1 || true; }

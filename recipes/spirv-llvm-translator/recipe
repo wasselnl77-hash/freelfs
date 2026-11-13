@@ -1,3 +1,6 @@
+# DEFERRED: not built yet. Only Mesa's Intel drivers need this, and they also need clang (recipe
+# llvm release 2), which waits for the 16 GB build machine (about January 2027). Group "deferred"
+# keeps it out of the image and out of ./build/60-packages.sh without names (named, it builds).
 # Translates between LLVM IR and SPIR-V: llvm-spirv and libLLVMSPIRVLib. Mesa's Intel drivers
 # need it at build time (shader compiler mesa_clc), libclc needs llvm-spirv. The version
 # must match LLVM (v22.1.x for LLVM 22.1.x).
@@ -9,7 +12,7 @@ summary="LLVM IR to SPIR-V translator"
 url=https://github.com/KhronosGroup/SPIRV-LLVM-Translator
 license=(Apache-2.0-WITH-LLVM-exception)
 arch=(x86_64)
-groups=(desktop)
+groups=(deferred)
 depends=(glibc gcc llvm spirv-tools)
 makedepends=(cmake ninja spirv-headers pkgconf)
 source=(spirv-llvm-translator-$version.tar.gz::https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v$version.tar.gz)

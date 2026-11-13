@@ -9,7 +9,7 @@ type web
 key ret
 wait 40
 shot @S@/start.ppm
-run grep -iE "sandbox|WARNING" /usr/tester/.local/state/freelfs/log/freebws.log | head -n 5
+run grep -iE "sandbox|WARNING" /home/tester/.local/state/freelfs/log/freebws.log | head -n 5
 run sbxcheck START
 key ctrl-l
 wait 1
@@ -17,14 +17,14 @@ type https://example.org\n
 wait 30
 shot @S@/https.ppm
 run sbxcheck HTTPS
-run grep -iE "dmabuf through|shm|restarting" /usr/tester/.local/state/freelfs/log/freebws.log | head -n 5
+run grep -iE "dmabuf through|shm|restarting" /home/tester/.local/state/freelfs/log/freebws.log | head -n 5
 key ctrl-l
 wait 1
 type @HOSTURL@/sample.bin\n
 wait 25
 shot @S@/download.ppm
-run ls -l /usr/tester/downloads/ ; sha256sum /usr/tester/downloads/sample.bin
-run tail -n 12 /usr/tester/.local/state/freelfs/log/freebws.log | cut -c1-200; find /usr/tester/.local/share/freebws /usr/tester/.config/freebws -name 'downloads.json' -exec cat {} \; 2>/dev/null | cut -c1-300
+run ls -l /home/tester/downloads/ ; sha256sum /home/tester/downloads/sample.bin
+run tail -n 12 /home/tester/.local/state/freelfs/log/freebws.log | cut -c1-200; find /home/tester/.local/share/freebws /home/tester/.config/freebws -name 'downloads.json' -exec cat {} \; 2>/dev/null | cut -c1-300
 run dmesg | grep -ci 'out of memory\|oom-kill'; pgrep -a "freebws|WPEWebProcess" | cut -c1-110
 run grep -ia -E 'download|policy|WebKitPolicy|decide|interrupted' /tmp/freebws.err | tail -n 25 | cut -c1-200
 # step 6, the fallback: bwrap not executable

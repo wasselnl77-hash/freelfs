@@ -9,7 +9,7 @@ run echo autostart-on=$(cat /tmp/m10-autostart 2>&1) autostart-off=$(test -e /tm
 run ps -eo user,rss,args | grep -E "flpanel|flcomp|flupdate|dbus-daemon --session" | grep -v grep
 run cat /run/user/$(id -u tester)/session.log
 # --- workspaces: a window on workspace 1, switch to 2 (empty), the overview, back
-run m10app flfiles /usr/tester/m10
+run m10app flfiles /home/tester/m10
 wait 4
 shot @S@/ws1-files.ppm
 key meta_l-ctrl-right
@@ -27,7 +27,7 @@ shot @S@/ws1-back.ppm
 key print
 wait 5
 shot @S@/print.ppm
-run ls -l /usr/tester/pictures/screenshots/
+run ls -l /home/tester/pictures/screenshots/
 # --- General Manager: Ctrl+Shift+Esc, Performance (Ctrl+2), Startup apps (Ctrl+3)
 key ctrl-shift-esc
 wait 5
@@ -51,19 +51,19 @@ run pkill -x flsettings; echo settings-closed
 run m10sh 'for s in login notification error tick screenshot; do flsound --force $s; echo flsound-$s-rc=$?; done'
 run echo pipewire-sinks=$(m10sh 'wpctl status 2>&1 | grep -c "Sinks"'); dmesg | grep -ci "segfault"
 # --- fledit
-run m10app fledit /usr/tester/m10/script.sh
+run m10app fledit /home/tester/m10/script.sh
 wait 5
 shot @S@/fledit.ppm
 run pgrep -a fledit
 run pkill -x fledit; echo fledit-closed
 # --- Archives: extract here, then the window
 run m10sh 'cd ~/m10 && timeout 60 flarchive --extract-here project.zip; echo extract-rc=$?; ls -R project; cat project/readme.txt'
-run m10app flarchive /usr/tester/m10/project.zip
+run m10app flarchive /home/tester/m10/project.zip
 wait 5
 shot @S@/archive.ppm
 run pkill -x flarchive; echo archive-closed
 # --- Images (and set as wallpaper), Documents, Music, Videos
-run m10app flview /usr/tester/m10/sample.png
+run m10app flview /home/tester/m10/sample.png
 wait 4
 shot @S@/image.ppm
 key w
@@ -73,13 +73,13 @@ run m10sh 'grep wallpaper ~/.config/freelfs/desktop.conf; ls -l ~/.local/share/f
 key q
 wait 3
 shot @S@/desktop-wallpaper.ppm
-run m10app flpdf /usr/tester/m10/sample.pdf
+run m10app flpdf /home/tester/m10/sample.pdf
 wait 5
 shot @S@/pdf.ppm
 key esc
 wait 1
 run pgrep -a flpdf; echo
-run m10app flmusic /usr/tester/m10/sample.flac
+run m10app flmusic /home/tester/m10/sample.flac
 wait 6
 shot @S@/music.ppm
 run m10sh 'flmusic --ctl status'
@@ -91,7 +91,7 @@ wait 2
 run m10sh 'flmusic --ctl status'
 run pkill -x flmusic; echo music-closed
 # mp3 (made by build/mk-mp3.py: the ffmpeg here cannot encode it): must play and move on
-run m10app flmusic /usr/tester/m10/sample.mp3
+run m10app flmusic /home/tester/m10/sample.mp3
 wait 5
 run m10sh 'flmusic --ctl status'
 run m10sh 'flmusic --ctl play'
@@ -100,23 +100,23 @@ shot @S@/music-mp3.ppm
 run m10sh 'flmusic --ctl status'
 wait 4
 run m10sh 'flmusic --ctl status'
-run m10sh 'grep -c . /usr/tester/.local/state/freelfs/log/flmusic.log 2>/dev/null; tail -n 5 /tmp/m10app.log'
+run m10sh 'grep -c . /home/tester/.local/state/freelfs/log/flmusic.log 2>/dev/null; tail -n 5 /tmp/m10app.log'
 run pkill -x flmusic; echo mp3-closed
-run m10app flvideo /usr/tester/m10/sample.mp4
+run m10app flvideo /home/tester/m10/sample.mp4
 wait 6
 shot @S@/video.ppm
 run ps -eo rss,comm | grep -E "flvideo" | head -3
 key q
 wait 2
 # --- Files: Enter opens by MIME type (mimeapps.list): picture, document, sound, text
-run m10app flfiles /usr/tester/m10
+run m10app flfiles /home/tester/m10
 wait 4
 type sample.png\n
 wait 4
 shot @S@/files-open-png.ppm
 run pgrep -a flview
 run pkill -x flview; echo
-run m10app flfiles /usr/tester/m10
+run m10app flfiles /home/tester/m10
 wait 3
 type sample.pdf\n
 wait 4
@@ -166,6 +166,16 @@ run m10sh 'fltheme --reset; echo reset-rc=$?; grep -c . ~/.config/freelfs/deskto
 wait 4
 shot @S@/themes-reset.ppm
 run pkill -x fltheme; echo themes-closed
+# --- the terminal starts in the home directory (Ctrl-Alt-T, started by flcomp: the round 14 fix of the
+# terminal that opened in root's /root); the cwd of every flterm and of its shell
+key ctrl-alt-t
+wait 5
+type pwd
+key ret
+wait 2
+shot @S@/terminal-home.ppm
+run for p in $(pgrep -x flterm) $(pgrep -u tester -x flsh); do echo "cwd $(ps -o comm= -p $p) $(readlink /proc/$p/cwd)"; done
+run pkill -x flterm; echo term-closed
 # --- the real btrfs: snapshots
 run flsnap status; flsnap create --reason "m10 desktop test" && flsnap list; ls -l /.snapshots; btrfs subvolume list / | cat
 run dmesg | grep -ci "out of memory\|oom-kill"; free -m | sed -n 2p

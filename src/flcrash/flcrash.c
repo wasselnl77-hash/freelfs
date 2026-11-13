@@ -1056,7 +1056,7 @@ static int text_loop(const struct info *in)
 static const char *const PROTECTED[] = {
 	"/", "/boot", "/sysflfs", "/sysflfs/bin", "/sysflfs/sbin", "/sysflfs/lib", "/sysflfs/libexec",
 	"/sysflfs/share", "/sysflfs/settings", "/sysflfs/data",
-	/* the classic names, hidden links into /sysflfs (and /usr, where the homes live) */
+	/* /usr is the system (/sysflfs links to it), and the classic names around it */
 	"/usr", "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/libexec", "/usr/share", "/bin", "/sbin", "/lib", "/lib64",
 	"/etc", "/var", "/home", "/root", "/drives", "/mnt", "/media", "/opt", "/srv",
 };

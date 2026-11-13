@@ -1,7 +1,7 @@
 # /etc/profile -- login shell setup for every user
 
-PATH=/sysflfs/local/bin:/sysflfs/bin
-[ "$(id -u)" -eq 0 ] && PATH=/sysflfs/local/sbin:/sysflfs/sbin:$PATH
+PATH=/usr/local/bin:/usr/bin
+[ "$(id -u)" -eq 0 ] && PATH=/usr/local/sbin:/usr/sbin:$PATH
 export PATH
 
 # The kernel console has no fonts for most of Unicode's scripts.

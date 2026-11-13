@@ -1,3 +1,6 @@
+# DEFERRED: not built yet. Only Mesa's Intel drivers need this, and they also need clang (recipe
+# llvm release 2), which waits for the 16 GB build machine (about January 2027). Group "deferred"
+# keeps it out of the image and out of ./build/60-packages.sh without names (named, it builds).
 # OpenCL C library in SPIR-V form (libclc.spv for spirv-mesa3d- and spirv64-mesa3d-): built
 # only for Mesa's shader compiler (mesa_clc), which turns the Intel drivers' built-in OpenCL C
 # kernels into NIR when Mesa is built. Nothing uses it at run time. Taken from the LLVM
@@ -10,7 +13,7 @@ summary="OpenCL C library for Mesa's build-time shader compiler"
 url=https://libclc.llvm.org/
 license=(Apache-2.0-WITH-LLVM-exception)
 arch=(x86_64)
-groups=(desktop)
+groups=(deferred)
 depends=(glibc)
 makedepends=(cmake ninja python llvm spirv-llvm-translator)
 source=(https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz)

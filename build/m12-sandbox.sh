@@ -29,7 +29,7 @@ cp "$here/m12-sandbox.cmds" "$cmds"
 if [ "$sbx" = diag ]; then # a wrapper that logs the policy decisions and GLib's debug output to /tmp/freebws.err
 	echo "mv /usr/bin/freebws /usr/bin/freebws.real && printf '%s\\n' '#!/bin/sh' 'FREEBWS_POLICY_LOG=1 G_MESSAGES_DEBUG=all exec /usr/bin/freebws.real \"\$@\" 2>>/tmp/freebws.err' > /usr/bin/freebws && chmod 755 /usr/bin/freebws && echo wrapper" >> "$cmds"
 fi
-[ "$sbx" != off ] || echo "mkdir -p /usr/tester/.config/freebws && echo sandbox=off > /usr/tester/.config/freebws/config && chown -R tester: /usr/tester/.config" >> "$cmds"
+[ "$sbx" != off ] || echo "mkdir -p /home/tester/.config/freebws && echo sandbox=off > /home/tester/.config/freebws/config && chown -R tester: /home/tester/.config" >> "$cmds"
 FLFS_VM_MEM=$mem FLFS_VM_TTY=$tty "$here/gentle.sh" "$here/vm-run.py" "$cmds" -snapshot -usb -device usb-tablet \
 	2>&1 | tee "$FLFS_WORK/logs/m12-sandbox-$mem-$sbx.log"
 for f in "$shots"/*.ppm; do

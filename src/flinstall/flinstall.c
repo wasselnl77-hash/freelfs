@@ -1884,7 +1884,7 @@ int main(int argc, char **argv)
 	/* the names the live system already uses */
 	fi_reserved_file(&S.res, "/etc/passwd");
 	fi_reserved_file(&S.res, "/etc/group");
-	fi_reserved_dir(&S.res, "/usr");
+	fi_reserved_dir(&S.res, "/home");
 
 	fl_win_opts o = {
 		.title = "FreeLFS install", .app_id = "flinstall", .w = 1080, .h = 720, .min_w = 900, .min_h = 640,
