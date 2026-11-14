@@ -1,0 +1,22 @@
+# Icons: the Papirus theme is in the image, the start menu draws icons of the theme (colours), and an app whose
+# .desktop file names a Flatpak-exported hicolor PNG shows that PNG in the menu (a fake export directory with a
+# magenta PNG; the real Firefox needs the laptop).
+@desktop
+@ok the Papirus theme is installed (PNG, index.theme, licence) :: test -f /usr/share/icons/Papirus/index.theme && test -f /usr/share/icons/Papirus/48x48/apps/utilities-system-monitor.png && test -f /usr/share/licenses/papirus-icon-theme/LICENSE
+@ok the app icons that .desktop files name exist in the theme :: for n in $(grep -h '^Icon=' /usr/share/applications/*.desktop | cut -d= -f2 | sort -u); do ls /usr/share/icons/Papirus/48x48/*/$n.png >/dev/null 2>&1 || { echo missing $n; exit 1; }; done
+@ok a fake Flatpak export with a magenta icon and a .desktop file for it :: install -d -o tester /home/tester/.local/share/flatpak/exports/share/icons/hicolor/48x48/apps /home/tester/.local/share/flatpak/exports/share/applications && echo iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAP0lEQVR4nO3OQQ0AMAgAMfybZi64PZpUQGdnvzL5QEhISKgeCAkJCdUDISEhoXogJCQkVA+EhISE6oGQkNCxB7P37wAXVW7dAAAAAElFTkSuQmCC | base64 -d > /home/tester/.local/share/flatpak/exports/share/icons/hicolor/48x48/apps/org.fake.Fakefox.png && printf '[Desktop Entry]\nType=Application\nName=Fakefox Browser\nExec=true\nIcon=org.fake.Fakefox\nCategories=Network;\n' > /home/tester/.local/share/flatpak/exports/share/applications/org.fake.Fakefox.desktop && chown -R tester /home/tester/.local
+@key meta_l
+@wait 2
+@shot @OUT@/ic-1-menu.ppm
+@shotcolors @OUT@/ic-1-menu.ppm 200
+@type fakefox
+@wait 2
+@shot @OUT@/ic-2-fakefox.ppm
+@shotpix @OUT@/ic-2-fakefox.ppm ff00ff 300
+@key escape
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@shot @OUT@/ic-3-gm.ppm
+@shotcolors @OUT@/ic-3-gm.ppm 300

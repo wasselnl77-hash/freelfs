@@ -66,6 +66,9 @@ static void parse_file(const char *path, struct parsed *o)
 			o->override = 1;
 	}
 	fclose(f);
+	gm_clean_utf8(o->name);
+	gm_clean_utf8(o->comment);
+	gm_clean_utf8(o->exec);
 }
 
 static int add(struct startup **v, int *n, int *cap, const struct startup *s)

@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Themes
+Icon=preferences-desktop-theme
 Comment=Colour scheme, accent, fonts, window buttons, panel, animations
 Exec=fltheme
 Categories=Settings;

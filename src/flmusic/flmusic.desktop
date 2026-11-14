@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Music
+Icon=applications-multimedia
 Comment=Play your music library
 Exec=flmusic %F
 Categories=Audio;Music;Player;AudioVideo;

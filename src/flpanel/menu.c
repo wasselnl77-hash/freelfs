@@ -21,6 +21,7 @@
 #include <unistd.h>
 
 #include "flpanel.h"
+#include "icons.h"
 
 enum { ID_SEARCH = 1, ID_CAT = 10, ID_LIST = 30, ID_LOCK = 40, ID_LOGOUT, ID_RESTART, ID_SHUTDOWN };
 
@@ -125,6 +126,8 @@ static int load_file(const char *path, struct entry *e)
 			e->desktop = !strcmp(v, "true");
 		else if (!strcmp(k, "X-FreeLFS-Glyph"))
 			snprintf(e->glyph, sizeof e->glyph, "%s", v);
+		else if (!strcmp(k, "Icon"))
+			snprintf(e->icon, sizeof e->icon, "%s", v);
 	}
 	fclose(f);
 	if (hidden || !app || !e->name[0] || !e->exec[0])
@@ -367,6 +370,7 @@ static void refilter(struct panel *p)
 /* A fresh menu: apps re-read (they may have been installed), search empty. */
 void menu_init(struct panel *p)
 {
+	icons_flush();
 	free(p->apps);
 	p->apps = NULL;
 	p->napps = 0;
@@ -406,7 +410,8 @@ static void draw_item(fl_ui *ui, fl_rect r, int i, int hover, int selected, void
 		fl_fill_rect(cv, row, fl_th.raised);
 	fl_rect tile = fl_r(row.x + 10, row.y + 10, 32, 32);
 	fl_fill_rect(cv, tile, hot ? fl_th.select : fl_th.raised);
-	fl_text_in(cv, p->f_mono, tile, FL_CENTER, 0, fl_th.text, e->glyph);
+	if (!icon_draw_name(cv, e->icon, tile.x, tile.y, 32)) /* the theme's icon, else the glyph */
+		fl_text_in(cv, p->f_mono, tile, FL_CENTER, 0, fl_th.text, e->glyph);
 	int nh = fl_font_height(ui->f_med), wh = fl_font_height(p->f_what);
 	int tx = row.x + 10 + 32 + 12, ty = row.y + (52 - nh - 1 - wh) / 2;
 	fl_rect clip = fl_r(tx, row.y, row.x + row.w - tx - 8, 52);

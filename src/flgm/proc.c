@@ -159,6 +159,9 @@ static void apps_scan_dir(const char *dir)
 				app = 0;
 		}
 		fclose(f);
+		gm_clean_utf8(name);
+		gm_clean_utf8(exec);
+		gm_clean_utf8(icon);
 		if (app && !hide && name[0] && exec[0] && !generic_exec(exec))
 			app_add(exec, name, icon);
 	}
@@ -225,6 +228,30 @@ static int slurp(const char *path, char *buf, size_t cap)
 	return (int)n;
 }
 
+/* comm, cmdline and .desktop names are bytes, not UTF-8: anything the text layer could choke on
+ * becomes '?' (control bytes and invalid sequences) */
+void gm_clean_utf8(char *s)
+{
+	unsigned char *p = (unsigned char *)s;
+	while (*p) {
+		unsigned char c = *p;
+		int n = c < 0x20 || c == 0x7f ? -1 : c < 0x80 ? 0 : (c & 0xe0) == 0xc0 && c >= 0xc2 ? 1
+		        : (c & 0xf0) == 0xe0 ? 2 : (c & 0xf8) == 0xf0 && c <= 0xf4 ? 3 : -1;
+		if (n < 0) {
+			*p++ = '?';
+			continue;
+		}
+		int ok = 1;
+		for (int i = 1; i <= n && ok; i++)
+			ok = (p[i] & 0xc0) == 0x80;
+		if (!ok) {
+			*p++ = '?';
+			continue;
+		}
+		p += n + 1;
+	}
+}
+
 static int cmp_int(const void *a, const void *b)
 {
 	return *(const int *)a - *(const int *)b;
@@ -243,6 +270,7 @@ static int is_interp(const char *c)
 static void derive_name(struct proc *p)
 {
 	snprintf(p->name, sizeof p->name, "%s", p->comm);
+	gm_clean_utf8(p->name);
 	if (!p->cmd || p->kernel || !p->cmd[0] || p->cmd[0] == '[')
 		return;
 	char a0[256];
@@ -264,6 +292,7 @@ static void derive_name(struct proc *p)
 				snprintf(p->name, sizeof p->name, "%s", sb);
 		}
 	}
+	gm_clean_utf8(p->name);
 }
 
 void procs_init(struct procs *ps, int ncpu)
@@ -290,46 +319,55 @@ struct proc *procs_find(struct procs *ps, int pid)
 	return NULL;
 }
 
-static int read_one(struct procs *ps, struct proc *p, int fresh, double dt)
+/* Reads one process. *fresh: the caller has no name for this pid yet; set to 1 when the pid was
+ * reused by another process since the last scan (its starttime changed), so the name and the
+ * command line are read again. Returns -1 when the process has gone. */
+static int read_one(struct procs *ps, struct proc *p, int *fresh, double dt)
 {
-	char path[64], buf[2048];
-	snprintf(path, sizeof path, "/proc/%d/stat", p->pid);
+	char path[96], buf[2048];
+	snprintf(path, sizeof path, PROC_DIR "/%d/stat", p->pid);
 	int n = slurp(path, buf, sizeof buf);
 	if (n <= 0)
 		return -1;
 	char *rp = strrchr(buf, ')');
 	char *lp = strchr(buf, '(');
-	if (!rp || !lp)
+	if (!rp || !lp || rp + 2 > buf + n)
 		return -1;
-	if (fresh) {
+	char state;
+	int ppid;
+	unsigned long long ut = 0, st = 0, start = 0;
+	long threads = 1;
+	/* after ") ": state ppid pgrp session tty tpgid flags minflt cminflt majflt cmajflt utime stime
+	 * cutime cstime priority nice num_threads itrealvalue starttime */
+	if (sscanf(rp + 2, "%c %d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu %*d %*d %*d %*d %ld %*d %llu", &state,
+	           &ppid, &ut, &st, &threads, &start) < 6)
+		return -1;
+	if (!*fresh && p->start && start != p->start) {
+		*fresh = 1; /* another process now has this pid */
+		p->io_ok = 0;
+	}
+	if (*fresh) {
 		size_t cl = (size_t)(rp - lp - 1);
 		if (cl >= sizeof p->comm)
 			cl = sizeof p->comm - 1;
 		memcpy(p->comm, lp + 1, cl);
 		p->comm[cl] = 0;
+		gm_clean_utf8(p->comm);
+		p->start = start;
 	}
-	char state;
-	int ppid;
-	unsigned long long ut = 0, st = 0;
-	long threads = 1;
-	/* after ") ": state ppid pgrp session tty tpgid flags minflt cminflt majflt cmajflt utime stime
-	 * cutime cstime priority nice num_threads */
-	if (sscanf(rp + 2, "%c %d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu %*d %*d %*d %*d %ld", &state, &ppid,
-	           &ut, &st, &threads) < 5)
-		return -1;
 	p->state = state;
 	p->ppid = ppid;
 	p->threads = (int)threads;
 	p->p_ticks = p->ticks;
 	p->ticks = ut + st;
-	if (fresh)
+	if (*fresh || p->ticks < p->p_ticks)
 		p->p_ticks = p->ticks;
 	p->cpu = 0;
-	if (!fresh && dt > 0.05) {
+	if (!*fresh && dt > 0.05) {
 		double d = (double)(p->ticks - p->p_ticks) / (double)ps->hz / dt * 100.0 / ps->ncpu;
-		p->cpu = d < 0 ? 0 : d;
+		p->cpu = d < 0 || d != d ? 0 : d;
 	}
-	snprintf(path, sizeof path, "/proc/%d/statm", p->pid);
+	snprintf(path, sizeof path, PROC_DIR "/%d/statm", p->pid);
 	if (slurp(path, buf, sizeof buf) > 0) {
 		unsigned long long size, res, shr;
 		if (sscanf(buf, "%llu %llu %llu", &size, &res, &shr) == 3) {
@@ -337,8 +375,8 @@ static int read_one(struct procs *ps, struct proc *p, int fresh, double dt)
 			p->priv_kb = (res > shr ? res - shr : 0) * (u64)pg;
 		}
 	}
-	if (p->io_ok || fresh) {
-		snprintf(path, sizeof path, "/proc/%d/io", p->pid);
+	if (p->io_ok || *fresh) {
+		snprintf(path, sizeof path, PROC_DIR "/%d/io", p->pid);
 		int m = (p->uid == getuid() || geteuid() == 0) ? slurp(path, buf, sizeof buf) : -1;
 		p->p_io = p->io;
 		if (m > 0) {
@@ -349,10 +387,10 @@ static int read_one(struct procs *ps, struct proc *p, int fresh, double dt)
 			if (b)
 				wr = strtoull(b + 12, NULL, 10);
 			p->io = rd + wr;
-			if (fresh)
+			if (*fresh || p->io < p->p_io)
 				p->p_io = p->io;
 			p->io_ok = 1;
-			p->disk_bps = !fresh && dt > 0.05 && p->io >= p->p_io ? (double)(p->io - p->p_io) / dt : 0;
+			p->disk_bps = !*fresh && dt > 0.05 ? (double)(p->io - p->p_io) / dt : 0;
 		} else {
 			p->io_ok = 0;
 			p->disk_bps = 0;
@@ -368,29 +406,41 @@ void procs_scan(struct procs *ps)
 	ps->t_prev = t;
 
 	int *pids = NULL, np = 0, pcap = 0;
-	DIR *d = opendir("/proc");
-	if (!d)
+	DIR *d = opendir(PROC_DIR);
+	if (!d) {
+		ps->failed = 1; /* the table stays as it was; the window says so */
 		return;
+	}
 	struct dirent *e;
 	while ((e = readdir(d))) {
 		if (e->d_name[0] < '1' || e->d_name[0] > '9')
 			continue;
 		if (np == pcap) {
-			pcap = pcap ? pcap * 2 : 512;
-			pids = realloc(pids, (size_t)pcap * sizeof *pids);
-			if (!pids) {
+			int ncap = pcap ? pcap * 2 : 512;
+			int *npids = realloc(pids, (size_t)ncap * sizeof *pids);
+			if (!npids) {
+				free(pids);
 				closedir(d);
+				ps->failed = 1;
 				return;
 			}
+			pids = npids;
+			pcap = ncap;
 		}
-		pids[np++] = atoi(e->d_name);
+		long v = strtol(e->d_name, NULL, 10);
+		if (v <= 0 || v > 0x7fffffff)
+			continue;
+		pids[np++] = (int)v;
 	}
 	closedir(d);
-	qsort(pids, (size_t)np, sizeof *pids, cmp_int);
+	ps->failed = 0;
+	if (np)
+		qsort(pids, (size_t)np, sizeof *pids, cmp_int);
 
 	struct proc *nw = calloc((size_t)np + 1, sizeof *nw);
 	if (!nw) {
 		free(pids);
+		ps->failed = 1;
 		return;
 	}
 	int nn = 0, oi = 0;
@@ -408,17 +458,18 @@ void procs_scan(struct procs *ps)
 			p->own_app = p->app = -1;
 			char path[64];
 			struct stat sb;
-			snprintf(path, sizeof path, "/proc/%d", p->pid);
+			snprintf(path, sizeof path, PROC_DIR "/%d", p->pid);
 			if (stat(path, &sb) == 0)
 				p->uid = sb.st_uid;
 		}
-		if (read_one(ps, p, fresh, dt) < 0) {
-			free(p->cmd);
+		if (read_one(ps, p, &fresh, dt) < 0) {
+			free(p->cmd); /* the process went away while it was read */
+			p->cmd = NULL;
 			continue;
 		}
 		if (fresh) {
-			char path[64], cb[1024];
-			snprintf(path, sizeof path, "/proc/%d/cmdline", p->pid);
+			char path[96], cb[1024];
+			snprintf(path, sizeof path, PROC_DIR "/%d/cmdline", p->pid);
 			int n = slurp(path, cb, sizeof cb);
 			if (n > 0) {
 				for (int k = 0; k < n; k++)
@@ -426,8 +477,10 @@ void procs_scan(struct procs *ps)
 						cb[k] = ' ';
 				while (n > 0 && cb[n - 1] == ' ')
 					cb[--n] = 0;
+				gm_clean_utf8(cb);
 			}
 			p->kernel = n <= 0 && (p->ppid == 2 || p->pid == 2);
+			free(p->cmd);
 			if (n > 0)
 				p->cmd = strdup(cb);
 			else {

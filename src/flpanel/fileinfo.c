@@ -307,6 +307,7 @@ void fileinfo_open_with(struct panel *p, const char *desk, const char *path)
 		close(ep[0]);
 		setsid();
 		signal(SIGCHLD, SIG_DFL);
+		{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }
 		execvp(argv[0], argv);
 		int e = errno;
 		ssize_t wr = write(ep[1], &e, sizeof e);

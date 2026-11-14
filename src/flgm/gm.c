@@ -1022,8 +1022,10 @@ static void draw_groups_page(fl_ui *ui, struct gm *g, fl_rect r, int tab, const 
 	cv->clip = save;
 	draw_scroll(ui, view, t, m->n, ROWH);
 	if (m->n == 0)
-		gm_text(ui, ui->f_reg, fl_r(view.x, view.y + 30, view.w, 30), FL_CENTER, fl_th.dim,
-		        g->search[0] ? "No process matches the search" : "Reading processes...");
+		gm_text(ui, ui->f_reg, fl_r(view.x, view.y + 30, view.w, 30), FL_CENTER,
+		        g->ps.failed ? fl_th.err : fl_th.dim,
+		        g->ps.failed ? "Could not read the process list (/proc)"
+		        : g->search[0] ? "No process matches the search" : "Reading processes...");
 }
 
 /* ---- Details ----------------------------------------------------------------------------------- */
@@ -1499,8 +1501,10 @@ int main(int argc, char **argv)
 		.decorated = 1, .resizable = 1, .draw = draw, .ud = g,
 	};
 	g->win = fl_win_new(g->app, &o);
-	if (!g->win)
+	if (!g->win) {
+		fprintf(stderr, "general-manager: cannot open a window\n");
 		return 1;
+	}
 	if (expand) {
 		/* groups opened up front: for screenshots */
 		procs_scan(&g->ps);

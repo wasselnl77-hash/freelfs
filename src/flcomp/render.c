@@ -262,13 +262,13 @@ static void composite_rect(struct rect clip)
 		bool vis = window_visible(w), hid = !vis && !still && anim_window_drawn_hidden(w);
 		if (!(vis || hid) || (skip_pid && surface_pid(w->surf) == skip_pid))
 			continue;
-		if (!still && !w->xw && anim_draw_window(w, clip))	/* opening, closing, moving, sliding (anim.c) */
+		if (!still && !w->xw && !w->ssd && anim_draw_window(w, clip))	/* opening, closing, moving, sliding (anim.c) */
 			continue;
 		if (!vis)
 			continue;
 		draw_tree(w->surf, clip);
-		if (w->xw)
-			xwm_deco_draw(w, clip);	/* the frame flcomp gives an X window */
+		if (window_framed(w))
+			xwm_deco_draw(w, clip);	/* the frame flcomp gives an X window or a server-side decorated one */
 	}
 	if (!still)
 		anim_draw_win_ghosts(clip);	/* a window that was just closed, fading */

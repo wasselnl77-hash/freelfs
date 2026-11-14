@@ -107,6 +107,7 @@ static int job_start(const char *cmd, int job)
 		}
 		dup2(fds[1], 1);
 		signal(SIGCHLD, SIG_DFL);
+		{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }
 		execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
 		_exit(127);
 	}

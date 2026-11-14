@@ -3,5 +3,6 @@ Type=Application
 Name=Files
 Comment=Browse folders and drives
 Exec=flfiles
+Icon=system-file-manager
 Categories=System;FileManager;
 X-FreeLFS-Glyph=▤

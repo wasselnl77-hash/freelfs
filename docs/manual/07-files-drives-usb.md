@@ -87,6 +87,10 @@ folder is not affected by it.
    powered off. A stick that is ejected can be taken out.
 2. Wait for the confirmation. Only then take the stick out.
 
+Files leaves a folder of the drive before it ejects it (it goes to Home), and also when the drive disappears. Programs started from
+Files, the start menu, the taskbar or the desktop icons always start in your Home folder, never in the folder you were looking at, so
+an ejected stick cannot leave them with a folder that is gone. A save dialog whose folder is gone or not writable offers Home.
+
 If you pull a stick without ejecting it, the system cleans up the mount and forgets
 it. Files you were writing may be lost. Always eject first.
 

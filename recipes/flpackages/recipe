@@ -2,7 +2,7 @@
 # src/flpackages in the FreeLFS tree.
 pkgname=flpackages
 version=0.1
-release=4
+release=5
 summary="FreeLFS package app: installed list, search, install and remove"
 license=(MIT)
 arch=(x86_64)

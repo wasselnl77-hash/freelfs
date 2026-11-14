@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Documents
+Icon=application-pdf
 Comment=Read PDF and e-book files
 Exec=flpdf %f
 Categories=Office;Viewer;

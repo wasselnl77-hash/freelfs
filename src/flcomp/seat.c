@@ -422,6 +422,12 @@ void seat_button(uint32_t ms, uint32_t button, bool pressed)
 				C.btn_down++;
 				if (button == 272)
 					xwm_deco_press(dw);
+				else if ((button == 273 || button == 274) && C.py < window_rect(dw).y1) {
+					if (button == 273)
+						window_menu_open(dw, (int)C.px, (int)C.py);	/* the title bar menu, as on our own windows */
+					else
+						window_close(dw);
+				}
 				return;
 			}
 			struct window *w = t ? window_of_surface(t) : NULL;

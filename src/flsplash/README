@@ -4,7 +4,8 @@ The one glossy thing in FreeLFS, on purpose: the logo of docs/logo.svg (three
 bars tilted 6 degrees) as beveled, glossy green slabs with an extruded side
 and a gel highlight, a soft glow behind, a faded mirror image on a dark floor,
 a light band that sweeps across, and "FreeLFS" (IBM Plex Sans, spaced, one
-size) fading in under it. About 3.8 s, then it holds.
+size) fading in under it. About 3.8 s; it always plays to the end (at least 3 s from the
+first picture), then fades out to the background in 300 ms and lets go.
 
 How: nothing is drawn at boot, only composited. genart.c renders the layers
 once at build time (bevel normals, diffuse and specular light, a fake studio
@@ -25,10 +26,10 @@ arrives); where flips do not work (simpledrm) the region alone is copied
 into the buffer on screen, paced at 60 Hz.
 
   flsplash             started by rc.sysinit as root; forks, exits 0 always
-  flsplash --handover  waits for the animation to end, drops DRM master (the
-                       last picture stays in the scanout) and returns; flgreet
-                       and the first-boot step of rc.sysinit run it before
-                       flcomp. flsplash exits 6 s later.
+  flsplash --handover  asks the splash to end: it plays the animation to its end,
+                       fades out (300 ms), drops DRM master and returns (waits up
+                       to 6 s); flgreet and the first-boot step of rc.sysinit run
+                       it before flcomp. flsplash exits 6 s after the release.
   flsplash --text      the boot text now (also puts the console back to text)
   flsplash --render MS W H FILE.ppm
                        the picture at MS ms on a W x H screen, written to a

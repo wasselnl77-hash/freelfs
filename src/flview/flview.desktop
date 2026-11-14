@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Images
+Icon=applications-graphics
 Comment=View pictures and browse a folder of them
 Exec=flview %f
 Categories=Graphics;Viewer;

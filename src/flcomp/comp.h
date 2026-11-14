@@ -92,6 +92,9 @@ struct window {
 	int x, y;			/* top left of the window geometry */
 	bool mapped, announced, minimized, maximized, fullscreen, resizing;
 	bool above;			/* always on top (the window menu, popup.c) */
+	bool ssd;			/* xdg-decoration: flcomp draws the title bar and frame (xwdeco.c) */
+	bool want_csd;			/* the client asked for its own decorations */
+	struct wl_resource *deco_res;	/* its zxdg_toplevel_decoration_v1 */
 	int deco_ours;			/* 0 not asked, 1 a FreeLFS program draws its title bar (popup.c), 2 not */
 	int ws;				/* workspace it is on (0 .. C.ws_cols * C.ws_rows - 1) */
 	int snap;			/* -1 left half, 1 right half of the work area, 0 not snapped (restore has the old place) */
@@ -183,6 +186,7 @@ void pmenu_motion(void);
 bool pmenu_button(uint32_t button, bool pressed);
 void pmenu_draw(struct rect clip);
 void window_menu_open(struct window *w, int x, int y);
+bool window_framed(struct window *w);	/* flcomp draws a frame around it: an X window without its own, or a Wayland one with server-side decorations */
 void cliphist_menu_open(void);
 bool title_click(struct window *w, uint32_t button, int x, int y);
 void snap_preview_set(int kind);		/* 0 none, -1 left half, 1 right half, 2 whole work area */

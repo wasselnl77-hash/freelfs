@@ -10,6 +10,14 @@
 
 typedef uint64_t u64;
 
+/* where the kernel's files are; tests/fake-test.c builds against a fake tree */
+#ifndef PROC_DIR
+#define PROC_DIR "/proc"
+#endif
+#ifndef SYS_DIR
+#define SYS_DIR "/sys"
+#endif
+
 /* ---- history (60 one-second samples, oldest first) ---------------------------------- */
 
 #define HIST 61
@@ -127,6 +135,7 @@ struct proc {
 	int threads, kernel;
 	u64 ticks, p_ticks;
 	u64 priv_kb; /* resident minus shared */
+	u64 start;   /* starttime from stat: tells a reused pid apart */
 	u64 io, p_io;
 	int io_ok, have_prev;
 	double cpu, disk_bps;
@@ -142,6 +151,7 @@ struct procs {
 	double t_prev;
 	int ncpu;
 	long hz;
+	int failed; /* the last scan could not read the process table */
 };
 
 struct appinfo {
@@ -153,6 +163,7 @@ int apps_count(void);
 const struct appinfo *apps_get(int i);
 void procs_init(struct procs *ps, int ncpu);
 void procs_scan(struct procs *ps);
+void gm_clean_utf8(char *s); /* control bytes and invalid UTF-8 become '?' */
 const char *user_name(unsigned uid);
 const char *state_name(char s);
 struct proc *procs_find(struct procs *ps, int pid);

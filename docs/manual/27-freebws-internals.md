@@ -307,6 +307,38 @@ real laptop since.
 | Turnstile | Cloudflare's challenge page blocks or fails in the embedded browser | the challenge host is never blocked by the ad blocker (`BUILTIN_ALLOW`), and the user agent changed in round 17. Whether the check now passes: **not verified** |
 | Google login | sign-in may refuse an embedded browser (user agent), or lose its opener (COOP); cookies (`cookies=always` default); popups; the discard | **open**. The popup and opener parts were changed in round 16. Whether Google accepts the sign-in: **not verified**. The planned `docs/CONTRIBUTING-freebws.md` will list it. |
 
+| Freeze at the end of a Google login (r18 laptop test) | the whole FreeBWS window hangs when the sign-in finishes; other programs keep running; claude.ai still fails the Cloudflare check | **cause NOT found** in round 19 (no laptop, no real Google account in QEMU). What was read and what is suspect: see "Round 19 clues" below |
+
+### Round 19 clues for the Google-login freeze
+
+Looked at, in `freebws.c` and `adblock.c`: the `create` signal (`on_create`: the popup is a related view, hidden until
+`ready-to-show` or 5 s), `window.close()` (`on_close_req` -> `idle_close` -> `tab_close`: the opener is activated before the popup's
+view is freed), `decide-policy` (no blocking call, no sync call in any signal handler: there is no `*_sync` call on the main
+loop except the one-off `g_spawn_sync` of the bwrap probe at start), the discard policy (only machines under 3 GB, so not the
+Ryzen laptop), and the dmabuf export path (the laptop uses dmabuf, QEMU runs use shm: **every QEMU test of FreeBWS so far went
+through the shm path**).
+
+Suspects, most likely first:
+
+1. **dmabuf buffers after a popup closes.** `live_exp` was a set of exportable *pointers*. A closed popup's exportable is freed; the
+   next allocation (a new tab, the next popup) can get the same address, and a late `wl_buffer.release` of a buffer of the
+   dead popup then called `wpe_view_backend_exportable_fdo_dispatch_release_buffer` on the *new* exportable with a resource that is
+   not its own. That is a real bug on a GPU path and fits "at the end of a login" (the popup closes). Round 19 changed the set
+   to hold a never-reused id per exportable (`tab.exp_id`). **Not proven to be the freeze.**
+2. **Ad blocker work on every cross-host redirect.** `on_load` calls `navigate_hook` for each `LOAD_STARTED` and `LOAD_REDIRECTED`;
+   for a new host `adb_navigate` -> `make_page_content` removes all filters and re-adds every compiled rule list
+   (`webkit_user_content_manager_add_filter` in a loop) and builds the cosmetic CSS on the main thread. A Google sign-in is a chain of
+   five to ten hosts. With EasyList-size lists this can keep the main loop busy for seconds per hop. Check with
+   `FREEBWS_POLICY_LOG=1` and the ad blocker's `verbose` setting, and a run with ad blocking off (`adblock=0` in `~/.config/freebws/config`): if the freeze goes, it is this.
+3. A hung network or web process: nothing in the browser waits for one (all calls are async), but a main loop that is only
+   *not woken* looks the same. On the laptop, `kill -USR1`-style tools are not there; use `gdb -p` or `eu-stack -p PID` on the
+   freebws process while it hangs, and `top` to tell a busy loop (suspect 2) from a blocked one (suspect 1, or the compositor).
+4. The sandbox (bwrap) and the portal were not part of the clues: the sandbox only affects the web process, and flportal is a
+   separate process.
+
+What would settle it: `eu-stack`/`gdb` of the hung freebws (where the main thread is), `~/.local/state/freelfs/log/freebws.log` from the
+run, and one run each with `adblock=0` and with `buffers=shm` (or `FREEBWS_BUFFERS=shm`; this also takes the dmabuf path out of the picture).
+
 Two other items the scan marked uncertain: whether WebKit's default cookie and tracking settings keep third-party frames (Google's and
 Cloudflare's), and whether a subframe response with an unusual type becomes a download and stops the load. Neither was checked against
 real sites.

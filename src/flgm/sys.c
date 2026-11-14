@@ -199,7 +199,7 @@ static void cpu_static(struct sys *s)
 {
 	struct cpuinfo *ci = &s->ci;
 	static char buf[65536];
-	int n = slurp("/proc/cpuinfo", buf, sizeof buf);
+	int n = slurp(PROC_DIR "/cpuinfo", buf, sizeof buf);
 	ci->model[0] = 0;
 	if (n > 0) {
 		static const char *keys[] = {"model name", "Model", "Hardware", "Processor", "cpu model", NULL};
@@ -230,8 +230,8 @@ static void cpu_static(struct sys *s)
 	for (int i = 0; i < s->ncpu; i++) {
 		char a[16];
 		snprintf(a, sizeof a, "%d", i);
-		long long pk = read_ll("/sys/devices/system/cpu/cpu%s/topology/%s", a, "physical_package_id", -1);
-		long long ck = read_ll("/sys/devices/system/cpu/cpu%s/topology/%s", a, "core_id", i);
+		long long pk = read_ll(SYS_DIR "/devices/system/cpu/cpu%s/topology/%s", a, "physical_package_id", -1);
+		long long ck = read_ll(SYS_DIR "/devices/system/cpu/cpu%s/topology/%s", a, "core_id", i);
 		if (pk < 0)
 			pk = 0;
 		int f = 0;
@@ -252,7 +252,7 @@ static void cpu_static(struct sys *s)
 	}
 	ci->cores = ns ? ns : s->ncpu;
 	ci->sockets = nsock ? nsock : 1;
-	long long mx = read_ll("/sys/devices/system/cpu/cpu%s/cpufreq/%s", "0", "cpuinfo_max_freq", 0);
+	long long mx = read_ll(SYS_DIR "/devices/system/cpu/cpu%s/cpufreq/%s", "0", "cpuinfo_max_freq", 0);
 	ci->max_ghz = mx > 0 ? (double)mx / 1e6 : 0;
 
 	/* caches of cpu0 */
@@ -262,7 +262,7 @@ static void cpu_static(struct sys *s)
 		char a[16], lvl[16], type[24], size[24], sh[96];
 		snprintf(a, sizeof a, "%d", i);
 		char p[200];
-		snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu0/cache/index%d", i);
+		snprintf(p, sizeof p, SYS_DIR "/devices/system/cpu/cpu0/cache/index%d", i);
 		if (read_str(lvl, sizeof lvl, "%s/level", p) < 0)
 			break;
 		read_str(type, sizeof type, "%s/type", p);
@@ -354,7 +354,7 @@ static void bracket(char *s) /* "Rembrandt [Radeon 680M]" -> "Radeon 680M" */
 
 static void gpu_scan(struct sys *s)
 {
-	DIR *d = opendir("/sys/class/drm");
+	DIR *d = opendir(SYS_DIR "/class/drm");
 	if (!d)
 		return;
 	struct dirent *e;
@@ -363,7 +363,7 @@ static void gpu_scan(struct sys *s)
 			continue;
 		struct gpu *g = &s->gpu[s->ngpu];
 		memset(g, 0, sizeof *g);
-		snprintf(g->path, sizeof g->path, "/sys/class/drm/%s/device", e->d_name);
+		snprintf(g->path, sizeof g->path, SYS_DIR "/class/drm/%s/device", e->d_name);
 		char buf[128], link[160];
 		snprintf(buf, sizeof buf, "%s/driver", g->path);
 		ssize_t n = readlink(buf, link, sizeof link - 1);
@@ -454,8 +454,8 @@ static void gpu_sample(struct sys *s)
 void sys_init(struct sys *s)
 {
 	memset(s, 0, sizeof *s);
-	char buf[8192];
-	int n = slurp("/proc/stat", buf, sizeof buf);
+	char buf[32768];
+	int n = slurp(PROC_DIR "/stat", buf, sizeof buf);
 	int cpus = 0;
 	if (n > 0)
 		for (char *l = buf; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL)
@@ -473,7 +473,7 @@ static int skip_disk(const char *n)
 		if (!strncmp(n, pre[i], strlen(pre[i])))
 			return 1;
 	char p[128];
-	snprintf(p, sizeof p, "/sys/block/%s", n);
+	snprintf(p, sizeof p, SYS_DIR "/block/%s", n);
 	return access(p, F_OK) != 0;
 }
 
@@ -487,10 +487,10 @@ static struct disk *disk_get(struct sys *s, const char *name)
 	struct disk *d = &s->disk[s->ndisk++];
 	memset(d, 0, sizeof *d);
 	snprintf(d->name, sizeof d->name, "%s", name);
-	d->bytes = (u64)read_ll("/sys/block/%s/%s", name, "size", 0) * 512;
-	if (read_str(d->model, sizeof d->model, "/sys/block/%s/device/model", name) < 0)
+	d->bytes = (u64)read_ll(SYS_DIR "/block/%s/%s", name, "size", 0) * 512;
+	if (read_str(d->model, sizeof d->model, SYS_DIR "/block/%s/device/model", name) < 0)
 		d->model[0] = 0;
-	long long rot = read_ll("/sys/block/%s/queue/%s", name, "rotational", -1);
+	long long rot = read_ll(SYS_DIR "/block/%s/queue/%s", name, "rotational", -1);
 	if (!strncmp(name, "nvme", 4))
 		snprintf(d->type, sizeof d->type, "NVMe SSD");
 	else if (!strncmp(name, "mmcblk", 6))
@@ -517,9 +517,9 @@ static struct net *net_get(struct sys *s, const char *name)
 	memset(n, 0, sizeof *n);
 	snprintf(n->name, sizeof n->name, "%s", name);
 	char p[128];
-	snprintf(p, sizeof p, "/sys/class/net/%s/wireless", name);
+	snprintf(p, sizeof p, SYS_DIR "/class/net/%s/wireless", name);
 	n->wireless = access(p, F_OK) == 0;
-	snprintf(p, sizeof p, "/sys/class/net/%s/phy80211", name);
+	snprintf(p, sizeof p, SYS_DIR "/class/net/%s/phy80211", name);
 	if (access(p, F_OK) == 0)
 		n->wireless = 1;
 	snprintf(n->label, sizeof n->label, "%s", n->wireless ? "Wi-Fi" : "Ethernet");
@@ -547,7 +547,7 @@ static void net_refresh_ips(struct sys *s)
 static void sample_cpu(struct sys *s)
 {
 	char buf[16384];
-	if (slurp("/proc/stat", buf, sizeof buf) <= 0)
+	if (slurp(PROC_DIR "/stat", buf, sizeof buf) <= 0)
 		return;
 	for (char *l = buf; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
 		if (strncmp(l, "cpu", 3))
@@ -563,6 +563,8 @@ static void sample_cpu(struct sys *s)
 		if (idx > MAXCPU)
 			continue;
 		const char *c = strchr(l, ' ');
+		if (!c)
+			continue;
 		u64 f[8] = {0};
 		sscanf(c, "%lu %lu %lu %lu %lu %lu %lu %lu", &f[0], &f[1], &f[2], &f[3], &f[4], &f[5], &f[6], &f[7]);
 		u64 tot = 0;
@@ -594,7 +596,7 @@ static void sample_cpu(struct sys *s)
 	for (int i = 0; i < s->ncpu; i++) {
 		char a[16];
 		snprintf(a, sizeof a, "%d", i);
-		long long khz = read_ll("/sys/devices/system/cpu/cpu%s/cpufreq/%s", a, "scaling_cur_freq", -1);
+		long long khz = read_ll(SYS_DIR "/devices/system/cpu/cpu%s/cpufreq/%s", a, "scaling_cur_freq", -1);
 		if (khz > 0) {
 			sum += (double)khz;
 			k++;
@@ -608,7 +610,7 @@ static void sample_cpu(struct sys *s)
 static void sample_mem(struct sys *s)
 {
 	char buf[4096];
-	if (slurp("/proc/meminfo", buf, sizeof buf) <= 0)
+	if (slurp(PROC_DIR "/meminfo", buf, sizeof buf) <= 0)
 		return;
 	static const struct { const char *k; size_t off; } map[] = {
 		{"MemTotal:", offsetof(struct sys, mem_total)}, {"MemFree:", offsetof(struct sys, mem_free)},
@@ -624,14 +626,14 @@ static void sample_mem(struct sys *s)
 				*(u64 *)((char *)s + map[i].off) = strtoull(l + strlen(map[i].k), NULL, 10);
 	if (!s->mem_avail)
 		s->mem_avail = s->mem_free + s->mem_cached + s->mem_buffers;
-	double used = (double)(s->mem_total - s->mem_avail);
+	double used = s->mem_total > s->mem_avail ? (double)(s->mem_total - s->mem_avail) : 0;
 	hist_push(&s->h_mem, s->mem_total ? 100.0 * used / (double)s->mem_total : 0);
 }
 
 static void sample_disk(struct sys *s)
 {
 	char buf[32768];
-	if (slurp("/proc/diskstats", buf, sizeof buf) <= 0)
+	if (slurp(PROC_DIR "/diskstats", buf, sizeof buf) <= 0)
 		return;
 	double busiest = 0;
 	for (char *l = buf; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
@@ -645,7 +647,8 @@ static void sample_disk(struct sys *s)
 		if (!d)
 			continue;
 		u64 ios = f[0] + f[4], wt = f[3] + f[7];
-		if (d->have_prev && s->dt > 0) {
+		int back = f[2] < d->p_rsec || f[6] < d->p_wsec || f[9] < d->p_ticks || ios < d->p_ios || wt < d->p_wt;
+		if (d->have_prev && s->dt > 0 && !back) {
 			d->active = 100.0 * (double)(f[9] - d->p_ticks) / (s->dt * 1000.0);
 			if (d->active > 100)
 				d->active = 100;
@@ -653,6 +656,8 @@ static void sample_disk(struct sys *s)
 			d->wr_bps = (double)(f[6] - d->p_wsec) * 512.0 / s->dt;
 			u64 di = ios - d->p_ios;
 			d->resp_ms = di ? (double)(wt - d->p_wt) / (double)di : 0;
+		} else if (back) {
+			d->active = d->rd_bps = d->wr_bps = d->resp_ms = 0;
 		}
 		d->p_rsec = f[2];
 		d->p_wsec = f[6];
@@ -683,7 +688,7 @@ static int skip_net(const char *n)
 static void sample_net(struct sys *s, int tick)
 {
 	char buf[16384];
-	if (slurp("/proc/net/dev", buf, sizeof buf) <= 0)
+	if (slurp(PROC_DIR "/net/dev", buf, sizeof buf) <= 0)
 		return;
 	double total = 0;
 	for (char *l = strchr(buf, '\n'); l && *(l + 1); l = strchr(l + 1, '\n')) {
@@ -701,14 +706,16 @@ static void sample_net(struct sys *s, int tick)
 		sscanf(colon + 1, "%lu %lu %lu %lu %lu %lu %lu %lu %lu", &f[0], &f[1], &f[2], &f[3], &f[4], &f[5], &f[6],
 		       &f[7], &f[8]);
 		char st[16] = "";
-		read_str(st, sizeof st, "/sys/class/net/%s/operstate", name);
+		read_str(st, sizeof st, SYS_DIR "/class/net/%s/operstate", name);
 		if (!strcmp(st, "down") && f[0] + f[8] == 0)
 			continue;
 		struct net *n = net_get(s, name);
 		if (!n)
 			continue;
 		snprintf(n->state, sizeof n->state, "%s", st);
-		if (n->have_prev && s->dt > 0) {
+		if (f[0] < n->p_rx || f[8] < n->p_tx) { /* the counters started again (driver reload, reconnect) */
+			n->rx_bps = n->tx_bps = 0;
+		} else if (n->have_prev && s->dt > 0) {
 			n->rx_bps = (double)(f[0] - n->p_rx) * 8.0 / s->dt;
 			n->tx_bps = (double)(f[8] - n->p_tx) * 8.0 / s->dt;
 		}
@@ -716,7 +723,7 @@ static void sample_net(struct sys *s, int tick)
 		n->tx = f[8];
 		n->p_rx = f[0];
 		n->p_tx = f[8];
-		n->speed_mbps = read_ll("/sys/class/net/%s/%s", name, "speed", -1);
+		n->speed_mbps = read_ll(SYS_DIR "/class/net/%s/%s", name, "speed", -1);
 		if (n->have_prev) {
 			hist_push(&n->h_rx, n->rx_bps);
 			hist_push(&n->h_tx, n->tx_bps);
@@ -741,12 +748,12 @@ void sys_sample(struct sys *s)
 	sample_net(s, tick++);
 	gpu_sample(s);
 	char b[128];
-	if (slurp("/proc/loadavg", b, sizeof b) > 0) {
+	if (slurp(PROC_DIR "/loadavg", b, sizeof b) > 0) {
 		int run, tot = 0;
 		sscanf(b, "%lf %lf %lf %d/%d", &s->load[0], &s->load[1], &s->load[2], &run, &tot);
 		s->nthreads = tot;
 	}
-	if (slurp("/proc/uptime", b, sizeof b) > 0)
+	if (slurp(PROC_DIR "/uptime", b, sizeof b) > 0)
 		s->uptime = atof(b);
 	int np = 0;
 	DIR *d = opendir("/proc");

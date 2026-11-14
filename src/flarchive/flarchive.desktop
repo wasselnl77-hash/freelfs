@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Archives
+Icon=file-roller
 Comment=Open, extract and create zip, tar, 7z and rar archives
 Exec=flarchive %f
 Categories=Utility;Archiving;Compression;

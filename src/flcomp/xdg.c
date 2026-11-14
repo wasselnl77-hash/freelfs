@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT */
 #include "comp.h"
 #include "xdg-shell-protocol.h"
+#include "xdg-decoration-unstable-v1-protocol.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -713,6 +714,8 @@ void cycle_end(void)
 
 static void window_destroy(struct window *w)
 {
+	if (w->deco_res)
+		wl_resource_set_user_data(w->deco_res, NULL);
 	anim_window_closing(w);		/* a copy of the last picture fades out; the struct itself goes now */
 	anim_window_gone(w);
 	if (G.w == w) {
@@ -1277,6 +1280,112 @@ static const struct xdg_toplevel_interface toplevel_impl = {
 	.set_minimized = tl_set_minimized,
 };
 
+/* ---- xdg-decoration: the server draws the title bar unless the client asks for its own ---------------- */
+
+static void deco_set_ssd(struct window *w, bool ssd)
+{
+	if (ssd == w->ssd)
+		return;
+	struct xinset before = xwm_insets(w);
+	if (w->mapped)
+		damage_all();
+	w->ssd = ssd;
+	if (w->mapped && !w->maximized && !w->fullscreen)
+		w->y += xwm_insets(w).t - before.t;	/* the title bar goes above (or leaves) the surface */
+	if (w->mapped)
+		damage_all();
+}
+
+static void deco_apply(struct window *w)
+{
+	bool ssd = !w->want_csd;
+	if (w->deco_res)
+		zxdg_toplevel_decoration_v1_send_configure(w->deco_res, ssd ? ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+									: ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+	deco_set_ssd(w, ssd);
+	if (w->xs && w->xs->configured)
+		window_configure(w, w->cfg_w, w->cfg_h);	/* the configure that carries the mode */
+}
+
+static void deco_destroy_req(struct wl_client *c, struct wl_resource *r)
+{
+	wl_resource_destroy(r);
+}
+
+static void deco_set_mode(struct wl_client *c, struct wl_resource *r, uint32_t mode)
+{
+	struct window *w = wl_resource_get_user_data(r);
+	if (!w)
+		return;
+	w->want_csd = mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+	deco_apply(w);
+}
+
+static void deco_unset_mode(struct wl_client *c, struct wl_resource *r)
+{
+	struct window *w = wl_resource_get_user_data(r);
+	if (!w)
+		return;
+	w->want_csd = false;
+	deco_apply(w);
+}
+
+static const struct zxdg_toplevel_decoration_v1_interface deco_impl = {
+	.destroy = deco_destroy_req,
+	.set_mode = deco_set_mode,
+	.unset_mode = deco_unset_mode,
+};
+
+static void deco_res_destroy(struct wl_resource *r)
+{
+	struct window *w = wl_resource_get_user_data(r);
+	if (!w)
+		return;
+	w->deco_res = NULL;
+	w->want_csd = false;
+	deco_set_ssd(w, false);	/* no object, no server-side frame: the client draws its own again */
+}
+
+static void dm_destroy_req(struct wl_client *c, struct wl_resource *r)
+{
+	wl_resource_destroy(r);
+}
+
+static void dm_get_toplevel_decoration(struct wl_client *c, struct wl_resource *r, uint32_t id,
+				       struct wl_resource *tl)
+{
+	struct window *w = wl_resource_get_user_data(tl);
+	if (!w)
+		return;
+	if (w->deco_res) {
+		wl_resource_post_error(r, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ALREADY_CONSTRUCTED, "toplevel has a decoration object");
+		return;
+	}
+	struct wl_resource *d = wl_resource_create(c, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(r), id);
+	if (!d) {
+		wl_client_post_no_memory(c);
+		return;
+	}
+	wl_resource_set_implementation(d, &deco_impl, w, deco_res_destroy);
+	w->deco_res = d;
+	deco_apply(w);	/* preferring server-side: the mode is sent at once */
+}
+
+static const struct zxdg_decoration_manager_v1_interface dm_impl = {
+	.destroy = dm_destroy_req,
+	.get_toplevel_decoration = dm_get_toplevel_decoration,
+};
+
+static void dm_bind(struct wl_client *c, void *data, uint32_t version, uint32_t id)
+{
+	struct wl_resource *r = wl_resource_create(c, &zxdg_decoration_manager_v1_interface, version, id);
+	if (!r) {
+		wl_client_post_no_memory(c);
+		return;
+	}
+	wl_resource_set_implementation(r, &dm_impl, NULL, NULL);
+}
+
 static void tl_res_destroy(struct wl_resource *r)
 {
 	struct window *w = wl_resource_get_user_data(r);
@@ -1466,4 +1575,5 @@ static void wm_bind(struct wl_client *c, void *data, uint32_t version, uint32_t 
 void xdg_init(void)
 {
 	wl_global_create(C.dpy, &xdg_wm_base_interface, 3, NULL, wm_bind);
+	wl_global_create(C.dpy, &zxdg_decoration_manager_v1_interface, 1, NULL, dm_bind);
 }

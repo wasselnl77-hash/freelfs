@@ -6,7 +6,7 @@
 # FreeBWS serves them to pages that carry DSSL tags (see src/freebws/freebws.c).
 pkgname=freebws
 version=0.1
-release=16
+release=17
 dssl=0.16.3
 summary="FreeBWS: web browser on WPE WebKit with a libflui toolbar"
 # The program is MIT. The ad blocker's filter lists (data files in /usr/share/freebws/lists, read at

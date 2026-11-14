@@ -22,12 +22,22 @@
 #include "fl-screencopy-client-protocol.h"
 #include "fl-shell-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
 struct wl_display *g_dpy;
 static struct wl_compositor *comp;
 static struct wl_shm *shm;
 static struct xdg_wm_base *wm;
+static struct zxdg_decoration_manager_v1 *decoman;
+static int bad_stride;	/* -E: a buffer whose stride is its width in bytes, not 4 times: flcomp must send a protocol error */
+static int deco_ask = -1;	/* -K s|c|u: ask server side, client side, or unset_mode (-1: do not use the protocol) */
+
+static void deco_cfg(void *d, struct zxdg_toplevel_decoration_v1 *x, uint32_t mode)
+{
+	printf("decoration %s\n", mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE ? "server_side" : "client_side");
+}
+static const struct zxdg_toplevel_decoration_v1_listener deco_l = { deco_cfg };
 static struct fl_shell *shell;
 static struct wl_seat *seat;
 static struct wl_surface *surf;
@@ -85,7 +95,7 @@ static void draw_to(struct wl_surface *sf, int w, int h, unsigned col, int alp)
 		zwp_linux_buffer_params_v1_destroy(pa);
 	} else {
 		struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size);
-		b = wl_shm_pool_create_buffer(pool, 0, w, h, stride,
+		b = wl_shm_pool_create_buffer(pool, 0, w, h, bad_stride ? w : stride,
 			alp >= 0 ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
 		wl_shm_pool_destroy(pool);
 	}
@@ -466,6 +476,8 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
 		comp = wl_registry_bind(r, name, &wl_compositor_interface, 4);
 	else if (!strcmp(iface, "wl_shm"))
 		shm = wl_registry_bind(r, name, &wl_shm_interface, 1);
+	else if (!strcmp(iface, "zxdg_decoration_manager_v1"))
+		decoman = wl_registry_bind(r, name, &zxdg_decoration_manager_v1_interface, 1);
 	else if (!strcmp(iface, "xdg_wm_base"))
 		wm = wl_registry_bind(r, name, &xdg_wm_base_interface, 2);
 	else if (!strcmp(iface, "fl_shell"))
@@ -499,9 +511,11 @@ static const struct wl_registry_listener reg_l = { reg_global, reg_remove };
 int main(int argc, char **argv)
 {
 	int secs = 3, opt;
-	while ((opt = getopt(argc, argv, "w:h:c:a:t:p:lMZXFmUs:C:P:QDBLNWS:O:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:c:a:t:p:lMZXFmUs:C:P:QDBLNWS:O:K:E")) != -1) {
 		switch (opt) {
 		case 'w': W = atoi(optarg); break;
+		case 'E': bad_stride = 1; break;
+		case 'K': deco_ask = optarg[0] == 's' ? 1 : optarg[0] == 'c' ? 0 : 2; break;
 		case 'h': H = atoi(optarg); break;
 		case 'c': color = strtoul(optarg, NULL, 16); break;
 		case 'a': alpha = atoi(optarg); break;
@@ -585,6 +599,18 @@ int main(int argc, char **argv)
 		xdg_toplevel_add_listener(top, &tl_l, NULL);
 		xdg_toplevel_set_title(top, title);
 		xdg_toplevel_set_app_id(top, "shmclient");
+		if (deco_ask >= 0 && decoman) {
+			struct zxdg_toplevel_decoration_v1 *dc = zxdg_decoration_manager_v1_get_toplevel_decoration(decoman, top);
+			zxdg_toplevel_decoration_v1_add_listener(dc, &deco_l, NULL);
+			if (deco_ask == 1)
+				zxdg_toplevel_decoration_v1_set_mode(dc, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+			else if (deco_ask == 0)
+				zxdg_toplevel_decoration_v1_set_mode(dc, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+			else
+				zxdg_toplevel_decoration_v1_unset_mode(dc);
+		} else if (deco_ask >= 0) {
+			printf("decoration none\n");
+		}
 		if (maximize)
 			xdg_toplevel_set_maximized(top);
 		if (fullscreen_req)
@@ -642,6 +668,10 @@ int main(int argc, char **argv)
 			free(c);
 			wl_display_flush(dpy);
 		}
+	}
+	if (bad_stride) {
+		int e = wl_display_get_error(dpy);
+		printf(e ? "protocol_error %d\n" : "no_protocol_error\n", e);
 	}
 	return 0;
 }

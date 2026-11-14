@@ -1508,11 +1508,17 @@ static void open_path_dialog(struct E *e, int mode, int after)
 			if (s)
 				s[1] = 0;
 			dir = cwd;
-		} else if (getcwd(cwd, sizeof cwd)) {
+		} else if (getcwd(cwd, sizeof cwd) && access(cwd, W_OK | X_OK) == 0) {
 			size_t l = strlen(cwd);
 			if (l && cwd[l - 1] != '/' && l + 1 < sizeof cwd)
 				strcat(cwd, "/");
 			dir = cwd;
+		} else {	/* the folder is gone, not writable (an ejected drive, "/"): Home */
+			const char *home = getenv("HOME");
+			if (home && *home) {
+				snprintf(cwd, sizeof cwd, "%s/", home);
+				dir = cwd;
+			}
 		}
 		snprintf(e->dlg_text, sizeof e->dlg_text, "%s%s", dir ? dir : "", mode == 2 ? "untitled.txt" : "");
 	}
@@ -2037,6 +2043,18 @@ static void path_confirm(struct E *e)
 	char err[300];
 	if (save_to(e, full, err, sizeof err) < 0) {
 		snprintf(e->dlg_err, sizeof e->dlg_err, "%s", err);
+		/* not allowed / gone / read-only (an ejected drive, "/"): offer the same name in Home */
+		const char *home = getenv("HOME");
+		if (home && *home && (strstr(err, "Permission denied") || strstr(err, "Read-only") ||
+				      strstr(err, "No such file") || strstr(err, "Input/output") || strstr(err, "No such device"))) {
+			const char *bn = strrchr(full, '/');
+			char alt[PATH_MAX];
+			snprintf(alt, sizeof alt, "%s/%s", home, bn ? bn + 1 : full);
+			if (strcmp(alt, full)) {
+				snprintf(e->dlg_text, sizeof e->dlg_text, "%s", alt);
+				snprintf(e->dlg_err, sizeof e->dlg_err, "%s - the name now points to your Home folder, press Save again", err);
+			}
+		}
 		return;
 	}
 	e->ov = OV_NONE;

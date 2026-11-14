@@ -256,3 +256,10 @@ Not done / untested after that round (later rounds closed several: Xwayland came
 - Files: spawn error pipes in flfiles, flview, flvideo, flmusic and flpanel's fileinfo.c (visible errors). flvideo decodes in software by default now (VA-API through radeonsi/iHD was never exercised in QEMU); mpv log in ~/.cache/flvideo/mpv.log. Opening a PNG and an MP4 by double click works in QEMU (build/m18/files-open.cmds, checked by picture colours).
 - flsplash runs the animation to its end in 300 ms when boot finishes early. FreeBWS: Safari-form User-Agent (consistent with the engine), ITP off, challenges.cloudflare.com never adblocked; no CAPTCHA handling.
 - Tests: build/m18-honest.sh (greeter, panel, forced shutdown, Files open), build/m18-realiso.py (the real ISO, no serial console: login screen, two clicks on Shut down, QEMU must exit), live-run.py fails on missing results / "NOT exited"; m16 uses a partitioned stick (sda1) and real assertions.
+
+**Round 19 (2026-11-14): eject/cwd, server-side decorations, Papirus icons, splash, General Manager.**
+- Eject bug (r18 laptop): every launcher (panel menu/search/taskbar, desktop icons, Open with in fileinfo, run dialog, quick settings, flfiles spawns, flcomp's own shortcuts) now chdirs to $HOME in the child; Files goes Home before an eject and when the drive's mountpoint disappears; flmount chdirs to / and sweeps empty mountpoints after an eject and a removal; fledit's save dialog starts in Home when the cwd is gone/not writable and offers Home after a "Permission denied". Test: build/m19-features.sh eject-launch. Cause: the cwd path is real; the claim that it is THE cause is not proven on hardware.
+- FreeBWS Google-login freeze: cause NOT found; clues in manual 27; one real hardening (dmabuf exportable ids instead of pointers).
+- flcomp: zxdg_decoration_manager_v1 (server-side preferred, client-side honoured); tests/deco.sh.
+- Papirus icon theme (PNG subset, recipe papirus-icon-theme, build/papirus-raster.py), taskbar and start-menu icons (flpanel icons.c).
+- flsplash: full animation always, no fade (the greeter continues from the wordmark); General Manager hardening (flgm).

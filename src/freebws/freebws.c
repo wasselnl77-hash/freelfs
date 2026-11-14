@@ -81,6 +81,7 @@ struct sbuf {
 struct tab {
 	WebKitWebView *view;		/* NULL while the tab is discarded */
 	struct wpe_view_backend_exportable_fdo *exp;
+	unsigned exp_id;	/* never reused: a freed exportable's address may be (see live_exp) */
 	WebKitUserContentManager *ucm;
 	WebKitWebViewSessionState *saved;	/* back/forward list of a discarded tab */
 	char uri[2048];
@@ -132,7 +133,8 @@ static struct B {
 	struct tab *tabs[MAX_TABS];
 	int ntabs;
 	struct tab *cur;
-	GHashTable *live_exp;	/* exportables whose dmabuf buffers may still be released */
+	GHashTable *live_exp;	/* ids (tab.exp_id) of exportables whose dmabuf buffers may still be released */
+	unsigned exp_seq;
 	char closed[MAX_CLOSED][2048];
 	int nclosed;
 	int spin;
@@ -278,12 +280,14 @@ static void export_shm(void *data, struct wpe_fdo_shm_exported_buffer *eb)
 	wpe_view_backend_exportable_fdo_dispatch_frame_complete(t->exp);
 }
 
-struct dmb_release { struct wpe_view_backend_exportable_fdo *exp; struct wl_resource *res; };
+struct dmb_release { struct wpe_view_backend_exportable_fdo *exp; unsigned id; struct wl_resource *res; };
 
 static void dmb_buffer_release(void *d, struct wl_buffer *b)
 {
 	struct dmb_release *r = d;
-	if (g_hash_table_contains(B.live_exp, r->exp))	/* its tab may be gone */
+	if (g_hash_table_contains(B.live_exp, GUINT_TO_POINTER(r->id)))	/* its tab may be gone; an id, not the
+								 * address: a new exportable can get the address of a destroyed one (a popup
+								 * closed, a tab opened) and would be handed a stale buffer */
 		wpe_view_backend_exportable_fdo_dispatch_release_buffer(r->exp, r->res);
 	wl_buffer_destroy(b);
 	free(r);
@@ -312,6 +316,7 @@ static void export_dmabuf(void *data, struct wpe_view_backend_exportable_fdo_dma
 		return;
 	}
 	rel->exp = t->exp;
+	rel->id = t->exp_id;
 	rel->res = r->buffer_resource;
 	wl_buffer_add_listener(b, &dmb_l, rel);
 	wl_surface_attach(B.page, b, 0, 0);
@@ -325,10 +330,14 @@ static const struct wpe_view_backend_exportable_fdo_client fdo_client = {
 	.export_dmabuf_resource = export_dmabuf, .export_shm_buffer = export_shm,
 };
 
-static void exp_destroy(gpointer exp)
+struct expd { struct wpe_view_backend_exportable_fdo *exp; unsigned id; };
+
+static void exp_destroy(gpointer p)
 {
-	g_hash_table_remove(B.live_exp, exp);
-	wpe_view_backend_exportable_fdo_destroy(exp);
+	struct expd *e = p;
+	g_hash_table_remove(B.live_exp, GUINT_TO_POINTER(e->id));
+	wpe_view_backend_exportable_fdo_destroy(e->exp);
+	free(e);
 }
 
 /* ---- input on the page ---------------------------------------------------- */
@@ -492,12 +501,16 @@ static void tab_realize(struct tab *t, WebKitWebView *related)
 				related = B.tabs[i]->view;
 	int w = B.page_rect.w > 1 ? B.page_rect.w : 1024, h = B.page_rect.h > 1 ? B.page_rect.h : 600;
 	t->exp = wpe_view_backend_exportable_fdo_create(&fdo_client, t, (uint32_t)w, (uint32_t)h);
-	g_hash_table_add(B.live_exp, t->exp);
+	t->exp_id = ++B.exp_seq;
+	g_hash_table_add(B.live_exp, GUINT_TO_POINTER(t->exp_id));
 	t->w = w;
 	t->h = h;
 	struct wpe_view_backend *vb = tab_vb(t);
+	struct expd *ed = calloc(1, sizeof *ed);
+	ed->exp = t->exp;
+	ed->id = t->exp_id;
 	wpe_view_backend_add_activity_state(vb, wpe_view_activity_state_in_window);
-	WebKitWebViewBackend *wb = webkit_web_view_backend_new(vb, exp_destroy, t->exp);
+	WebKitWebViewBackend *wb = webkit_web_view_backend_new(vb, exp_destroy, ed);
 	t->ucm = webkit_user_content_manager_new();
 	dssl_setup_view(t);
 	pages_setup_view(t->ucm, t);

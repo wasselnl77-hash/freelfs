@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Web Browser
+Icon=web-browser
 Comment=Browse the web
 Exec=freebws %u
 Categories=Network;WebBrowser;

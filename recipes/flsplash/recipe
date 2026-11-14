@@ -1,7 +1,7 @@
 # flsplash, from src/flsplash in the FreeLFS tree.
 pkgname=flsplash
 version=0.2
-release=4
+release=5
 summary="FreeLFS boot screen: a glossy 3D logo on the KMS framebuffer, no compositor"
 license=(MIT)
 arch=(x86_64)

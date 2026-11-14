@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Packages
+Icon=package-x-generic
 Comment=Install and remove software, and Flathub apps
 Exec=flpackages
 Categories=System;PackageManager;

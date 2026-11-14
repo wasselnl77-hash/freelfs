@@ -15,7 +15,7 @@
 enum { CAT_ALL, CAT_INTERNET, CAT_OFFICE, CAT_SYSTEM, CAT_SETTINGS, CAT_RECENT, CAT_COUNT };
 
 struct entry {
-	char name[64], what[96], exec[256], glyph[8];
+	char name[64], what[96], exec[256], glyph[8], icon[128]; /* icon: Icon= (icons.c) */
 	unsigned cats; /* bit per CAT_* */
 	int terminal;
 	int desktop; /* X-FreeLFS-Desktop-Icon=true: also an icon on the desktop (deskicons.c) */

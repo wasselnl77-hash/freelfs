@@ -92,6 +92,7 @@ static pid_t spawn_keep(const char *prog, int keep)
 		sigemptyset(&none);
 		sigprocmask(SIG_SETMASK, &none, NULL);
 		signal(SIGPIPE, SIG_DFL);
+		{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }	/* programs start in $HOME, not in a folder that may go away */
 		for (int fd = 3; fd < 1024; fd++)	/* no inherited descriptors, except the greeter's pipe for flgreet-ui */
 			if (fd != keep)
 				close(fd);

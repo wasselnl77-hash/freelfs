@@ -1,7 +1,7 @@
 # fledit, from src/fledit in the FreeLFS tree.
 pkgname=fledit
 version=0.1
-release=2
+release=3
 summary="FreeLFS text editor: tabs, syntax colours, find and replace, remembered files"
 license=(MIT)
 arch=(x86_64)

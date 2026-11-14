@@ -45,6 +45,8 @@ Test hooks: GM_INTERVAL_MS (refresh interval, at least 50), --sort, --expand APP
 Headless screenshots: FLUI_PPM=FILE FLUI_PPM_DELAY=3500 GM_INTERVAL_MS=250 (see docs/m7/gm-*.png).
 
 Tests
-  make check          sys.c, proc.c, startup.c against the host /proc and a scratch autostart dir
+  make check          sys.c, proc.c, startup.c against the host /proc and a scratch autostart dir,
+                      then fake-test.c against a fake /proc and /sys (300 processes, long and
+                      non-UTF-8 names, vanished and reused pids, missing files, counters going back)
   tests/e2e.sh        headless flcomp + the window: Ctrl+Shift+Esc starts it, search, Down, Delete
                       ends a victim process of its own, screenshots (needs FLCOMP=, GM_SYSROOT=)

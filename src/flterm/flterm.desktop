@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Terminal
+Icon=utilities-terminal
 Comment=Type commands in flsh
 Exec=flterm
 Categories=System;TerminalEmulator;

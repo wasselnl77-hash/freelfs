@@ -3,7 +3,7 @@
 # comes from flpackages (hidden there), which is why the store depends on it.
 pkgname=flstore
 version=0.1
-release=3
+release=4
 summary="FreeLFS Software Store: Flathub apps and FreeLFS packages, install, update, remove"
 license=(MIT)
 arch=(x86_64)

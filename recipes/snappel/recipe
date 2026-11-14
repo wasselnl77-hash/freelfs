@@ -1,7 +1,7 @@
 # snappel, from src/snappel in the FreeLFS tree.
 pkgname=snappel
 version=0.1
-release=1
+release=2
 summary="FreeLFS screenshot tool: full screen, window, region, timer, annotate, clipboard"
 license=(MIT)
 arch=(x86_64)

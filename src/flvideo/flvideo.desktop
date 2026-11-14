@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Videos
+Icon=multimedia-video-player
 Comment=Play videos
 Exec=flvideo %f
 Categories=AudioVideo;Video;Player;

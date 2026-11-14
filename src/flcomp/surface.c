@@ -270,7 +270,7 @@ struct surface *pick(int x, int y, int *lx, int *ly)
 			continue;
 		if ((r = tree_pick(w->surf, x, y, lx, ly)))
 			return r;
-		if (w->xw && xwm_deco_contains(w, x, y)) {
+		if (xwm_deco_contains(w, x, y)) {
 			xwm_deco_note(w);	/* a frame: no surface, the seat handles it */
 			return NULL;
 		}
@@ -420,6 +420,18 @@ static bool apply_buffer(struct surface *s, struct rect *dmg, bool *full)
 	if (bw <= 0 || bh <= 0 || bw > 16384 || bh > 16384) {
 		wl_resource_post_error(s->res, WL_DISPLAY_ERROR_INVALID_OBJECT, "bad buffer size");
 		return false;
+	}
+	if (shm) {	/* libwayland only checks stride >= width: the 4 bytes per pixel copy below needs more */
+		uint32_t fmt = wl_shm_buffer_get_format(shm);
+		if (fmt != WL_SHM_FORMAT_ARGB8888 && fmt != WL_SHM_FORMAT_XRGB8888) {
+			wl_resource_post_error(s->res, WL_DISPLAY_ERROR_INVALID_OBJECT, "unsupported buffer format");
+			return false;
+		}
+		/* (size_t is 64 bit and stride, bh are bounded: stride * (bh - 1) + bw * 4 cannot wrap) */
+		if (stride < 0 || (size_t)stride < (size_t)bw * 4) {
+			wl_resource_post_error(s->res, WL_DISPLAY_ERROR_INVALID_OBJECT, "bad stride");
+			return false;
+		}
 	}
 	*full = !s->px || bw != s->w || bh != s->h || !s->p_dmg_set;
 	if (!s->px || bw != s->w || bh != s->h) {

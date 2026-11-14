@@ -23,6 +23,7 @@ SCANNER ?= wayland-scanner
 WLPROTO ?= $(shell pkg-config --variable=pkgdatadir wayland-protocols)
 XWL_XML = $(WLPROTO)/staging/xwayland-shell/xwayland-shell-v1.xml
 XDG_XML = $(WLPROTO)/stable/xdg-shell/xdg-shell.xml
+DECO_XML = $(WLPROTO)/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml
 DMABUF_XML = $(WLPROTO)/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml
 FL_XML = protocol/fl-shell.xml
 SC_XML = protocol/fl-screencopy.xml
@@ -30,15 +31,20 @@ SC_XML = protocol/fl-screencopy.xml
 GEN = xdg-shell-protocol.h xdg-shell-protocol.c fl-shell-protocol.h fl-shell-protocol.c \
 	fl-screencopy-protocol.h fl-screencopy-protocol.c \
 	linux-dmabuf-unstable-v1-protocol.h linux-dmabuf-unstable-v1-protocol.c \
-	xwayland-shell-protocol.h xwayland-shell-protocol.c
+	xwayland-shell-protocol.h xwayland-shell-protocol.c \
+	xdg-decoration-unstable-v1-protocol.h xdg-decoration-unstable-v1-protocol.c
 OBJS = main.o nightlight.o render.o surface.o xdg.o seat.o flshell.o drm.o dmabuf.o gl.o config.o output.o media.o osd.o switcher.o shot.o lock.o power.o perf.o theme.o sound.o anim.o overview.o popup.o screencopy.o xwm.o xwsel.o xwdeco.o \
-	xdg-shell-protocol.o fl-shell-protocol.o fl-screencopy-protocol.o linux-dmabuf-unstable-v1-protocol.o xwayland-shell-protocol.o
+	xdg-decoration-unstable-v1-protocol.o xdg-shell-protocol.o fl-shell-protocol.o fl-screencopy-protocol.o linux-dmabuf-unstable-v1-protocol.o xwayland-shell-protocol.o
 
 all: flcomp
 
 flcomp: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(PKG_LIBS)
 
+xdg-decoration-unstable-v1-protocol.h: $(DECO_XML)
+	$(SCANNER) server-header $< $@
+xdg-decoration-unstable-v1-protocol.c: $(DECO_XML)
+	$(SCANNER) private-code $< $@
 xdg-shell-protocol.h: $(XDG_XML)
 	$(SCANNER) server-header $< $@
 xdg-shell-protocol.c: $(XDG_XML)
@@ -72,6 +78,8 @@ check: flcomp tests/shmclient tests/xclient
 	./tests/perf.sh
 	./tests/anim.sh
 	./tests/x.sh
+	./tests/deco.sh
+	./tests/stride.sh
 
 # animations: open, close, minimize, maximize, slide, overview, pacing, idleness (needs python3)
 check-anim: flcomp tests/shmclient
@@ -103,11 +111,16 @@ tests/xclient: tests/xclient.c
 tests/shmclient: tests/shmclient.c fl-shell-client-protocol.h fl-shell-client-protocol.c \
 		fl-screencopy-client-protocol.h fl-screencopy-client-protocol.c \
 		xdg-shell-client-protocol.h xdg-shell-client-protocol.c \
-		linux-dmabuf-unstable-v1-client-protocol.h linux-dmabuf-unstable-v1-client-protocol.c
+		linux-dmabuf-unstable-v1-client-protocol.h linux-dmabuf-unstable-v1-client-protocol.c \
+		xdg-decoration-unstable-v1-client-protocol.h xdg-decoration-unstable-v1-client-protocol.c
 	$(CC) $(CFLAGS) -Wno-missing-field-initializers -I. $(shell pkg-config --cflags wayland-client libdrm) -o $@ $< \
-		fl-shell-client-protocol.c fl-screencopy-client-protocol.c xdg-shell-client-protocol.c linux-dmabuf-unstable-v1-client-protocol.c \
+		fl-shell-client-protocol.c fl-screencopy-client-protocol.c xdg-shell-client-protocol.c linux-dmabuf-unstable-v1-client-protocol.c xdg-decoration-unstable-v1-client-protocol.c \
 		$(shell pkg-config --libs wayland-client)
 
+xdg-decoration-unstable-v1-client-protocol.h: $(DECO_XML)
+	$(SCANNER) client-header $< $@
+xdg-decoration-unstable-v1-client-protocol.c: $(DECO_XML)
+	$(SCANNER) private-code $< $@
 fl-shell-client-protocol.h: $(FL_XML)
 	$(SCANNER) client-header $< $@
 fl-shell-client-protocol.c: $(FL_XML)
@@ -139,3 +152,8 @@ clean:
 		linux-dmabuf-unstable-v1-client-protocol.[ch]
 
 .PHONY: all check check-perf check-keys check-lock check-ws check-x install clean
+
+# xdg-decoration: server-side title bar and frame, client-side kept (needs python3)
+check-deco: flcomp tests/shmclient
+	./tests/deco.sh
+	./tests/stride.sh

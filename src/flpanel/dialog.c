@@ -205,6 +205,7 @@ static void power_run(void)
 		}
 		dup2(e[1], 2);
 		dup2(s[1], 3);
+		{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }
 		execl("/bin/sh", "sh", "-c", "eval \"$1\"; r=$?; printf '%d' \"$r\" >&3; exit \"$r\"", "sh",
 		      power[what].cmd, (char *)NULL);
 		_exit(127);

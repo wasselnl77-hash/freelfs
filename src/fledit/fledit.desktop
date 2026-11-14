@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Text Editor
+Icon=accessories-text-editor
 Comment=Write and edit plain text
 Exec=fledit %F
 Categories=Office;TextEditor;

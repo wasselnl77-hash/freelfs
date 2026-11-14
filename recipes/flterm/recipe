@@ -1,7 +1,7 @@
 # flterm, from src/flterm in the FreeLFS tree.
 pkgname=flterm
 version=0.1
-release=3
+release=4
 summary="The FreeLFS terminal (runs flsh)"
 license=(MIT)
 arch=(x86_64)

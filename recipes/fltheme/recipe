@@ -2,7 +2,7 @@
 # panel, animations and presets in one place, with GTK hints for Flatpak apps.
 pkgname=fltheme
 version=0.1
-release=1
+release=2
 summary="FreeLFS Themes: colour scheme (dark, light), accent, fonts, window controls, panel, animations, presets"
 license=(MIT)
 arch=(x86_64)

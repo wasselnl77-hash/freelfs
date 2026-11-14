@@ -75,7 +75,10 @@ extern const uint8_t flsplash_art[], flsplash_art_end[];
 #define T_TEXT0 2100    /* the word fades in */
 #define T_TEXT 1300
 #define T_END 3800
-#define FINISH_MS 300 /* boot ended early: the rest of the animation in this time */
+#define T_MIN 3000       /* the splash holds at least this long from the first picture (the animation is longer) */
+#define FADE_US 300000   /* after the animation, or when the handover came: fade out in this time */
+#define HANDOVER_WAIT_MS 6000 /* --handover waits for the fade and the animation's rest */
+_Static_assert(T_END >= T_MIN, "the splash must hold at least T_MIN");
 #define FRAME_US 16667
 #define MIN_GAP_US 8000      /* least time between two copied frames */
 #define MIN_FLIP_GAP_US 14000 /* between two flips: drivers without a vertical blank report them at once */
@@ -105,6 +108,7 @@ struct scene {
 	int *sx0, *sx1;
 	uint16_t lut[256];
 	int64_t frame_t;
+	unsigned frame_f; /* the fade the frame was composed with */
 };
 static struct scene *scenes[MAXSIZE];
 static int nsizes, art_S[MAXSIZE], art_Rw[MAXSIZE], art_Rh[MAXSIZE];
@@ -296,6 +300,7 @@ static struct scene *load_scene(int idx)
 		s->lut[i] = (uint16_t)lroundf((broad + narrow) * 256.0f);
 	}
 	s->frame_t = -1;
+	s->frame_f = ~0u;
 	scenes[idx] = s;
 	return s;
 }
@@ -345,11 +350,24 @@ static void over_row(uint32_t *d, const uint32_t *s, int a, int b, uint32_t k)
 	}
 }
 
+static unsigned g_fade; /* 0..256: how far the picture has faded to the background */
+
+static inline uint32_t fade_to(uint32_t d, uint32_t c, unsigned k) /* d toward c by k/256, per channel */
+{
+	uint32_t out = d & 0xff000000u;
+	for (int sh = 0; sh <= 16; sh += 8) {
+		int a = (int)((d >> sh) & 255), b = (int)((c >> sh) & 255);
+		out |= (uint32_t)(a + (b - a) * (int)k / 256) << sh;
+	}
+	return out;
+}
+
 static void compose(struct scene *s, int64_t t)
 {
-	if (s->frame_t == t)
+	if (s->frame_t == t && s->frame_f == g_fade)
 		return;
 	s->frame_t = t;
+	s->frame_f = g_fade;
 	unsigned ga = k256(ease((float)t / T_GLOW)), la = k256(ease((float)(t - T_LOGO0) / T_LOGO)),
 	         ra = k256(ease((float)(t - T_REFL0) / T_REFL)), ta = k256(ease((float)(t - T_TEXT0) / T_TEXT));
 	int sweep = t > T_SWEEP0 && t < T_SWEEP0 + T_SWEEP, cpos = 0;
@@ -391,6 +409,9 @@ static void compose(struct scene *s, int64_t t)
 		int ty = y - s->text.y;
 		if (ta && ty >= 0 && ty < s->text.h && s->text.x0[ty] >= 0)
 			over_row(d + s->text.x, s->text.px + (size_t)ty * (size_t)s->text.w, s->text.x0[ty], s->text.x1[ty], ta);
+		if (g_fade)
+			for (int x = 0; x < s->Rw; x++)
+				d[x] = fade_to(d[x], s->rowcol[y], g_fade);
 	}
 }
 
@@ -410,7 +431,7 @@ struct out {
 };
 struct card {
 	int fd, fbdev, nout, nopoll;
-	char path[64];
+	char path[300];
 	struct out o[MAXOUT];
 };
 
@@ -421,6 +442,7 @@ static struct termios tty_saved;
 static int tty_raw, kd_graphics;
 static int64_t t0_us = -1; /* monotonic us of the first picture */
 static int anim_done, released, card_gone, want_release;
+static int64_t fade_us = -1; /* when the fade-out started, -1 none */
 static int64_t st_frames, st_us, st_gap, st_last; /* what the frames cost: for the log */
 static int64_t start_us, rescan_at = -1, retry_until = -1, release_us, done_us;
 
@@ -446,15 +468,9 @@ static void logf_(const char *fmt, ...)
 	}
 }
 
-static int64_t fin_us = -1; /* the handover came before the animation was over */
 static int64_t clock_t_now(void)
 {
 	int64_t t = t0_us < 0 ? 0 : (now_us() - t0_us) / 1000;
-	if (fin_us >= 0 && t0_us >= 0) { /* boot is done: run the rest of the animation in FINISH_MS, no longer */
-		int64_t f = (fin_us - t0_us) / 1000;
-		int64_t e = (now_us() - fin_us) / 1000;
-		t = f + (e >= FINISH_MS ? T_END : (T_END - f) * e / FINISH_MS);
-	}
 	return t > T_END ? T_END : t;
 }
 
@@ -605,7 +621,7 @@ static int draw_card_full(struct card *c, int64_t t)
 		struct out *o = &c->o[i];
 		present_full(c, o, t);
 		o->pending = 0;
-		o->final_sent = t >= T_END;
+		o->final_sent = t >= T_END && fade_us < 0;
 		o->next_us = 0;
 	}
 	in_draw = 0;
@@ -647,7 +663,7 @@ static int draw_card(struct card *c, int64_t t, int64_t nowu, int64_t *next)
 		if (st_last && p0 - st_last > st_gap)
 			st_gap = p0 - st_last;
 		st_last = p0;
-		if (t >= T_END)
+		if (t >= T_END && fade_us < 0)
 			o->final_sent = 1;
 		if (o->pending) {
 			o->next_us = nowu + MIN_FLIP_GAP_US;
@@ -916,7 +932,7 @@ static int rescan(void)
 	while (d && (de = readdir(d))) {
 		if (strncmp(de->d_name, "card", 4) || ncards >= MAXCARD)
 			continue;
-		char path[64];
+		char path[300];
 		snprintf(path, sizeof path, "/dev/dri/%s", de->d_name);
 		drm_nodes++;
 		if (have_card(path))
@@ -1049,6 +1065,35 @@ static void do_release(void)
 	logf_("released");
 }
 
+/* the fade-out: the picture goes to the background colour over FADE_US, then the screen is let go */
+__attribute__((unused)) static void fade_start(int64_t now)
+{
+	fade_us = now;
+	g_fade = 0;
+	for (int i = 0; i < ncards; i++)
+		for (int j = 0; j < cards[i].nout; j++) {
+			cards[i].o[j].final_sent = 0;
+			cards[i].o[j].next_us = 0;
+		}
+}
+
+static void fade_finish(void)
+{
+	g_fade = 256;
+	int64_t t = clock_t_now();
+	for (int i = ncards - 1; i >= 0; i--)
+		for (int j = 0; j < cards[i].nout; j++) {
+			cards[i].o[j].next_us = 0;
+			cards[i].o[j].pending = 0;
+		}
+	for (int i = ncards - 1; i >= 0; i--) {
+		int64_t next = INT64_MAX;
+		draw_card(&cards[i], t, now_us(), &next); /* the last picture, fully faded */
+	}
+	do_release();
+	logf_("faded out, screen released");
+}
+
 static void daemon_main(int ready)
 {
 	start_us = now_us();
@@ -1082,10 +1127,14 @@ static void daemon_main(int ready)
 	for (;;) {
 		int64_t now = now_us(), wake = INT64_MAX;
 #define WAKE(at) do { if ((at) < wake) wake = (at); } while (0)
-		if (!released && ncards && !anim_done) {
+		if (!released && ncards && (!anim_done || fade_us >= 0)) {
 			int64_t next = INT64_MAX;
 			int lost = 0;
 			int64_t t = clock_t_now();
+			if (fade_us >= 0) {
+				int64_t e = (now - fade_us) * 256 / FADE_US;
+				g_fade = e >= 256 ? 256u : (unsigned)e;
+			}
 			for (int i = ncards - 1; i >= 0; i--)
 				if (draw_card(&cards[i], t, now, &next) < 0) {
 					logf_("%s vanished while drawing", cards[i].path);
@@ -1095,18 +1144,26 @@ static void daemon_main(int ready)
 			if ((lost || card_gone) && rescan_at < 0)
 				rescan_at = now + 100000;
 			card_gone = 0;
-			if (ncards && all_final()) {
+			if (fade_us >= 0) {
+				WAKE(next);
+			} else if (ncards && all_final()) {
 				anim_done = 1;
 				done_us = now;
 				touch(DONEF);
-				if (want_release)
-					do_release();
 				logf_("done: %lld frames, %lld us each, longest gap %lld ms", (long long)st_frames,
 				      (long long)(st_us / (st_frames ? st_frames : 1)), (long long)(st_gap / 1000));
+				if (want_release)
+					do_release(); /* no fade: flgreet's first frames continue from the wordmark left on screen */
 			} else {
 				WAKE(next);
 			}
 		}
+		if (fade_us >= 0 && !released && now >= fade_us + (int64_t)FADE_US) {
+			fade_finish();
+			continue;
+		}
+		if (fade_us >= 0 && !released)
+			WAKE(fade_us + (int64_t)FADE_US);
 		if (rescan_at >= 0)
 			WAKE(rescan_at);
 		if (!ncards && !released)
@@ -1140,10 +1197,8 @@ static void daemon_main(int ready)
 				if (si.ssi_signo == SIGUSR1) {
 					if (anim_done || !ncards || t0_us < 0)
 						do_release();
-					else { /* the system is up: finish the picture quickly, then let go */
+					else { /* the system is up: the animation runs to its end, then the screen is let go with the wordmark in place */
 						want_release = 1;
-						if (fin_us < 0)
-							fin_us = now_us();
 					}
 				} else if (released) {
 					if (si.ssi_signo == SIGUSR2) /* the login screen did not come up */
@@ -1280,8 +1335,8 @@ int main(int argc, char **argv)
 		pid_t p = read_pid();
 		if (!p)
 			return 0;
-		kill(p, SIGUSR1); /* the daemon runs the animation to its end in 300 ms at most */
-		wait_file(RELF, p, 2500);
+		kill(p, SIGUSR1); /* the daemon runs the animation to its end, then the screen is let go */
+		wait_file(RELF, p, HANDOVER_WAIT_MS);
 		return 0;
 	}
 	if (argc > 1 && !strcmp(argv[1], "--text")) {

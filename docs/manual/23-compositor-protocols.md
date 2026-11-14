@@ -78,6 +78,7 @@ These are the globals flcomp creates (`wl_global_create` calls in `src/flcomp`):
 | `wl_seat` | 5 | `seat.c` | pointer, keyboard, touch not offered |
 | `wl_data_device_manager` | 3 | `seat.c` | clipboard and drag offers (drag and drop not implemented) |
 | `xdg_wm_base` | 3 | `xdg.c` | toplevels, popups |
+| `zxdg_decoration_manager_v1` | 1 | `xdg.c` | server-side decorations (round 19). A client that binds it and does not ask for client-side gets `server_side`: flcomp draws the same title bar and frame it draws for X windows (`xwdeco.c`: minimize, maximize, close, move, resize, right click opens the window menu, middle click closes). A client that sets `client_side` keeps its own. Clients that never bind it (GTK 3, Firefox, FreeLFS's own flui programs) are not touched. A window with a server-drawn frame is not animated on open and close. Test: `src/flcomp/tests/deco.sh` |
 | `zwp_linux_dmabuf_v1` | 3 | `dmabuf.c` | GPU buffers (section 15) |
 | `fl_shell` | 9 | `flshell.c` | the private desktop protocol (section 4) |
 | `fl_screencopy_manager` | 1 | `screencopy.c` | the private screenshot protocol (section 5) |

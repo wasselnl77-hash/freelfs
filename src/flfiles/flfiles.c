@@ -29,6 +29,14 @@
 #include <time.h>
 #include <unistd.h>
 
+/* a started program must not keep Files' folder (a drive that is ejected later): it starts in $HOME */
+static void child_home(void)
+{
+	const char *h = getenv("HOME");
+	if (!h || !*h || chdir(h) != 0)
+		(void)!chdir("/");
+}
+
 enum {
 	ID_BACK = 1, ID_FWD, ID_UP, ID_PATH, ID_NEW, ID_GRID, ID_SCROLL,
 	ID_SIDE = 100, ID_DRIVE = 200, ID_EJECT = 300, ID_CELL = 1000, ID_MENU = 0x40000, ID_DLG = 0x41000,
@@ -1289,6 +1297,7 @@ static int spawn_desktop(struct F *f, const char *desktop, const char *path, con
 		close(ep[0]);
 		setsid();
 		signal(SIGCHLD, SIG_DFL);
+		child_home();
 		/* the app gets no descriptors of Files (sockets, job pipes, mount info) */
 		for (int fd = 3; fd < 1024; fd++)
 			if (fd != ep[1])
@@ -1358,6 +1367,7 @@ static void open_entry(struct F *f, int i)
 	if (pid == 0) {
 		setsid();
 		signal(SIGCHLD, SIG_DFL);
+		child_home();
 		execlp("fledit", "fledit", p, (char *)NULL);
 		_exit(127);
 	}
@@ -2056,6 +2066,26 @@ static int split_tabs(char *line, char **fld, int max)
 	return n;
 }
 
+/* is PATH inside DIR (or DIR itself)? */
+static int path_in(const char *path, const char *dir)
+{
+	size_t n = strlen(dir);
+	while (n > 1 && dir[n - 1] == '/')
+		n--;
+	return !strncmp(path, dir, n) && (path[n] == '/' || !path[n]);
+}
+
+/* go to Home when the folder shown is on a drive that is being ejected or is gone */
+static void go_home_if(struct F *f, const char *drive_path)
+{
+	if (!path_in(f->cwd, drive_path))
+		return;
+	const char *home = getenv("HOME");
+	if (home && *home && load_dir(f, home, 1) == 0)
+		return;
+	load_dir(f, "/", 1);
+}
+
 /* the drive list from flmount list (NULL: flmount is not there), plus the mounts under /drives and /run/media */
 static void drives_rebuild(struct F *f, const char *list)
 {
@@ -2121,6 +2151,15 @@ static void drives_rebuild(struct F *f, const char *list)
 		fclose(fp);
 	}
 	f->ndrv2 = n;
+	/* the folder shown is under /drives or /run/media and no mounted drive covers it any more: Home */
+	if (!strncmp(f->cwd, "/drives/", 8) || !strncmp(f->cwd, "/run/media/", 11)) {
+		int covered = 0;
+		for (int i = 0; i < n; i++)
+			if (f->drv2[i].mounted && f->drv2[i].path[0] && !f->drv2[i].system && path_in(f->cwd, f->drv2[i].path))
+				covered = 1;
+		if (!covered)
+			go_home_if(f, f->cwd);
+	}
 	if (f->ndrv != f->ndrv2 || memcmp(f->drv, f->drv2, sizeof f->drv)) {
 		memcpy(f->drv, f->drv2, sizeof f->drv);
 		f->ndrv = f->ndrv2;
@@ -2775,6 +2814,8 @@ static void run_action(struct F *f)
 		}
 		struct drive *d = &f->drv[f->act_idx];
 		int mount = act == A_MOUNT;
+		if (!mount && d->path[0])
+			go_home_if(f, d->path);	/* never stay in a folder of the drive that goes away */
 		say(f, 0, "%s %s...", mount ? "Mounting" : "Ejecting", d->label);
 		f->opr = hlp_spawn(f, mount ? HK_MOUNT : HK_EJECT, mount ? "mount" : "eject", d->dev);
 		if (f->opr)
@@ -3829,6 +3870,15 @@ int main(int argc, char **argv)
 		fl_fd_add(f->app, f->mi_fd, POLLPRI, mi_ready, f);
 
 	const char *start = argc == 2 ? argv[1] : home && *home ? home : "/";
+	char startabs[PATH_MAX];
+	if (argc == 2 && realpath(start, startabs))
+		start = startabs;
+	/* Files never keeps a drive's folder as its own working directory (started from a terminal in it, or by
+	 * the "USB stick connected" card): that would make the eject fail with "in use" */
+	if (home && *home)
+		(void)!chdir(home);
+	else
+		(void)!chdir("/");
 	if (load_dir(f, start, 1) < 0) {
 		char first[300];
 		snprintf(first, sizeof first, "%s", f->msg);

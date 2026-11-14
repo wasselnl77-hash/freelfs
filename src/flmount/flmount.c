@@ -631,6 +631,22 @@ static void write_file(const char *path, const char *val)
 	}
 }
 
+/* remove the empty, unmounted directories left under /drives (rmdir only works on those) */
+static void sweep_drives(void)
+{
+	DIR *d = opendir("/drives");
+	struct dirent *e;
+	while (d && (e = readdir(d))) {
+		char p[PATH_MAX];
+		if (e->d_name[0] == '.')
+			continue;
+		snprintf(p, sizeof p, "/drives/%s", e->d_name);
+		rmdir(p);
+	}
+	if (d)
+		closedir(d);
+}
+
 static int cmd_eject(const char *dev)
 {
 	struct part *v = calloc(MAXP, sizeof *v);
@@ -659,6 +675,7 @@ static int cmd_eject(const char *dev)
 		if (unmount_dev(d, 0, NULL))
 			bad = 1;
 	}
+	sweep_drives();
 	if (bad)
 		goto out;
 	/* flush the device's cache, then remove it from the SCSI layer (the kernel stops the unit) and, for USB, cut it off */
@@ -767,6 +784,8 @@ static void run_as(uid_t uid, gid_t gid, const char *name, const char *const *ar
 	struct passwd *pw = getpwuid(uid);
 	if (pw)
 		setenv("HOME", pw->pw_dir, 1);
+	if (!pw || chdir(pw->pw_dir) != 0)
+		(void)!chdir("/");	/* never start in a folder of a drive */
 	if (out_fd >= 0)
 		dup2(out_fd, 1);
 	int nul = open("/dev/null", O_RDWR);
@@ -892,18 +911,7 @@ static int cmd_gone(const char *dev)
 	if (strncmp(dev, "/dev/", 5) || !name_ok(dev + 5))
 		return 1;
 	unmount_dev(dev, 1, NULL);
-	/* empty leftover directories */
-	DIR *d = opendir("/drives");
-	struct dirent *e;
-	while (d && (e = readdir(d))) {
-		char p[PATH_MAX];
-		if (e->d_name[0] == '.')
-			continue;
-		snprintf(p, sizeof p, "/drives/%s", e->d_name);
-		rmdir(p);	/* only succeeds for an empty, unmounted directory */
-	}
-	if (d)
-		closedir(d);
+	sweep_drives();
 	return 0;
 }
 
@@ -911,6 +919,7 @@ int main(int argc, char **argv)
 {
 	for (int fd = 3; fd < 256; fd++)	/* the caller's status pipe (fd 3) must not stay open in anything we start */
 		close(fd);
+	(void)!chdir("/");	/* our own folder must never keep a drive busy */
 	if (geteuid() != 0) {
 		err("not installed setuid root (the system's file ownership was not applied)");
 		return 1;

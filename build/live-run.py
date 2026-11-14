@@ -20,6 +20,8 @@ CMDFILE: one shell command per line, '#' lines skipped. Lines starting with '@':
     @ok TEXT :: CMD       run CMD in the guest as root; FAILS unless it exits 0 (TEXT names the check)
     @waitok SECS TEXT :: CMD   like @ok, but CMD is tried every second for up to SECS seconds
     @shotok FILE          like @shot (kept for old files), or (almost) one colour
+    @shotdiff BASE NEW MIN [X1 Y1 X2 Y2]  FAILS unless at least MIN pixels differ between two screendumps
+    @shotpix FILE RRGGBB MIN  FAILS unless at least MIN pixels have exactly that colour
     @shotcolors FILE MIN  FAILS unless the screendump FILE has at least MIN distinct colours
     @shot FILE            screendump; also FAILS when the file is missing or blank
 Console transcript: $FLFS_WORK/logs/live-run.log. Exit 1 when any check failed (see the RESULT line),
@@ -142,6 +144,28 @@ def shot_colours(fn):
     return len({px[i:i + 3] for i in range(0, len(px) - 3, 3 * 7)})
 
 
+def shot_diff(a, b, box=None):
+    """Number of pixels that differ between two PPMs (optionally inside box = x1 y1 x2 y2), -1 when unreadable."""
+    try:
+        da, db = open(a, "rb").read(), open(b, "rb").read()
+        ma = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", da)
+        mb = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", db)
+        w, h = int(ma.group(1)), int(ma.group(2))
+        if (w, h) != (int(mb.group(1)), int(mb.group(2))):
+            return -1
+        pa, pb = da[ma.end():], db[mb.end():]
+    except (OSError, AttributeError):
+        return -1
+    x1, y1, x2, y2 = box or (0, 0, w, h)
+    n = 0
+    for y in range(y1, min(y2, h)):
+        ra = pa[(y * w + x1) * 3:(y * w + min(x2, w)) * 3]
+        rb = pb[(y * w + x1) * 3:(y * w + min(x2, w)) * 3]
+        if ra != rb:
+            n += sum(1 for i in range(0, len(ra), 3) if ra[i:i + 3] != rb[i:i + 3])
+    return n
+
+
 def guest_ok(con, text, cmdline):
     """Run cmdline in the guest; True when it exits 0. The verdict token is computed, so the console's
     echo of the command cannot contain it."""
@@ -208,6 +232,20 @@ with open(LOG, "w") as log:
                     print("colours in %s: %d" % (os.path.basename(w[1]), n))
                     if n < int(w[2]):
                         fail("%s has %d colours, expected at least %s (blank or flat window?)" % (os.path.basename(w[1]), n, w[2]))
+                elif w[0] == "shotdiff":	# @shotdiff BASE NEW MIN [X1 Y1 X2 Y2]: FAILS unless at least MIN pixels differ
+                    n = shot_diff(w[1], w[2], tuple(int(v) for v in w[4:8]) if len(w) >= 8 else None)
+                    print("pixels that differ, %s vs %s: %d" % (os.path.basename(w[1]), os.path.basename(w[2]), n))
+                    if n < int(w[3]):
+                        fail("%s differs from %s in %d pixels, expected at least %s (no window appeared?)" % (os.path.basename(w[2]), os.path.basename(w[1]), n, w[3]))
+                elif w[0] == "shotpix":	# @shotpix FILE RRGGBB MIN: FAILS unless at least MIN pixels have exactly that colour
+                    d = open(w[1], "rb").read()
+                    m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", d)
+                    want = bytes.fromhex(w[2])
+                    px = d[m.end():]
+                    n = sum(1 for i in range(0, len(px) - 2, 3) if px[i:i + 3] == want)
+                    print("pixels of %s in %s: %d" % (w[2], os.path.basename(w[1]), n))
+                    if n < int(w[3]):
+                        fail("%s has %d pixels of colour %s, expected at least %s" % (os.path.basename(w[1]), n, w[2], w[3]))
                 elif w[0] in ("ok", "waitok"):
                     secs = int(w[1]) if w[0] == "waitok" else 0
                     body = line.split(None, 2)[2] if w[0] == "waitok" else line.split(None, 1)[1]

@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=FreeLFS install
+Icon=drive-harddisk
 Comment=Install FreeLFS on this computer
 Exec=flinstall
 # only the live system has this directory: the icon is not shown on an installed system

@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Snappel
+Icon=applets-screenshooter
 Comment=Take and annotate screenshots
 Exec=snappel
 Categories=Utility;Graphics;

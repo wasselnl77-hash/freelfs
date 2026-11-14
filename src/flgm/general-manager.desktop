@@ -3,5 +3,6 @@ Type=Application
 Name=General Manager
 Comment=Processes, performance, startup apps and users
 Exec=general-manager
+Icon=utilities-system-monitor
 Categories=System;Monitor;
 X-FreeLFS-Glyph=▥

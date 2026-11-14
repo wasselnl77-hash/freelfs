@@ -12,6 +12,7 @@
 #include <poll.h>
 #include <sys/stat.h>
 #include <flui.h>
+#include "icons.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -350,6 +351,8 @@ void launch(const char *exec, int terminal)
 		return;
 	setsid();
 	signal(SIGCHLD, SIG_DFL);
+	/* never inherit a folder (an ejected drive): programs start in $HOME */
+	{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }
 	if (terminal) /* in flterm; a failing program leaves its window open for a look */
 		execlp("flterm", "flterm", "-e", "sh", "-c",
 		       "eval \"$1\"; r=$?; [ $r = 0 ] || { printf '\\n[exit status %d, press Enter]' $r; read x; }",
@@ -936,12 +939,14 @@ static void draw_panel(fl_ui *ui, void *ud)
 			fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 2, r.w, 2), fl_th.line);
 		int iy = r.y + (r.h - 2 - ICON_PX) / 2;
 		if (labels) {
-			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + 12, iy, ICON_PX, fg);
+			if (!icon_draw_app(cv, w->app_id, r.x + 12, iy, ICON_PX))
+				fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + 12, iy, ICON_PX, fg);
 			char fit[160];
 			fl_text_fit(ui->f_reg, name, ew - 12 - ICON_PX - 8 - 12, fit, sizeof fit);
 			fl_text_in(cv, ui->f_reg, fl_r(r.x + 12 + ICON_PX + 8, r.y, ew - 12 - ICON_PX - 8, r.h - 2), FL_LEFT, 0, fg, fit);
 		} else {
-			fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + (r.w - ICON_PX) / 2, iy, ICON_PX, fg);
+			if (!icon_draw_app(cv, w->app_id, r.x + (r.w - ICON_PX) / 2, iy, ICON_PX))
+				fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + (r.w - ICON_PX) / 2, iy, ICON_PX, fg);
 		}
 		/* tell the compositor where this entry is: minimise and restore move towards it (fl_shell 7) */
 		if (p->shell && p->shell_ver >= 7 && (w->ex != r.x || w->ew != r.w || w->eh != r.h)) {

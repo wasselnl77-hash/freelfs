@@ -1,0 +1,28 @@
+pkgname=papirus-icon-theme
+version=20260801
+release=1
+summary="Papirus icon theme (PNG subset: apps, categories, places, mimetypes, devices at 16 to 48 px)"
+url=https://github.com/PapirusDevelopmentTeam/papirus-icon-theme
+license=(GPL-3.0-only)
+arch=(any)
+groups=(desktop)
+# Source 1: the official release tarball (SVG), checked here and in sources.lock; it is the provenance and the
+# license text. Source 2: the PNG subset of it, made on the build host by build/papirus-raster.py (flpkg builds in
+# the chroot, which has no SVG renderer, and the system has none at run time: flpanel looks up PNG only).
+# To refresh source 2: build/papirus-raster.py ~/freelfs-work/cache/sources/papirus-icon-theme-$version.tar.gz
+#   ~/freelfs-work/cache/sources/papirus-png-$version.tar.xz --rsvg PATH/rsvg-convert  and copy it to rootfs/sources.
+source=(papirus-icon-theme-$version.tar.gz::https://github.com/PapirusDevelopmentTeam/papirus-icon-theme/archive/refs/tags/$version.tar.gz
+	papirus-png-$version.tar.xz::file:///sources/papirus-png-$version.tar.xz)
+sha256=(646f622e9e7e9e65eef9d0ab58999d4920ddb33d98e6a75232627cfe3bd508f9
+	e99559fda16d368c2d8863e5c8302a871c268f480572d46966defc70b7d67593)
+
+package() {
+	cd "$srcdir"
+	# the theme's own LICENSE and AUTHORS come in the PNG subset; the upstream tree is only checked for them
+	test -f "papirus-icon-theme-$version/LICENSE"
+	install -d "$pkgdir/usr/share/icons"
+	cp -a Papirus "$pkgdir/usr/share/icons/Papirus"
+	install -Dm644 "papirus-icon-theme-$version/LICENSE" "$pkgdir/usr/share/licenses/papirus-icon-theme/LICENSE"
+	install -Dm644 "papirus-icon-theme-$version/AUTHORS" "$pkgdir/usr/share/licenses/papirus-icon-theme/AUTHORS"
+	rm -f "$pkgdir/usr/share/icons/Papirus/LICENSE" "$pkgdir/usr/share/icons/Papirus/AUTHORS"
+}

@@ -29,10 +29,17 @@ static struct window *noted, *hover_w, *pressed_w;
 static int hover_p, pressed_p;
 static unsigned pressed_edges;
 
+bool window_framed(struct window *w)
+{
+	if (!w || w->fullscreen)
+		return false;
+	return w->xw ? w->xw->deco : w->ssd;
+}
+
 struct xinset xwm_insets(struct window *w)
 {
 	struct xinset z = { 0, 0, 0, 0 };
-	if (!w || !w->xw || !w->xw->deco || w->fullscreen)
+	if (!w || !window_framed(w))
 		return z;
 	if (w->maximized) {
 		z.t = XD_TITLE;
@@ -52,7 +59,7 @@ static struct rect outer_of(struct window *w)
 
 struct rect xwm_deco_outer(struct window *w)
 {
-	if (!w->xw || !w->xw->deco || w->fullscreen)
+	if (!window_framed(w))
 		return (struct rect){ 0, 0, 0, 0 };
 	return outer_of(w);
 }
@@ -186,7 +193,7 @@ static struct rect button_rect(struct rect o, int part)
 
 void xwm_deco_draw(struct window *w, struct rect clip)
 {
-	if (!w->xw || !w->xw->deco || w->fullscreen)
+	if (!window_framed(w))
 		return;
 	struct xinset in = xwm_insets(w);
 	struct rect c = window_rect(w), o = { c.x1 - in.l, c.y1 - in.t, c.x2 + in.r, c.y2 + in.b }, t;
@@ -249,7 +256,7 @@ void xwm_deco_draw(struct window *w, struct rect clip)
 static int part_at(struct window *w, int x, int y, unsigned *edges)
 {
 	*edges = 0;
-	if (!w->xw || !w->xw->deco || w->fullscreen)
+	if (!window_framed(w))
 		return DP_NONE;
 	struct xinset in = xwm_insets(w);
 	struct rect c = window_rect(w), o = { c.x1 - in.l, c.y1 - in.t, c.x2 + in.r, c.y2 + in.b };

@@ -4,14 +4,14 @@
 CC ?= cc
 CFLAGS ?= -O2 -g
 CFLAGS += -std=c17 -D_GNU_SOURCE -Wall -Wextra -Wno-unused-parameter
-PKGS = flui wayland-client dbus-1
+PKGS = flui wayland-client dbus-1 libpng
 PREFIX ?= /usr
 DESTDIR ?=
 # the protocol is flcomp's; the recipe copies it here
 PROTO ?= ../flcomp/protocol/fl-shell.xml
 
 OBJS = panel.o menu.o flyout.o notify.o battery.o perfmode.o deskicons.o wsmenu.o fl-shell-protocol.o dialog.o ctxmenu.o \
-	fileinfo.o quick.o
+	fileinfo.o quick.o icons.o
 
 all: flpanel flnotify flpower
 
@@ -49,6 +49,17 @@ check: all
 	./tests/pager.sh
 
 clean:
-	rm -f flpanel flnotify flpower $(OBJS) fl-shell-client-protocol.h fl-shell-protocol.c
+	rm -f flpanel flnotify flpower $(OBJS) fl-shell-client-protocol.h fl-shell-protocol.c tests/icons_test
 
-.PHONY: all install check clean
+# the icon lookup against a fake tree (tests/icons_test.c): built against the rootfs sysroot and run
+# through its loader; ICON_SYSROOT names another sysroot, ICON_SCRATCH the scratch tree the test writes
+ICON_SYSROOT ?= $(HOME)/freelfs-work/rootfs-x86_64
+ICON_SCRATCH ?= $(HOME)/freelfs-work/icons-test
+
+tests/icons_test: tests/icons_test.c icons.c icons.h
+	$(CC) $(CFLAGS) --sysroot=$(ICON_SYSROOT) -o $@ tests/icons_test.c icons.c -lflui -lpng16
+
+icons-test: tests/icons_test
+	mkdir -p $(ICON_SCRATCH) && $(ICON_SYSROOT)/lib64/ld-linux-x86-64.so.2 --library-path $(ICON_SYSROOT)/usr/lib:$(ICON_SYSROOT)/lib64 ./tests/icons_test $(ICON_SCRATCH)
+
+.PHONY: all install check clean icons-test

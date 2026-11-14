@@ -1,0 +1,74 @@
+# The r18 laptop bug: eject a USB stick in Files, then nothing opened any more and saving said "permission denied".
+# A PARTITIONED stick (sda1), Files started the worst way (its own folder is the stick), eject with the eject button in
+# Files' sidebar, then General Manager, Settings and Terminal from the start menu's search. Each must draw a window:
+# the verdict is a pixel comparison with the desktop before (not pgrep). Then fledit saves a file: into Home.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@mon drive_add 0 if=none,id=u,file=@USB@,format=raw
+@mon device_add usb-storage,drive=u,id=ud,bus=xhci.0
+@waitok 60 the partitioned stick (sda1) is mounted under /drives :: grep -q '^/dev/sda1 /drives/TESTUSB ' /proc/mounts
+@ok a file on the stick :: su -s /bin/sh tester -c 'echo hi > /drives/TESTUSB/note.txt'
+su -s /bin/sh tester -c 'cd /drives/TESTUSB; set -a; . /tmp/sessenv; setsid flfiles /drives/TESTUSB </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 4
+@shot @OUT@/el-1-files-on-stick.ppm
+# the eject button next to TESTUSB in the sidebar
+@mouse 321 490
+@click
+@waitok 40 the stick is gone (no mount, no disk) :: ! grep -q ' /drives/TESTUSB ' /proc/mounts && ! test -e /sys/block/sda
+@wait 3
+@ok no mountpoint is left under /drives :: ! test -e /drives/TESTUSB
+@shot @OUT@/el-2-after-eject.ppm
+# Files itself must have left the drive: its window now shows a folder that exists (Home); the title is not TESTUSB
+@ok Files is still running :: pgrep -u tester -x flfiles
+@shotdiff @OUT@/el-1-files-on-stick.ppm @OUT@/el-2-after-eject.ppm 3000 150 40 1010 600
+# General Manager from the start menu search
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/el-3-gm.ppm
+@shotdiff @OUT@/el-2-after-eject.ppm @OUT@/el-3-gm.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/el-3-gm.ppm 150
+@ok General Manager did not start in a folder of the stick :: test "$(readlink /proc/$(pgrep -u tester -x general-manager | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager
+@wait 2
+@shot @OUT@/el-4-base2.ppm
+@key meta_l
+@wait 2
+@type settings
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/el-5-settings.ppm
+@shotdiff @OUT@/el-4-base2.ppm @OUT@/el-5-settings.ppm 40000 0 0 1280 750
+@ok Settings runs in Home :: test "$(readlink /proc/$(pgrep -u tester -x flsettings | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x flsettings; sleep 1; ! pgrep -u tester -x flsettings
+@wait 2
+@shot @OUT@/el-6-base3.ppm
+@key meta_l
+@wait 2
+@type terminal
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/el-7-terminal.ppm
+@shotdiff @OUT@/el-6-base3.ppm @OUT@/el-7-terminal.ppm 40000 0 0 1280 750
+@ok the terminal's shell starts in Home :: for p in $(pgrep -u tester -x flterm); do for c in $(pgrep -P $p); do test "$(readlink /proc/$c/cwd)" = /home/tester && exit 0; done; done; exit 1
+@ok close it :: pkill -u tester -x flterm; sleep 1; ! pgrep -u tester -x flterm
+@wait 2
+# saving a text file in the editor, started from "/" (a folder tester cannot write to): the save dialog offers Home
+su -s /bin/sh tester -c 'cd /; set -a; . /tmp/sessenv; setsid fledit </dev/null >/tmp/fledit.log 2>&1 &'
+@waitok 20 the editor runs :: pgrep -u tester -x fledit
+@wait 3
+@type hello r19
+@key ctrl-s
+@wait 2
+@shot @OUT@/el-8-save-dialog.ppm
+@key ret
+@wait 3
+@shot @OUT@/el-9-saved.ppm
+@ok the text file was saved in Home :: grep -q 'hello' /home/tester/untitled.txt
+@ok nothing was written to / :: ! test -e /untitled.txt

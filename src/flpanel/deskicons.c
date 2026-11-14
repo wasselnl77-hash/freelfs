@@ -567,6 +567,7 @@ void desk_import_uris(struct panel *p, const char *list, int move)
 		pid_t worker = fork();
 		if (worker == 0) {
 			signal(SIGCHLD, SIG_DFL);
+			{ const char *h_ = getenv("HOME"); if (!h_ || !*h_ || chdir(h_) != 0) (void)!chdir("/"); }
 			execv("/bin/sh", argv);
 			_exit(127);
 		}

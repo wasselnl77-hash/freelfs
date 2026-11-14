@@ -3,7 +3,7 @@
 # the live session's persistent home (flpersist create SIZE, used by flinitrd at the next boot).
 pkgname=flmount
 version=0.1
-release=1
+release=2
 summary="Mount, unmount and eject USB drives; automount on plug-in; live persistence"
 license=(MIT)
 arch=(x86_64)
