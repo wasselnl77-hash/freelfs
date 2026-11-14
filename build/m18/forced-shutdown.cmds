@@ -1,0 +1,9 @@
+# A shutdown that hangs in three services (each ignores TERM and sleeps) must still end: the 15 s watchdog of rc
+# forces sync, umount and power off. Started with telinit 0 as root (the hang is in rc itself, not in the click).
+@greeter
+printf '%s\n' '#!/bin/bash' '. /etc/rc.d/functions' '[ "$1" = stop ] && { trap "" TERM; echo hanging; sleep 1000; }' > /etc/rc.d/init.d/hang1
+cp /etc/rc.d/init.d/hang1 /etc/rc.d/init.d/hang2; cp /etc/rc.d/init.d/hang1 /etc/rc.d/init.d/hang3; chmod +x /etc/rc.d/init.d/hang?
+sed -i 's/^SERVICES=(/SERVICES=(hang1 hang2 hang3 /' /etc/rc.conf
+@ok the hanging services are in rc.conf :: grep -q '^SERVICES=(hang1' /etc/rc.conf
+telinit 0
+@poweroffwait 45

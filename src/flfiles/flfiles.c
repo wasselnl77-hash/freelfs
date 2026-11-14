@@ -1274,17 +1274,47 @@ static int spawn_desktop(struct F *f, const char *desktop, const char *path, con
 	char *argv[32] = {0};
 	if (exec_args(desktop, path, argv, 32) < 0)
 		return 0;
+	char prog[256];
+	snprintf(prog, sizeof prog, "%s", argv[0]);
+	/* a pipe with close-on-exec: it stays empty when exec works, and carries errno when it fails */
+	int ep[2];
+	if (pipe2(ep, O_CLOEXEC) < 0) {
+		for (int i = 0; argv[i]; i++)
+			free(argv[i]);
+		say(f, 1, "Cannot start %s: %s", prog, strerror(errno));
+		return 1;
+	}
 	pid_t pid = fork();
 	if (pid == 0) {
+		close(ep[0]);
 		setsid();
 		signal(SIGCHLD, SIG_DFL);
+		/* the app gets no descriptors of Files (sockets, job pipes, mount info) */
+		for (int fd = 3; fd < 1024; fd++)
+			if (fd != ep[1])
+				close(fd);
 		execvp(argv[0], argv);
+		int e = errno;
+		ssize_t wr = write(ep[1], &e, sizeof e);
+		(void)wr;
 		_exit(127);
 	}
+	close(ep[1]);
 	for (int i = 0; argv[i]; i++)
 		free(argv[i]);
-	if (pid < 0)
-		say(f, 1, "Cannot start the app for %s: %s", name, strerror(errno));
+	if (pid < 0) {
+		close(ep[0]);
+		say(f, 1, "Cannot start %s: %s", prog, strerror(errno));
+		return 1;
+	}
+	int e = 0;
+	ssize_t r;
+	do
+		r = read(ep[0], &e, sizeof e);
+	while (r < 0 && errno == EINTR);
+	close(ep[0]);
+	if (r == (ssize_t)sizeof e)
+		say(f, 1, "Cannot start %s for %s: %s", prog, name, strerror(e));
 	return 1;
 }
 

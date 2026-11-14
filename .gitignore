@@ -21,3 +21,8 @@ __pycache__/
 /src/flsettings/flsettings
 /src/libdssl/tests/conform
 /src/fldisplay/fldisplay
+/src/flcomp/tests/xclient
+/src/flpkg/tests/test-core
+/src/flsnap/flsnap
+/src/fltheme/fltheme
+/src/fltheme/tests/contrast

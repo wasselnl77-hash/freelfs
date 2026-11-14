@@ -1,6 +1,8 @@
 #!/bin/bash
 # /etc/rc.d/rc.shutdown 0|6 -- bring the system down after the services
-# have stopped, then power off (0) or reboot (6).
+# have stopped, then power off (0) or reboot (6). Every step has a time limit
+# (timeout -k: also for a process stuck in the kernel), and rc started a
+# watchdog that forces the end after 15 s in all (functions: force_power).
 
 . /etc/rc.conf
 . /etc/rc.d/functions
@@ -9,24 +11,35 @@ case $HARDWARECLOCK in
 	localtime) clock=--localtime ;;
 	*) clock=--utc ;;
 esac
-step "Saving the system clock" timeout 10 hwclock --systohc "$clock"
+wd=$(cat /run/flshutdown.wd 2> /dev/null)
+omit=()
+[ -n "$wd" ] && omit=(-o "$wd")
 
+say "Saving the clock"
+step "Saving the system clock" timeout -k 1 5 hwclock --systohc "$clock"
+
+say "Stopping remaining processes"
 stat_busy "Stopping remaining processes"
-killall5 -15
-sleep 2
-killall5 -9
+timeout -k 1 4 killall5 -15 "${omit[@]}"
+sleep 1
+timeout -k 1 4 killall5 -9 "${omit[@]}"
 stat_done
 
-step "Deactivating swap" timeout 20 swapoff -a
-step "Unmounting file systems" timeout 30 umount -a -r -O no_netdev \
+say "Deactivating swap, unmounting"
+step "Deactivating swap" timeout -k 1 8 swapoff -a
+step "Unmounting file systems" timeout -k 1 8 umount -a -r -O no_netdev \
 	-t notmpfs,nosysfs,noproc,nodevtmpfs,nodevpts,nocgroup2
-step "Remounting root read-only" timeout 10 bash -c ". /etc/rc.d/functions; remount_root ro"
-timeout 15 sync
+step "Remounting root read-only" timeout -k 1 4 bash -c ". /etc/rc.d/functions; remount_root ro"
+timeout -k 1 4 sync
 
+# no halt -i: taking the network interfaces down by hand has nothing left to do (dhcpcd and iwd are
+# stopped) and a Wi-Fi driver that hangs there would stop the power-off
 if [ "$1" = 6 ]; then
-	echo "Rebooting."
-	reboot -d -f -i
+	say "Rebooting."
+	timeout -k 1 3 reboot -d -f
 else
-	echo "Powering off."
-	halt -d -f -i -p
+	say "Powering off."
+	timeout -k 1 3 halt -d -f -p
 fi
+# halt or reboot came back: that should not happen
+force_power "$1"

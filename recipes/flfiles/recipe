@@ -1,7 +1,7 @@
 # flfiles, from src/flfiles in the FreeLFS tree.
 pkgname=flfiles
 version=0.1
-release=3
+release=4
 summary="FreeLFS file manager: places, drives, icon grid, trash"
 license=(MIT)
 arch=(x86_64)

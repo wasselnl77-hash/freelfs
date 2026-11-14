@@ -1,6 +1,6 @@
 pkgname=flmusic
 version=0.1
-release=2
+release=3
 summary="FreeLFS music player: tag library, queue, GStreamer playback, MPRIS"
 license=(MIT)
 arch=(x86_64)

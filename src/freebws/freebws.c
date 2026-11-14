@@ -2367,19 +2367,20 @@ static void sandbox_paths(void)
 	}
 }
 
-/* useragent= in the config replaces it. The default is a Chrome on Linux string with WebKit's own
- * version: sign-in pages (Google) refuse browsers they do not know, and an embedded WebKit's default
- * string (with its WPE token) is one of them. The Chrome version is a constant to move up now and then. */
-#define CHROME_UA_VERSION "146.0.0.0"
+/* useragent= in the config replaces it. The default is the string a WebKit browser sends (Safari's form,
+ * the one Epiphany sends too): the engine is WebKit, and a page that checks the string against what the
+ * browser can do (Cloudflare's Turnstile does) must find them alike. A Chrome string on a WebKit engine does
+ * not: no window.chrome, no userAgentData, an AppleWebKit token that is not 537.36. Sign-in pages (Google)
+ * accept this form; an embedded WebKit's own default (with its WPE token) is one they refuse. */
+#define SAFARI_UA_VERSION "18.4"
 static void user_agent_setup(void)
 {
 	const char *c = cfg_get("useragent", "");
 	if (*c)
 		B.ua = g_strdup(c);
 	else
-		B.ua = g_strdup_printf("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/%u.%u.%u (KHTML, like Gecko) "
-				       "Chrome/%s Safari/537.36", webkit_get_major_version(), webkit_get_minor_version(),
-				       webkit_get_micro_version(), CHROME_UA_VERSION);
+		B.ua = g_strdup("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+				"Version/" SAFARI_UA_VERSION " Safari/605.1.15");
 }
 
 /* cookies=always (default) or cookies=no-third-party. The default keeps every cookie: WebKit's
@@ -2390,6 +2391,9 @@ static void cookies_setup(void)
 	const char *c = getenv("FREEBWS_COOKIES");
 	if (!c || !*c)
 		c = cfg_get("cookies", "always");
+	/* Intelligent Tracking Prevention partitions and expires third-party storage: a check page's
+	 * challenge frame (Cloudflare) then never sees the cookie it set a moment ago */
+	webkit_network_session_set_itp_enabled(webkit_network_session_get_default(), FALSE);
 	WebKitCookieManager *cm = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
 	webkit_cookie_manager_set_accept_policy(cm, !strcmp(c, "no-third-party") ? WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY
 										 : WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS);

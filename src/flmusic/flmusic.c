@@ -189,6 +189,8 @@ static int add_track(struct M *m, struct track *t)
 static int probe(struct M *m, const char *path, long long mtime, long long size, struct track *t)
 {
 	memset(t, 0, sizeof *t);
+	if (!m->disc)
+		return -1;
 	char *uri = gst_filename_to_uri(path, NULL);
 	if (!uri)
 		return -1;
@@ -833,6 +835,13 @@ static int make_pipeline(struct M *m)
 		if (f) {
 			gst_object_unref(f);
 			sink = gst_element_factory_make("pipewiresink", NULL);
+			/* the plugin can be there with no PipeWire daemon: READY opens the connection, so check it now
+			 * and fall back to autoaudiosink (ALSA, PulseAudio) rather than fail on the first song */
+			if (sink && gst_element_set_state(sink, GST_STATE_READY) == GST_STATE_CHANGE_FAILURE) {
+				gst_element_set_state(sink, GST_STATE_NULL);
+				gst_object_unref(sink);
+				sink = NULL;
+			}
 		}
 		if (!sink)
 			sink = gst_element_factory_make("autoaudiosink", NULL);
@@ -1554,10 +1563,16 @@ int main(int argc, char **argv)
 	m->pos_timer = fl_timer_new(m->app, pos_tick, m);
 	m->show_queue = 1;
 	GError *err = NULL;
+	/* no discoverer: the window still opens and says why (probe() refuses without one) */
+	char start_err[300] = "";
 	m->disc = gst_discoverer_new(5 * GST_SECOND, &err);
 	if (!m->disc) {
-		fprintf(stderr, "flmusic: %s\n", err ? err->message : "no discoverer");
-		return 1;
+		snprintf(start_err, sizeof start_err, "Cannot read audio files: %s",
+		         err ? err->message : "GStreamer has no discoverer");
+		fprintf(stderr, "flmusic: %s\n", start_err);
+		if (err)
+			g_error_free(err);
+		err = NULL;
 	}
 	if (make_pipeline(m) < 0)
 		say(m, 1, "GStreamer's playbin is missing: nothing can be played");
@@ -1578,6 +1593,8 @@ int main(int argc, char **argv)
 	m->mpris = mpris_start(m->app, &ops);
 
 	m->tab = start_tab;
+	if (start_err[0])
+		say(m, 1, "%s", start_err);
 	cache_load(m);
 	if (m->root[0])
 		walk(m, m->root, 0);
@@ -1589,13 +1606,19 @@ int main(int argc, char **argv)
 		cache_save(m);
 
 	if (nfiles) {
-		int first = -1;
+		int first = -1, bad = 0;
+		char badname[300] = "";
 		int *tr = malloc((size_t)nfiles * sizeof(int)), n = 0;
 		for (int i = 0; i < nfiles; i++) {
 			struct stat st;
 			struct track t;
-			if (stat(files[i], &st) < 0 || probe(m, files[i], (long long)st.st_mtime, (long long)st.st_size, &t) < 0)
+			if (stat(files[i], &st) < 0 || probe(m, files[i], (long long)st.st_mtime, (long long)st.st_size, &t) < 0) {
+				/* said below: a file the command line named must not vanish without a word */
+				if (!bad)
+					snprintf(badname, sizeof badname, "%s", strrchr(files[i], '/') ? strrchr(files[i], '/') + 1 : files[i]);
+				bad++;
 				continue;
+			}
 			int ti = add_track(m, &t);
 			if (ti >= 0)
 				tr[n++] = ti;
@@ -1606,6 +1629,8 @@ int main(int argc, char **argv)
 			queue_play(m, tr, n, 0);
 		free(tr);
 		build_index(m);
+		if (bad)
+			say(m, 1, bad == 1 ? "Cannot play %s" : "Cannot play %s and %d other file(s)", badname, bad - 1);
 	}
 	fl_app_watch_conf(m->app, NULL, NULL);
 	fl_app_run(m->app);

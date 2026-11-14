@@ -1,0 +1,38 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fff;
+  --fg: #1d1d1f;
+  --muted: #5b5b5b;
+  --line: #c8c8c8;
+  --accent: #2ea865;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161616; --fg: #e8e8e8; --muted: #a8a8a8; --line: #444; }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+header, main, footer { max-width: 42rem; margin: 0 auto; padding: 0 1rem; }
+header { padding-top: 1.25rem; }
+header img { width: 2.5rem; height: 2.5rem; vertical-align: middle; }
+header a.brand { text-decoration: none; font-weight: bold; }
+nav { margin: 0.75rem 0 1.5rem; }
+nav a { margin-right: 1rem; }
+a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+h1 { font-size: 1.75rem; margin-top: 0; }
+h2 { font-size: 1.25rem; margin-top: 2rem; }
+.warn { border: 2px solid var(--fg); padding: 0.75rem 1rem; margin: 1.5rem 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+pre { border: 1px solid var(--line); padding: 0.75rem; overflow-x: auto; font-size: 0.9rem; white-space: pre-wrap; }
+figure { margin: 1.5rem 0; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 0.3rem; }
+footer { margin-top: 3rem; padding: 1rem 1rem 2rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+footer h2 { font-size: 1rem; margin: 0 0 0.4rem; color: var(--fg); }
+footer ul { margin: 0 0 1rem; padding-left: 1.2rem; }

@@ -75,6 +75,7 @@ extern const uint8_t flsplash_art[], flsplash_art_end[];
 #define T_TEXT0 2100    /* the word fades in */
 #define T_TEXT 1300
 #define T_END 3800
+#define FINISH_MS 300 /* boot ended early: the rest of the animation in this time */
 #define FRAME_US 16667
 #define MIN_GAP_US 8000      /* least time between two copied frames */
 #define MIN_FLIP_GAP_US 14000 /* between two flips: drivers without a vertical blank report them at once */
@@ -419,7 +420,7 @@ static int ttyfd = -1, ifd = -1, wd_dev = -1, wd_dri = -1;
 static struct termios tty_saved;
 static int tty_raw, kd_graphics;
 static int64_t t0_us = -1; /* monotonic us of the first picture */
-static int anim_done, released, card_gone;
+static int anim_done, released, card_gone, want_release;
 static int64_t st_frames, st_us, st_gap, st_last; /* what the frames cost: for the log */
 static int64_t start_us, rescan_at = -1, retry_until = -1, release_us, done_us;
 
@@ -445,9 +446,15 @@ static void logf_(const char *fmt, ...)
 	}
 }
 
+static int64_t fin_us = -1; /* the handover came before the animation was over */
 static int64_t clock_t_now(void)
 {
 	int64_t t = t0_us < 0 ? 0 : (now_us() - t0_us) / 1000;
+	if (fin_us >= 0 && t0_us >= 0) { /* boot is done: run the rest of the animation in FINISH_MS, no longer */
+		int64_t f = (fin_us - t0_us) / 1000;
+		int64_t e = (now_us() - fin_us) / 1000;
+		t = f + (e >= FINISH_MS ? T_END : (T_END - f) * e / FINISH_MS);
+	}
 	return t > T_END ? T_END : t;
 }
 
@@ -1092,6 +1099,8 @@ static void daemon_main(int ready)
 				anim_done = 1;
 				done_us = now;
 				touch(DONEF);
+				if (want_release)
+					do_release();
 				logf_("done: %lld frames, %lld us each, longest gap %lld ms", (long long)st_frames,
 				      (long long)(st_us / (st_frames ? st_frames : 1)), (long long)(st_gap / 1000));
 			} else {
@@ -1129,7 +1138,13 @@ static void daemon_main(int ready)
 			struct signalfd_siginfo si;
 			if (read(sfd, &si, sizeof si) == sizeof si) {
 				if (si.ssi_signo == SIGUSR1) {
-					do_release();
+					if (anim_done || !ncards || t0_us < 0)
+						do_release();
+					else { /* the system is up: finish the picture quickly, then let go */
+						want_release = 1;
+						if (fin_us < 0)
+							fin_us = now_us();
+					}
 				} else if (released) {
 					if (si.ssi_signo == SIGUSR2) /* the login screen did not come up */
 						kd_text_now();
@@ -1265,9 +1280,8 @@ int main(int argc, char **argv)
 		pid_t p = read_pid();
 		if (!p)
 			return 0;
-		wait_file(DONEF, p, 8000);
-		kill(p, SIGUSR1);
-		wait_file(RELF, p, 2000);
+		kill(p, SIGUSR1); /* the daemon runs the animation to its end in 300 ms at most */
+		wait_file(RELF, p, 2500);
 		return 0;
 	}
 	if (argc > 1 && !strcmp(argv[1], "--text")) {

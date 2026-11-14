@@ -1,0 +1,14 @@
+# Shut down on the login screen, straight after boot, as the person does: one click arms ("Click again"), the second
+# click powers off. Results are read from the guest, not from what this file printed.
+@greeter
+@shot @OUT@/gf-1-greeter.ppm
+@ok the live user is in the group seat :: id -nG tester | grep -qw seat
+@ok flpower is setuid root:seat 4750 in the ISO :: [ "$(stat -c %U:%G:%a /usr/bin/flpower)" = root:seat:4750 ]
+@ok /usr/sbin/poweroff and telinit exist :: test -x /usr/sbin/poweroff && test -x /usr/sbin/telinit
+@mouse 534 535
+@click
+@wait 1
+@shot @OUT@/gf-2-armed.ppm
+@ok one click alone does not power off (greeter still up) :: pgrep -x flgreet-ui
+@click
+@poweroffwait 30

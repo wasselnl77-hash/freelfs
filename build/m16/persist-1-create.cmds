@@ -1,8 +1,6 @@
-grep -E ' /run/live/(src|iso) ' /proc/mounts
-ls /drives
+@ok the live medium is mounted read-only under /run/live :: grep -qE ' /run/live/(src|iso) ' /proc/mounts
 su -s /bin/sh tester -c 'flmount list'
 su -s /bin/sh tester -c 'flpersist status'
-su -s /bin/sh tester -c 'flpersist create 512M; echo rc=$?'
+@ok flpersist create 512M succeeds as tester :: su -s /bin/sh tester -c 'flpersist create 512M'
 ls -l /run/live/src/
-su -s /bin/sh tester -c 'flpersist status'
-sync
+@ok flpersist status reports the new persistence :: su -s /bin/sh tester -c 'flpersist status' | grep -qE '^(ready|active)$'

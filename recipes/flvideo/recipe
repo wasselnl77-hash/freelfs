@@ -1,6 +1,6 @@
 pkgname=flvideo
 version=0.1
-release=3
+release=5
 summary="FreeLFS video player: libmpv software rendering, VA-API, subtitles, resume"
 license=(MIT)
 arch=(x86_64)

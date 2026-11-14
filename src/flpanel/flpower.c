@@ -198,11 +198,12 @@ static int logout_session(void)
 	return 0;
 }
 
-/* run poweroff or reboot; its own words and our status go to stderr/exit code */
-static int run_power(const char *cmd)
+/* run ARGV[0] with a clean environment and wait at most SECS for it (then it is killed, also when it
+ * hangs inside the kernel: SIGKILL, and we stop waiting after one more second). 0 when it exited 0. */
+static int run_wait(const char *const *argv, int secs)
 {
-	if (access(cmd, X_OK) < 0) {
-		fprintf(stderr, "flpower: %s: %s\n", cmd, strerror(errno));
+	if (access(argv[0], X_OK) < 0) {
+		fprintf(stderr, "flpower: %s: %s\n", argv[0], strerror(errno));
 		return 1;
 	}
 	pid_t pid = fork();
@@ -213,18 +214,54 @@ static int run_power(const char *cmd)
 	if (pid == 0) {
 		clearenv();
 		setenv("PATH", "/usr/sbin:/usr/bin", 1);
-		execl(cmd, cmd, (char *)NULL);
-		fprintf(stderr, "flpower: %s: %s\n", cmd, strerror(errno));
+		execv(argv[0], (char *const *)argv);
+		fprintf(stderr, "flpower: %s: %s\n", argv[0], strerror(errno));
 		_exit(127);
 	}
-	int st = 0;
-	while (waitpid(pid, &st, 0) < 0 && errno == EINTR)
-		;
+	int st = 0, done = 0;
+	for (int i = 0; i < secs * 20 + 20 && !done; i++) {
+		pid_t r = waitpid(pid, &st, WNOHANG);
+		if (r == pid)
+			done = 1;
+		else if (r < 0 && errno != EINTR)
+			return 1;
+		else {
+			if (i == secs * 20)
+				kill(pid, SIGKILL);
+			usleep(50000);
+		}
+	}
+	if (!done) {
+		fprintf(stderr, "flpower: %s did not finish in %d s\n", argv[0], secs);
+		return 1;
+	}
 	if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
-		fprintf(stderr, "flpower: %s failed (status %d)\n", cmd, WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+		fprintf(stderr, "flpower: %s failed (status %d)\n", argv[0], WIFEXITED(st) ? WEXITSTATUS(st) : -1);
 		return 1;
 	}
 	return 0;
+}
+
+/* off (restart = 0) or restart: telling init directly, else the usual way (poweroff/reboot), else the kernel itself after a sync. Each step has a time limit; the last
+ * one is the only one that skips the rc scripts. The caller gets a message on stderr and status 1
+ * only when every step failed (reboot(2) did not take effect either). */
+static int run_power(int restart)
+{
+	/* telinit: the one message init needs, nothing around it (no wall, no nologin file) */
+	const char *a1[] = {"/usr/sbin/telinit", restart ? "6" : "0", NULL};
+	if (run_wait(a1, 4) == 0)
+		return 0;
+	const char *a2[] = {restart ? "/usr/sbin/reboot" : "/usr/sbin/poweroff", NULL};
+	fprintf(stderr, "flpower: next: %s\n", a2[0]);
+	if (run_wait(a2, 5) == 0)
+		return 0;
+	fprintf(stderr, "flpower: init does not answer, forcing it\n");
+	sync();
+	const char *a3[] = {restart ? "/usr/sbin/reboot" : "/usr/sbin/halt", "-f", restart ? "-d" : "-p", NULL};
+	if (run_wait(a3, 6) == 0)
+		return 0;
+	fprintf(stderr, "flpower: the %s did not happen\n", restart ? "restart" : "shut down");
+	return 1;
 }
 
 int main(int argc, char **argv)
@@ -236,9 +273,9 @@ int main(int argc, char **argv)
 	if (argc == 2 && !strcmp(argv[1], "logout"))
 		return logout_session();
 	if (argc == 2 && !strcmp(argv[1], "off"))
-		cmd = "/usr/sbin/poweroff";
+		cmd = "off";
 	else if (argc == 2 && !strcmp(argv[1], "restart"))
-		cmd = "/usr/sbin/reboot";
+		cmd = "restart";
 	else if (argc == 3 && !strcmp(argv[1], "saver") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
 		if (geteuid() == 0 && setuid(0) < 0) {
 			perror("flpower");
@@ -259,5 +296,5 @@ int main(int argc, char **argv)
 		perror("flpower");
 		return 1;
 	}
-	return run_power(cmd);
+	return run_power(!strcmp(cmd, "restart"));
 }

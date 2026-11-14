@@ -1635,15 +1635,14 @@ int main(int argc, char **argv)
 		}
 	}
 	v->script = getenv("FLVIEW_KEYS");
-	char dir[PATH_MAX] = "", file[NAME_MAX + 1] = "";
+	char dir[PATH_MAX] = "", file[NAME_MAX + 1] = "", open_err[300] = "";
 	if (arg) {
 		char real[PATH_MAX];
 		struct stat st;
+		/* errors are shown in the window: the app is often started from Files, where nobody reads stderr */
 		if (!realpath(arg, real) || stat(real, &st) < 0) {
-			fprintf(stderr, "flview: cannot open %s: %s\n", arg, strerror(errno));
-			return 1;
-		}
-		if (S_ISDIR(st.st_mode)) {
+			snprintf(open_err, sizeof open_err, "Cannot open %s: %s", arg, strerror(errno));
+		} else if (S_ISDIR(st.st_mode)) {
 			snprintf(dir, sizeof dir, "%s", real);
 		} else {
 			char *sl = strrchr(real, '/');
@@ -1682,9 +1681,12 @@ int main(int argc, char **argv)
 	v->win = fl_win_new(v->app, &o);
 	if (!v->win)
 		return 1;
-	if (scan_dir(v, dir) < 0) {
-		fprintf(stderr, "flview: cannot read %s: %s\n", dir, strerror(errno));
-		return 1;
+	if (open_err[0]) {
+		say(v, 1, "%s", open_err);
+		fl_timer_arm(v->msg_timer, 15000, 0);
+	} else if (scan_dir(v, dir) < 0) {
+		say(v, 1, "Cannot read %s: %s", dir, strerror(errno));
+		fl_timer_arm(v->msg_timer, 15000, 0);
 	}
 	int start = 0;
 	if (file[0])

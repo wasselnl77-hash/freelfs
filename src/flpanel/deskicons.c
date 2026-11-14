@@ -601,7 +601,7 @@ static void desk_pick(struct panel *p, uintptr_t ud, int code)
 	if (code >= C_CHOICE) {
 		int i = code - C_CHOICE;
 		if (i < D.nchoice)
-			fileinfo_open_with(D.choice[i].desk, D.menu_path);
+			fileinfo_open_with(D.p, D.choice[i].desk, D.menu_path);
 		return;
 	}
 	switch (code) {

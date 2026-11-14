@@ -1,3 +1,3 @@
-grep -E ' /home ' /proc/mounts
-cat /home/tester/marker.txt
+@ok /home is the persistent image after the reboot :: grep -qE ' /home | /run/live/persist ' /proc/mounts
+@ok the marker survived the reboot :: grep -qx persisted-ok /home/tester/marker.txt
 ls -ld /home/tester

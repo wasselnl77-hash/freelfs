@@ -11,10 +11,10 @@ works on every machine, with no GL or EGL, and the memory use is the decoder plu
 window-sized frame (the render buffer is the size of the video area, so a small window is
 also cheaper to scale into).
 
-Hardware decoding: hwdec=auto-copy-safe, i.e. VA-API decoding with the frames copied back to
-memory (the recipe ffmpeg and mpv are built with libva). It is used when the GPU has a
-VA-API driver (iHD, radeonsi, ...) and silently falls back to software decoding otherwise.
-FLVIDEO_HWDEC=no turns it off, FLVIDEO_HWDEC=vaapi-copy insists on it.
+Hardware decoding: off by default since round 18 (software decoding; a Ryzen laptop did not play
+anything, and VA-API through radeonsi/iHD is a path no QEMU test covers). FLVIDEO_HWDEC=auto-copy-safe
+(or vaapi-copy) turns on VA-API decoding with the frames copied back to memory (mpv and the recipe
+ffmpeg are built with libva). mpv's own log: ~/.cache/flvideo/mpv.log.
 
 Controls: play/pause, -10 s and +10 s, a seek bar (drag or click), speed (click cycles
 0.5x .. 2x), Audio and Subtitles menus (pick a track; Subtitles has "Off"), mute and volume,

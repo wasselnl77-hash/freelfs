@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeLFS</title>
+<meta name="description" content="FreeLFS is an independent Linux distribution built from scratch. Pre-alpha.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <p><a class="brand" href="index.html"><img src="logo.svg" alt="FreeLFS logo" width="40" height="40"> FreeLFS</a></p>
+  <nav aria-label="Main">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="download.html">Download</a>
+    <a href="testers.html">Testers</a>
+    <a href="docs.html">Docs</a>
+  </nav>
+</header>
+
+<main>
+<h1>FreeLFS</h1>
+<p>FreeLFS is an independent Linux distribution, built from scratch with no parent distro. Its own pieces are written in C: the package manager (flpkg), the boot loader (flboot), the shell (flsh), a Wayland compositor (flcomp) and a desktop in the spirit of Linux Mint's Cinnamon.</p>
+<p>It uses a rolling release: there are no numbered versions to jump between.</p>
+<p>It is pre-alpha. It has been tested almost only in QEMU virtual machines and on one real laptop, where it showed serious bugs.</p>
+
+<h2>Small on purpose</h2>
+<p>The goal is a full desktop on a computer with 1 GB of RAM. In QEMU with 1 GB, the idle desktop uses about 85 MB of RAM. That is a measurement in a virtual machine, not a promise for every computer.</p>
+
+<h2>What's included</h2>
+<ul>
+  <li><strong>flcomp</strong>: the Wayland compositor that draws the desktop</li>
+  <li><strong>flpanel</strong>: the panel, with the start menu and a tray (battery, network, volume)</li>
+  <li><strong>Files</strong>: the file manager</li>
+  <li><strong>Settings</strong>: system settings, including a Wi-Fi page</li>
+  <li><strong>Themes</strong>: accent colours and wallpapers</li>
+  <li><strong>Software Store</strong>: apps from Flathub and FreeLFS packages (on an installed system)</li>
+  <li><strong>Packages</strong>: install, update and remove FreeLFS packages</li>
+  <li><strong>FreeBWS</strong>: web browser, a light browser on WPE WebKit</li>
+  <li><strong>Terminal</strong>: the terminal, running flsh</li>
+  <li><strong>Text Editor</strong>: with syntax colours</li>
+  <li><strong>Archives</strong>, <strong>Images</strong>, <strong>Documents</strong>, <strong>Music</strong>, <strong>Videos</strong>: archive tool, image viewer, PDF viewer, music and video players</li>
+  <li><strong>General Manager</strong>: task manager</li>
+  <li><strong>Snappel</strong>: screenshot tool</li>
+  <li><strong>FreeLFS install</strong>: the installer (it erases the disk you pick)</li>
+  <li><strong>flpkg</strong> and <strong>flboot</strong>: package manager and boot loader, under the desktop</li>
+</ul>
+
+<div class="warn">
+  <p><strong>PRE-ALPHA. Do not use FreeLFS on an important machine.</strong> Things will break, and nothing is stable yet. Don't rely on it to keep your data safe. Try it in a virtual machine or on a spare computer.</p>
+</div>
+
+<h2>Screenshots</h2>
+<figure>
+  <img src="img/desktop.png" alt="The FreeLFS desktop with a dark green wallpaper and the panel at the bottom" width="1280" height="800" loading="lazy">
+  <figcaption>The desktop, with the panel and its start menu.</figcaption>
+</figure>
+<figure>
+  <img src="img/files.png" alt="The Images app showing a PNG picture, with the file manager behind it" width="1280" height="800" loading="lazy">
+  <figcaption>Images, opening a picture from Files.</figcaption>
+</figure>
+<figure>
+  <img src="img/settings.png" alt="The Settings app on its appearance page, with accent colour choices" width="1280" height="800" loading="lazy">
+  <figcaption>Settings: dark theme and accent colours.</figcaption>
+</figure>
+<figure>
+  <img src="img/themes-dark.png" alt="The Themes app with its presets: FreeLFS Dark, FreeLFS Light and others" width="1280" height="800" loading="lazy">
+  <figcaption>Themes: presets for dark and light.</figcaption>
+</figure>
+<figure>
+  <img src="img/store.png" alt="The Software Store showing a list of apps" width="1280" height="800" loading="lazy">
+  <figcaption>Software Store.</figcaption>
+</figure>
+<figure>
+  <img src="img/terminal.png" alt="The Terminal open in the home folder" width="1280" height="800" loading="lazy">
+  <figcaption>Terminal.</figcaption>
+</figure>
+<figure>
+  <img src="img/installer-disk.png" alt="The FreeLFS installer on the disk choice step" width="1280" height="800" loading="lazy">
+  <figcaption>The installer, on the disk step.</figcaption>
+</figure>
+<figure>
+  <img src="img/overview.png" alt="The workspace overview showing four desktops" width="1280" height="800" loading="lazy">
+  <figcaption>Workspace overview.</figcaption>
+</figure>
+</main>
+
+<footer>
+  <h2>Help us!</h2>
+  <ul>
+    <li><a href="docs.html#freebws">FreeBWS</a>: our own light web browser is a community project. Bug fixes are very welcome (<a href="https://github.com/wasselnl77-hash/freelfs/issues">issues</a>).</li>
+    <li><a href="https://github.com/wasselnl77-hash/freelfs/issues/new?title=Contributor%20application">Apply to be a contributor</a>: tell us what you'd like to work on (code, testing, translations, docs).</li>
+    <li>Buy me a coffee! (coming soon)</li>
+  </ul>
+  <p>FreeLFS is pre-alpha. Its own code is MIT licensed. <a href="https://github.com/wasselnl77-hash/freelfs">Source and issues on GitHub</a>.</p>
+</footer>
+</body>
+</html>

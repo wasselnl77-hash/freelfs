@@ -15,7 +15,8 @@
 # persist-1..3 a stick with freelfs-persist.img keeps /home over a reboot
 # flauth       (image) the password window for removing a package: wrong password, then the right one
 # Not here: Ctrl+Alt+T on the login screen opens nothing, and `flpower off` as tester -- both are the first lines of usb-plug.
-set -euo pipefail
+set -uo pipefail
+FAILED=""
 here=$(cd "$(dirname "$0")" && pwd)
 twin=${1:?usage: m16-features.sh TWIN.iso [IMAGE.img]}
 image=${2:-}
@@ -28,9 +29,19 @@ run() { # run NAME [QEMU args]
 	sed "s|@OUT@|$out|g; s|@HERE@|$here/m16|g" "$here/m16/$n.cmds" > "$out/$n.run"
 	echo "== $n"
 	nice -n 10 python3 -u "$here/live-run.py" --iso "$twin" --mem 1G "$out/$n.run" -- -device usb-tablet "$@" | tee "$out/$n.log"
+	[ "${PIPESTATUS[0]}" = 0 ] || { echo "-> $n FAILED"; FAILED="$FAILED $n"; }
 }
 usb=$out/usb.img
-[ -f "$usb" ] || { truncate -s 256M "$usb"; /usr/sbin/mkfs.exfat -L TESTUSB "$usb" > /dev/null; }
+# a PARTITIONED stick, as sold: an MBR with one exFAT partition (sda1), not a bare file system on the whole disk
+if ! /usr/sbin/sfdisk -d "$usb" 2> /dev/null | grep -q "^[^ ]* *: start="; then
+	rm -f "$usb" "$usb.part"
+	truncate -s 256M "$usb"
+	printf 'label: dos\nstart=2048, type=7\n' | /usr/sbin/sfdisk --quiet "$usb"
+	truncate -s $((256*1024*1024 - 2048*512)) "$usb.part"
+	/usr/sbin/mkfs.exfat -L TESTUSB "$usb.part" > /dev/null
+	dd if="$usb.part" of="$usb" bs=512 seek=2048 conv=notrunc status=none
+	rm -f "$usb.part"
+fi
 want usb-plug && run usb-plug -device qemu-xhci,id=xhci
 want usb-notify && run usb-notify -device qemu-xhci,id=xhci
 want poweroff-menu && run poweroff-menu
@@ -55,4 +66,5 @@ if [ -n "$image" ] && want flauth; then
 	sed "s|\$OUT|$out|g" "$here/m16/flauth.tty" > "$out/flauth.tty"
 	FLFS_IMG=$image FLFS_VM_MEM=1G FLFS_VM_TTY=$out/flauth.tty python3 "$here/vm-run.py" "$out/flauth.run" -snapshot -usb -device usb-tablet | tee "$out/flauth.log"
 fi
+[ -z "$FAILED" ] || { echo "FAILED:$FAILED"; echo "pictures in $out"; exit 1; }
 echo "pictures in $out (convert the .ppm files; look at them)"

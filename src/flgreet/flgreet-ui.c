@@ -13,6 +13,8 @@
  */
 #include <crypt.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <flui.h>
 #include <math.h>
 #include <pwd.h>
@@ -42,6 +44,9 @@ struct G {
 	char pw[PW_CAP];
 	char err[96];
 	int shut_armed;
+	int shut_fd; /* stderr of `flpower off` while it runs, else -1 */
+	pid_t shut_pid;
+	char shut_msg[96];
 	int done;
 	int out_fd;
 	/* the take-over from flsplash (see "the wordmark" below) */
@@ -350,6 +355,75 @@ static void user_row(fl_ui *ui, fl_rect r, int i, int hover, int selected, void 
 	           selected ? fl_th.strong : fl_th.text, g->users[i].label);
 }
 
+/* `flpower off` (we are root: it tries poweroff, then init, then the kernel, each with a time limit). Its
+ * words and its status come back here: when it fails the login screen says so instead of doing nothing. */
+static void shut_out(void *ud, int fd, short rev)
+{
+	struct G *g = ud;
+	(void)rev;
+	char buf[96];
+	ssize_t n = read(fd, buf, sizeof buf - 1);
+	if (n == -1 && (errno == EINTR || errno == EAGAIN))
+		return;
+	size_t have = strlen(g->shut_msg);
+	if (n > 0) {
+		if (have + (size_t)n < sizeof g->shut_msg) {
+			memcpy(g->shut_msg + have, buf, (size_t)n);
+			g->shut_msg[have + (size_t)n] = 0;
+		}
+		return;
+	}
+	fl_fd_remove(g->app, fd);
+	close(fd);
+	g->shut_fd = -1;
+	int st = 0;
+	while (g->shut_pid > 0 && waitpid(g->shut_pid, &st, 0) < 0 && errno == EINTR)
+		;
+	g->shut_pid = 0;
+	if (WIFEXITED(st) && WEXITSTATUS(st) == 0)
+		return; /* init has been told: the screen goes away by itself */
+	for (char *c = g->shut_msg; *c; c++)
+		if (*c == '\n')
+			*c = ' ';
+	snprintf(g->err, sizeof g->err, "Shut down failed: %s", g->shut_msg[0] ? g->shut_msg : "no answer");
+	g->shut_armed = 0;
+	g->shut_msg[0] = 0;
+}
+
+static void start_shutdown(struct G *g)
+{
+	int e[2];
+	if (g->shut_fd >= 0)
+		return; /* already running */
+	if (pipe2(e, O_CLOEXEC) < 0) {
+		snprintf(g->err, sizeof g->err, "Shut down failed: no pipe");
+		return;
+	}
+	pid_t p = fork();
+	if (p < 0) {
+		close(e[0]);
+		close(e[1]);
+		snprintf(g->err, sizeof g->err, "Shut down failed: fork");
+		return;
+	}
+	if (p == 0) {
+		dup2(e[1], 2);
+		execl("/usr/bin/flpower", "flpower", "off", (char *)NULL);
+		fprintf(stderr, "flpower: %s", strerror(errno));
+		_exit(127);
+	}
+	close(e[1]);
+	g->shut_pid = p;
+	g->shut_fd = e[0];
+	g->shut_msg[0] = 0;
+	g->err[0] = 0;
+	snprintf(g->err, sizeof g->err, "Shutting down...");
+	if (fl_fd_add(g->app, e[0], POLLIN, shut_out, g) < 0) {
+		close(e[0]);
+		g->shut_fd = -1;
+	}
+}
+
 static void shut_disarm(void *ud)
 {
 	struct G *g = ud;
@@ -474,11 +548,7 @@ static void draw(fl_ui *ui, void *ud)
 			g->shut_armed = 1;
 			fl_timer_arm(g->shut_timer, 4000, 0);
 		} else {
-			pid_t p = fork();
-			if (p == 0) {
-				execl("/usr/sbin/poweroff", "poweroff", (char *)NULL);
-				_exit(127);
-			}
+			start_shutdown(g);
 		}
 	}
 	if ((login || enter) && g->nusers)
@@ -539,6 +609,7 @@ int main(int argc, char **argv)
 	}
 	g->title = fl_font_ui(500, WM_REST_PX);
 	g->small = fl_font_ui(400, 12);
+	g->shut_fd = -1;
 	g->shut_timer = fl_timer_new(g->app, shut_disarm, g);
 	load_users(g);
 

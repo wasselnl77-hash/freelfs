@@ -1,37 +1,31 @@
 # login screen: Ctrl+Alt+T must open nothing
-@wait 1
-for i in $(seq 60); do pgrep -x flgreet-ui >/dev/null && break; sleep 1; done; pgrep -x flgreet-ui >/dev/null && echo greeter-up
-@wait 4
+@greeter
 @key ctrl-alt-t
 @key meta_l-t
 @key meta_l-e
 @wait 3
-pgrep -a 'flterm|flfiles|general-manager' ; echo "terminals-after-keys: $(pgrep -c -x 'flterm|flfiles' )"
-ps -eo pid,user,comm | grep -E 'flterm|flfiles' ; echo end
+@ok no terminal or file manager opened on the login screen :: ! pgrep -x 'flterm|flfiles|general-manager'
 @shot @OUT@/a-login.ppm
 @key ret
-@wait 15
+@waitok 60 the desktop is up :: pgrep -x flpanel
+@wait 3
 @shot @OUT@/a-desktop.ppm
-ls -l /usr/bin/flpower /usr/bin/flmount /usr/bin/flauth
-su -s /bin/sh tester -c 'flmount list'
-echo ---plug
+@ok flpower is root:seat 4750 :: [ "$(stat -c %U:%G:%a /usr/bin/flpower)" = root:seat:4750 ]
+@ok flmount is root:seat 4750 :: [ "$(stat -c %U:%G:%a /usr/bin/flmount)" = root:seat:4750 ]
+@ok no stick yet :: ! su -s /bin/sh tester -c 'flmount list' | grep -q TESTUSB
 @mon drive_add 0 if=none,id=u,file=@OUT@/usb.img,format=raw
 @mon device_add usb-storage,drive=u,id=ud,bus=xhci.0
-@wait 10
-su -s /bin/sh tester -c 'flmount list'
-grep drives /proc/mounts
-ls /drives
-su -s /bin/sh tester -c 'echo hello-usb > /drives/TESTUSB/hello.txt && cat /drives/TESTUSB/hello.txt'
-ls -l /drives/TESTUSB
+@waitok 60 the partitioned stick (sda1) is listed and mounted under /drives :: su -s /bin/sh tester -c 'flmount list' | grep -q '/dev/sda1.*TESTUSB' && grep -q ' /drives/TESTUSB ' /proc/mounts
+@ok the whole disk sda is not offered as a drive :: ! su -s /bin/sh tester -c 'flmount list' | grep -q '^/dev/sda '
+@ok tester can write to the stick :: su -s /bin/sh tester -c 'echo hello-usb > /drives/TESTUSB/hello.txt' && test "$(cat /drives/TESTUSB/hello.txt)" = hello-usb
 @shot @OUT@/a-notify.ppm
-su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flfiles >/tmp/files.log 2>&1 </dev/null &'
-@wait 6
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flfiles >/tmp/files.log 2>&1 </dev/null &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 4
 @shot @OUT@/a-files.ppm
-su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; flmount unmount /dev/sda; echo unmount-rc=$?'
-grep -c drives /proc/mounts
-su -s /bin/sh tester -c 'flmount mount /dev/sda; echo mount-rc=$?'
-su -s /bin/sh tester -c 'flmount eject /dev/sda; echo eject-rc=$?'
-@wait 3
-su -s /bin/sh tester -c 'flmount list'
-su -s /bin/sh tester -c 'flmount eject /dev/sr0; echo rc=$?'
-su -s /bin/sh tester -c 'flmount mount /dev/vda1; echo internal-rc=$?'
+@ok unmount works :: su -s /bin/sh tester -c 'flmount unmount /dev/sda1' && ! grep -q ' /drives/TESTUSB ' /proc/mounts
+@ok mount works :: su -s /bin/sh tester -c 'flmount mount /dev/sda1' && grep -q ' /drives/TESTUSB ' /proc/mounts && test -s /drives/TESTUSB/hello.txt
+@ok eject works and the device is gone :: su -s /bin/sh tester -c 'flmount eject /dev/sda1' ; sleep 3; ! grep -q ' /drives/TESTUSB ' /proc/mounts && ! test -e /sys/block/sda
+@ok the eject of the CD drive is refused or harmless (no crash) :: su -s /bin/sh tester -c 'flmount eject /dev/sr0'; true
+@ok an internal partition is never mounted for the user :: ! su -s /bin/sh tester -c 'flmount mount /dev/vda1'

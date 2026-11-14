@@ -1,0 +1,16 @@
+# Shut down from the panel's start menu with things open: Files, the editor with an unsaved window. Power off must
+# happen within the budget of live-run.py (20 s) and the console must show "Powering off".
+@desktop
+@ok the panel runs as tester :: pgrep -u tester -x flpanel
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; setsid flfiles /home/tester </dev/null >/tmp/files.log 2>&1 & setsid fledit </dev/null >/tmp/fledit.log 2>&1 &'
+@waitok 20 Files and the editor are running :: pgrep -u tester -x flfiles && pgrep -u tester -x fledit
+@key meta_l
+@wait 2
+@mouse 448 731
+@click
+@wait 2
+@shot @OUT@/ps-1-dialog.ppm
+# Enter is the dialog's main button (Shut down now / Log out now); its place on the screen moves with the windows behind it
+@key ret
+@poweroffwait 40

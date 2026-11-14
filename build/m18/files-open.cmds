@@ -1,0 +1,35 @@
+# Open a PNG and an MP4 by double click in Files, as tester, in the session the panel started (the environment of
+# the panel process is what Files gets; nothing is exported by hand except that copy). Checks the processes, the
+# window pictures (a gradient picture or a video frame has hundreds of colours, a blank window a handful) and the
+# apps' own logs. Needs the samples disk as a virtio disk (build/m10-samples.py), see m18-honest.sh.
+@desktop
+@ok the samples disk is there :: mkdir -p /mnt/s && mount -o ro -t vfat /dev/vda /mnt/s && test -s /mnt/s/sample.png && test -s /mnt/s/sample.mp4
+@ok samples copied to the home of tester :: cp /mnt/s/sample.png /mnt/s/sample.mp4 /home/tester/ && chown 1000:999 /home/tester/sample.png /home/tester/sample.mp4 && umount /mnt/s
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@ok the default apps resolve (mimeapps.list) :: grep -q '^image/png=flview.desktop' /usr/share/applications/mimeapps.list && grep -q '^video/mp4=flvideo.desktop' /usr/share/applications/mimeapps.list && test -x /usr/bin/flview && test -x /usr/bin/flvideo
+su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; setsid flfiles </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files is running :: pgrep -u tester -x flfiles
+@wait 4
+@shot @OUT@/fo-1-files.ppm
+@mouse 619 262
+@dclick
+@waitok 20 flview opened sample.png :: pgrep -u tester -a flview | grep -q sample.png
+@wait 4
+@shot @OUT@/fo-2-png.ppm
+@shotcolors @OUT@/fo-2-png.ppm 300
+@ok no error dialog and flview did not crash :: pgrep -u tester -x flview && ! ls /home/tester/.local/state/freelfs/log/*crash* 2>/dev/null | grep -q .
+@ok close the viewer :: pkill -u tester -x flview; sleep 1; ! pgrep -u tester -x flview
+@wait 2
+@mouse 511 262
+@dclick
+@waitok 20 flvideo opened sample.mp4 :: pgrep -u tester -a flvideo | grep -q sample.mp4
+@wait 6
+@shot @OUT@/fo-3-mp4.ppm
+@shotcolors @OUT@/fo-3-mp4.ppm 300
+@ok flvideo is still running and mpv logged no error :: pgrep -u tester -x flvideo && ! grep -i -E 'fatal|error' /home/tester/.cache/flvideo/mpv.log
+@ok the video engine's log shows the decoder and audio outcome :: cat /home/tester/.cache/flvideo/mpv.log | head -20
+# the other ways in: "gio open" is what the desktop icons and the start menu's Recent list run
+@ok close the player :: pkill -u tester -x flvideo; sleep 1; ! pgrep -u tester -x flvideo
+@ok gio open of a PNG starts flview (desktop icon and Recent path) :: su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; cd /home/tester; gio open sample.png' ; for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -u tester -a flview | grep -q sample.png && exit 0; sleep 1; done; exit 1
+@ok gio open of an MP4 starts flvideo :: su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; cd /home/tester; gio open sample.mp4' ; for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -u tester -a flvideo | grep -q sample.mp4 && exit 0; sleep 1; done; exit 1
+@ok gio open as seen by the panel (sh -c, no terminal) :: su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; setsid sh -c "gio open /home/tester/sample.png" </dev/null >/tmp/gio.log 2>&1'; sleep 2; cat /tmp/gio.log; pgrep -u tester -c flview | grep -qv '^0$'

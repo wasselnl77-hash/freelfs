@@ -5,6 +5,6 @@
 @mouse 448 731
 @click
 @wait 2
-@mouse 700 374
-@click
+# Enter is the dialog's main button (Shut down now); without it the dialog counts down 30 s
+@key ret
 @poweroffwait 60

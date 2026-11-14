@@ -149,10 +149,12 @@ Popups, user agent, cookies (round 16)
   from a script (after an await, seconds after the click) is not dropped. The
   popup's tab is shown at ready-to-show (a fallback after 5 s).
   User agent: useragent=STRING in ~/.config/freebws/config replaces the default,
-  which is a Chrome on Linux string with WebKit's own version
-  (Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/MAJ.MIN.MIC (KHTML, like Gecko)
-  Chrome/CHROME_UA_VERSION Safari/537.36; the constant is in freebws.c, move it
-  up now and then). Google refuses browsers it does not know, so no WPE token.
+  which is the Safari form every WebKit browser sends (Mozilla/5.0 (X11; Linux x86_64)
+  AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15; SAFARI_UA_VERSION
+  in freebws.c). It matches the engine: a Chrome string on WebKit (the default until round
+  17) is what bot checks such as Cloudflare Turnstile catch (no window.chrome, no
+  userAgentData). No WPE token, which Google refuses. ITP is off and
+  challenges.cloudflare.com is never blocked (adblock.c BUILTIN_ALLOW).
   Cookies: cookies=always (default) or cookies=no-third-party (or
   FREEBWS_COOKIES=) sets WebKit's cookie accept policy on the default network
   session. The default keeps all cookies. WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY

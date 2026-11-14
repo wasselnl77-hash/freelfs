@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download - FreeLFS</title>
+<meta name="description" content="Download the FreeLFS live ISO, check it, write it to a USB stick, and see the requirements.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <p><a class="brand" href="index.html"><img src="logo.svg" alt="FreeLFS logo" width="40" height="40"> FreeLFS</a></p>
+  <nav aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="download.html" aria-current="page">Download</a>
+    <a href="testers.html">Testers</a>
+    <a href="docs.html">Docs</a>
+  </nav>
+</header>
+
+<main>
+<h1>Download</h1>
+
+<div class="warn">
+  <p><strong>No release published yet.</strong> The live ISO is built, but it is not on GitHub Releases yet. When it is, it will be listed at <a href="https://github.com/wasselnl77-hash/freelfs/releases">github.com/wasselnl77-hash/freelfs/releases</a>.</p>
+</div>
+
+<p>The live ISO is called <code>freelfs-live.iso</code> and is about 843 MB. It boots from a CD image or a USB stick, and the live session keeps everything in RAM. Nothing is written to the computer's disks unless you run the installer.</p>
+
+<h2>Check the sha256</h2>
+<p>Compare the checksum of your copy with the sha256 value on the release page.</p>
+<pre>sha256sum freelfs-live.iso</pre>
+<p>On Windows: <code>certutil -hashfile freelfs-live.iso SHA256</code></p>
+
+<h2>Write it to a USB stick</h2>
+<p><strong>Option 1: Ventoy.</strong> Install Ventoy on the stick, then copy <code>freelfs-live.iso</code> onto it as a file. Boot the stick and choose "Boot in normal mode". Ventoy works in UEFI mode only, with Secure Boot off.</p>
+
+<p><strong>Option 2: dd (Linux).</strong></p>
+<div class="warn">
+  <p><strong>Double-check the device.</strong> <code>dd</code> erases the whole disk it writes to, with no question asked. Use the stick as a whole device (for example <code>/dev/sdb</code>), not a partition (<code>/dev/sdb1</code>). Check the name with <code>lsblk</code> first: the size and model must match your stick. Writing to your system disk destroys your data.</p>
+</div>
+<pre>lsblk
+sudo dd if=freelfs-live.iso of=/dev/sdX bs=4M status=progress conv=fsync</pre>
+<p>Replace <code>/dev/sdX</code> with your stick's device name.</p>
+
+<h2>Requirements</h2>
+<table>
+  <tr><th></th><th>Minimum</th><th>Recommended</th></tr>
+  <tr><td>CPU</td><td>x86_64 (64-bit Intel or AMD)</td><td>same</td></tr>
+  <tr><td>RAM</td><td>1 GB</td><td>2 GB or more: the live session keeps everything in RAM</td></tr>
+  <tr><td>Firmware</td><td>UEFI, Secure Boot off</td><td>same</td></tr>
+  <tr><td>Graphics</td><td>see below</td><td>AMD (tested on one laptop)</td></tr>
+</table>
+<p>Legacy BIOS boot is not supported: the live ISO and the installer use UEFI.</p>
+
+<h2>Graphics and Wi-Fi</h2>
+<table>
+  <tr><th>Hardware</th><th>Status</th></tr>
+  <tr><td>AMD graphics</td><td>Tested partly, on a Ryzen 5 7520U laptop (Radeon 610M). Other AMD chips: prepared, not tested on real hardware.</td></tr>
+  <tr><td>Intel graphics</td><td>Prepared, not tested on real hardware. Needs testers. Intel 3D drivers are planned for later; until then Intel uses software OpenGL.</td></tr>
+  <tr><td>NVIDIA</td><td>Not supported yet. The computer runs on its firmware display or its integrated GPU. Open-source driver (nouveau) planned.</td></tr>
+  <tr><td>Wi-Fi</td><td>Realtek rtw89 tested on one laptop. Other Intel, Realtek and MediaTek chips are included in the kernel but not tested.</td></tr>
+</table>
+<p>The full list is in <a href="https://github.com/wasselnl77-hash/freelfs/blob/main/docs/HARDWARE.md">docs/HARDWARE.md</a>. 32-bit systems are not planned.</p>
+</main>
+
+<footer>
+  <h2>Help us!</h2>
+  <ul>
+    <li><a href="docs.html#freebws">FreeBWS</a>: our own light web browser is a community project. Bug fixes are very welcome (<a href="https://github.com/wasselnl77-hash/freelfs/issues">issues</a>).</li>
+    <li><a href="https://github.com/wasselnl77-hash/freelfs/issues/new?title=Contributor%20application">Apply to be a contributor</a>: tell us what you'd like to work on (code, testing, translations, docs).</li>
+    <li>Buy me a coffee! (coming soon)</li>
+  </ul>
+  <p>FreeLFS is pre-alpha. Its own code is MIT licensed. <a href="https://github.com/wasselnl77-hash/freelfs">Source and issues on GitHub</a>.</p>
+</footer>
+</body>
+</html>

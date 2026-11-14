@@ -97,6 +97,17 @@ def main():
     def shot(name):
         ppm = os.path.join(tmp, name + ".ppm")
         monitor(f"screendump {ppm}", 1.5)
+        nonlocal fails
+        if not os.path.exists(ppm) or os.path.getsize(ppm) < 10000:
+            print(f"  FAIL: no screendump for {name}")
+            fails += 1
+        else:
+            d = open(ppm, "rb").read()
+            px = d[d.index(b"255\n") + 4:]
+            samp = [px[i:i + 3] for i in range(0, len(px) - 3, 3 * 211)]
+            if max(samp.count(c) for c in set(samp)) > 0.985 * len(samp):
+                print(f"  FAIL: screendump {name} is blank")
+                fails += 1
         if args.shots and os.path.exists(ppm):
             os.makedirs(args.shots, exist_ok=True)
             ppm_to_png(ppm, os.path.join(args.shots, name + ".png"))
@@ -133,7 +144,7 @@ def main():
 
             def run(cmd, marker):
                 con.send(cmd)
-                out = con.expect(":~#", 60)
+                out = bt.strip_echo(con.expect(":~#", 60))
                 ok = marker in out
                 print(f"  {cmd[:70]} ... {'ok' if ok else 'FAIL'}")
                 if not ok:
@@ -142,11 +153,11 @@ def main():
 
             checks = [
                 ("grep ' / ' /proc/mounts", " / overlay "),
-                ("grep -c squashfs /proc/mounts", "1"),
+                ("echo n$(grep -c squashfs /proc/mounts)", "n1"),
                 ("id tester", "uid=1000(tester)"),
                 ("ls -ld /home/tester", "tester"),
-                ("test ! -e /boot/vmlinuz* && echo noboot-ok", "noboot-ok"),
-                ("cat /etc/fstab | grep -c btrfs; true", "0"),
+                ("test ! -e /boot/vmlinuz* && echo noboot-$((6*7))", "noboot-42"),
+                ("echo n$(grep -c btrfs /etc/fstab)", "n0"),
                 ("free -m | sed -n 2p", "Mem:"),
             ]
             for c, m in checks:
@@ -166,7 +177,7 @@ def main():
             if args.no_desktop:
                 pass
             else:
-                bt.step("login screen up", lambda: (con.send("for i in $(seq 40); do pgrep -x flgreet-ui >/dev/null && break; sleep 1; done; pgrep -x flgreet-ui >/dev/null && echo greeter-up"), con.expect("greeter-up", 60)))
+                bt.step("login screen up", lambda: (con.send("for i in $(seq 40); do pgrep -x flgreet-ui >/dev/null && break; sleep 1; done; pgrep -x flgreet-ui >/dev/null && echo greeter-$((6*7))"), con.expect("greeter-42", 60)))
                 con.expect(":~#", 10)
                 time.sleep(3)
                 shot("live-login")
@@ -187,23 +198,30 @@ def main():
                     def gui(cmd, wait):
                         env = ("export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 "
                                "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_CURRENT_DESKTOP=FreeLFS; ")
-                        run(f"su -s /bin/sh tester -c '{env}setsid sh -c \"{cmd}\" >/tmp/gui.log 2>&1 </dev/null &'; echo started", "started")
+                        run(f"su -s /bin/sh tester -c '{env}setsid sh -c \"{cmd}\" >/tmp/gui.log 2>&1 </dev/null &'; echo started-$((6*7))", "started-42")
                         time.sleep(wait)
 
                     gui("flstore", 8)
                     shot("live-store")
-                    run("pkill -x flstore; echo gone", "gone")
-                    run("ls -d /run/live/rw/up/home/tester/.local/share/flatpak 2>&1 | tail -1; du -sk /run/live/rw/up | cut -f1", "")
+                    run("pkill -x flstore; echo gone-$((6*7))", "gone-42")
+                    run("ls -d /run/live/rw/up/home/tester/.local/share/flatpak 2>&1 | tail -1; du -sk /run/live/rw/up | cut -f1", "")  # info only
                     gui("flvideo", 4)
                     monitor("sendkey ctrl-o")
                     time.sleep(8)
                     shot("live-video-open")
-                    run("pgrep -a flportal; pkill -x flvideo; pkill -f 'flvideo --pick-file'; pkill -x flportal; echo gone", "gone")
+                    run("pgrep -a flportal; pkill -x flvideo; pkill -f 'flvideo --pick-file'; pkill -x flportal; echo gone-$((6*7))", "gone-42")
                     gui("flcrash --cant /sysflfs/bin", 4)
                     shot("live-egg")
-                    run("pkill -x flcrash; echo gone", "gone")
+                    run("pkill -x flcrash; echo gone-$((6*7))", "gone-42")
             con.send("poweroff")
-            con.drain(40)
+            out = con.drain(60)
+            try:
+                qemu.wait(15)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("the machine did not power off")
+            if "Powering off" not in out:
+                raise RuntimeError("no 'Powering off.' on the console: rc.shutdown did not finish")
+            print("  power off ... ok")
         except Exception as e:
             print(f"FAIL: {e}")
             fails += 1
@@ -212,7 +230,8 @@ def main():
             except Exception:
                 pass
         finally:
-            qemu.terminate()
+            if qemu.poll() is None:
+                qemu.terminate()
             qemu.wait()
     print("PASS" if not fails else f"{fails} problem(s); console log: {LOG}")
     return 1 if fails else 0

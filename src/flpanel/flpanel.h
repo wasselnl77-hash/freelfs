@@ -200,7 +200,7 @@ struct app_choice {
 };
 /* the apps that open the file, into out; mime gets its type. Returns how many. */
 int fileinfo_apps(const char *path, struct app_choice *out, int max, char *mime, size_t mcap);
-void fileinfo_open_with(const char *desk, const char *path);
+void fileinfo_open_with(struct panel *p, const char *desk, const char *path);
 void props_open(struct panel *p, const char *path, int is_dir); /* one Properties window at a time */
 
 /* ---- quick.c: the tray's Bluetooth and night light icons, and their flyouts ---- */

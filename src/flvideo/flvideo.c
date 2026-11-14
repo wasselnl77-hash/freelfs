@@ -392,6 +392,25 @@ static void on_upd_fd(void *ud, int fd, short rev)
 	fl_win_redraw(v->win);
 }
 
+/* mpv's own log (audio output, hardware decoding, codec errors) goes to a file: the player has no terminal,
+ * so without it an audio or decoder failure is invisible. ~/.cache/flvideo/mpv.log, else the runtime dir. */
+static int mpv_log_path(char *out, size_t cap)
+{
+	const char *ch = getenv("XDG_CACHE_HOME"), *h = getenv("HOME"), *rt = getenv("XDG_RUNTIME_DIR");
+	char dir[PATH_MAX];
+	if (ch && *ch)
+		snprintf(dir, sizeof dir, "%s/flvideo", ch);
+	else if (h && *h)
+		snprintf(dir, sizeof dir, "%s/.cache/flvideo", h);
+	else if (rt && *rt)
+		snprintf(dir, sizeof dir, "%s", rt);
+	else
+		return -1;
+	mkdir_p(dir);
+	snprintf(out, cap, "%s/mpv.log", dir);
+	return 0;
+}
+
 static int mpv_start(struct V *v, const char *path)
 {
 	v->mpv = mpv_create();
@@ -410,7 +429,10 @@ static int mpv_start(struct V *v, const char *path)
 	mpv_set_option_string(v->mpv, "vo", "libmpv");
 	mpv_set_option_string(v->mpv, "ao", ao && *ao ? ao : "pipewire,alsa");
 	mpv_set_option_string(v->mpv, "audio-client-name", "Videos");
-	mpv_set_option_string(v->mpv, "hwdec", hw && *hw ? hw : "auto-copy-safe");
+	mpv_set_option_string(v->mpv, "hwdec", hw && *hw ? hw : "no");
+	/* Software decoding is the default: "auto-copy-safe" went through VA-API (radeonsi_drv_video, iHD) on a real GPU,
+	 * a path QEMU never exercises (virtio has no VA-API) and one that can stall or fail on a laptop. FLVIDEO_HWDEC=
+	 * auto-copy-safe (or vaapi-copy) turns it on again. */
 	mpv_set_option_string(v->mpv, "keep-open", "yes");
 	mpv_set_option_string(v->mpv, "sub-auto", "fuzzy");
 	mpv_set_option_string(v->mpv, "sub-font", "IBM Plex Sans");
@@ -421,6 +443,9 @@ static int mpv_start(struct V *v, const char *path)
 	mpv_set_option_string(v->mpv, "volume-max", "100");
 	mpv_set_option_string(v->mpv, "resume-playback", "no");
 	mpv_set_option_string(v->mpv, "msg-level", getenv("FLVIDEO_DEBUG") ? "all=v" : "all=warn");
+	char logp[PATH_MAX];
+	if (mpv_log_path(logp, sizeof logp) == 0)
+		mpv_set_option_string(v->mpv, "log-file", logp);
 	if (getenv("FLVIDEO_DEBUG"))
 		mpv_set_option_string(v->mpv, "terminal", "yes");
 	if (v->start_at > 0) {
@@ -1255,15 +1280,18 @@ int main(int argc, char **argv)
 			return 2;
 		}
 	}
+	/* a file that cannot be opened is reported in the window, the player still opens */
+	char open_err[300] = "";
 	if (file) {
 		char real[PATH_MAX];
 		if (!realpath(file, real)) {
-			fprintf(stderr, "flvideo: cannot open %s: %s\n", file, strerror(errno));
-			return 1;
+			snprintf(open_err, sizeof open_err, "Cannot open %s: %s", file, strerror(errno));
+			file = NULL;
+		} else {
+			snprintf(v->path, sizeof v->path, "%s", real);
+			if (!explicit_start)
+				v->start_at = resume_get(v->path);
 		}
-		snprintf(v->path, sizeof v->path, "%s", real);
-		if (!explicit_start)
-			v->start_at = resume_get(v->path);
 	}
 	if (pipe2(v->wake, O_NONBLOCK | O_CLOEXEC) < 0 || pipe2(v->upd, O_NONBLOCK | O_CLOEXEC) < 0)
 		return 1;
@@ -1286,8 +1314,13 @@ int main(int argc, char **argv)
 	v->win = fl_win_new(v->app, &o);
 	if (!v->win)
 		return 1;
+	if (open_err[0]) {
+		say(v, 1, "%s", open_err);
+		fl_timer_arm(v->msg_timer, 15000, 0);
+	}
 	if (mpv_start(v, file ? v->path : NULL) < 0) {
-		fprintf(stderr, "flvideo: libmpv did not start\n");
+		say(v, 1, "The video engine (libmpv) did not start. Its log: ~/.cache/flvideo/mpv.log");
+		fl_timer_arm(v->msg_timer, 15000, 0);
 		if (v->mpv) {
 			mpv_terminate_destroy(v->mpv);
 			v->mpv = NULL;

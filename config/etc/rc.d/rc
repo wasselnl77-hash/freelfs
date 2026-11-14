@@ -11,7 +11,7 @@
 stop_services() {
 	local s
 	for s in $(enabled_services | tac); do
-		[ -x "/etc/rc.d/init.d/$s" ] && "/etc/rc.d/init.d/$s" stop
+		[ -x "/etc/rc.d/init.d/$s" ] && timeout -k 1 8 "/etc/rc.d/init.d/$s" stop
 	done
 }
 
@@ -20,6 +20,8 @@ case $1 in
 		# the desktop goes first: with seatd gone flcomp would die with status 1 and the
 		# crash screen would show during the power-off
 		: > /run/flshutdown
+		# whatever hangs below, after 15 s the system is forced down (functions: force_power)
+		shutdown_watchdog "$1" 15
 		pkill -TERM -x flgreet 2> /dev/null
 		pkill -TERM -x flcomp 2> /dev/null
 		for i in 1 2 3 4 5 6 7 8; do
@@ -27,7 +29,10 @@ case $1 in
 			sleep 0.5
 		done
 		pkill -KILL -x flcomp 2> /dev/null
+		text_console
+		if [ "$1" = 6 ]; then say "Restarting: stopping services"; else say "Shutting down: stopping services"; fi
 		stop_services
+		say "Services stopped"
 		exec /etc/rc.d/rc.shutdown "$1"
 		;;
 	1 | S)

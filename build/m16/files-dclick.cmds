@@ -5,5 +5,5 @@ su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=w
 @mouse 511 270
 @dclick
 @wait 4
-ps -eo pid,comm | grep -E "fledit" | grep -v grep
+@waitok 10 double click opened readme.txt in the editor :: pgrep -u tester -a fledit | grep -q readme.txt
 @shot @OUT@/g4-file.ppm

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testers - FreeLFS</title>
+<meta name="description" content="We need testers for FreeLFS. What to test, and how to report it.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <p><a class="brand" href="index.html"><img src="logo.svg" alt="FreeLFS logo" width="40" height="40"> FreeLFS</a></p>
+  <nav aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="download.html">Download</a>
+    <a href="testers.html" aria-current="page">Testers</a>
+    <a href="docs.html">Docs</a>
+  </nav>
+</header>
+
+<main>
+<h1>We need testers!</h1>
+<p>FreeLFS has been run mostly in virtual machines. Real computers show different bugs, and most hardware has never been tried. Every report helps.</p>
+
+<h2>What to test</h2>
+<ul>
+  <li>Boot the live stick to the login screen and log in.</li>
+  <li>Wi-Fi: find a network and connect in Settings.</li>
+  <li>Shutdown and restart.</li>
+  <li>Files and USB sticks: open, copy and eject.</li>
+  <li>Opening images and video.</li>
+  <li>Sound.</li>
+  <li>Bluetooth.</li>
+  <li>The installer, in a virtual machine (the installer erases the disk you pick, so use a VM disk).</li>
+</ul>
+
+<h2>How to report</h2>
+<ol>
+  <li>Open the Terminal and run <code>flreport</code>.</li>
+  <li>Save its output to a USB stick.</li>
+  <li>Open an issue at <a href="https://github.com/wasselnl77-hash/freelfs/issues/new">github.com/wasselnl77-hash/freelfs/issues/new</a>. You need a GitHub account.</li>
+  <li>Include your hardware, what you did and what happened. Attach the flreport file.</li>
+</ol>
+
+<h2>Report template</h2>
+<pre>Hardware: (laptop or desktop model, CPU, graphics, RAM, Wi-Fi chip if known)
+FreeLFS: (the ISO file name and its sha256, from the Download page)
+Boot method: (CD, USB stick written with dd, or Ventoy)
+
+What I did:
+1.
+2.
+
+What I expected:
+
+What happened:
+
+flreport file attached: yes / no
+</pre>
+</main>
+
+<footer>
+  <h2>Help us!</h2>
+  <ul>
+    <li><a href="docs.html#freebws">FreeBWS</a>: our own light web browser is a community project. Bug fixes are very welcome (<a href="https://github.com/wasselnl77-hash/freelfs/issues">issues</a>).</li>
+    <li><a href="https://github.com/wasselnl77-hash/freelfs/issues/new?title=Contributor%20application">Apply to be a contributor</a>: tell us what you'd like to work on (code, testing, translations, docs).</li>
+    <li>Buy me a coffee! (coming soon)</li>
+  </ul>
+  <p>FreeLFS is pre-alpha. Its own code is MIT licensed. <a href="https://github.com/wasselnl77-hash/freelfs">Source and issues on GitHub</a>.</p>
+</footer>
+</body>
+</html>

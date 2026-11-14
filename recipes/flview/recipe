@@ -1,6 +1,6 @@
 pkgname=flview
 version=0.1
-release=4
+release=5
 summary="FreeLFS image viewer: folder browsing, zoom, rotate, trash, wallpaper"
 license=(MIT)
 arch=(x86_64)

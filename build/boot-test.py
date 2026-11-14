@@ -52,14 +52,14 @@ CHECKS = [
     # M7: the first boot asked for the keyboard
     ("cat /etc/keyboard.conf", "LAYOUT=de"),
     # M7: tty1 runs the login screen (flgreet starts flcomp, which starts flgreet-ui)
-    ("grep -c '^1:.*flgreet' /etc/inittab", "1"),
+    ("echo n$(grep -c '^1:.*flgreet' /etc/inittab)", "n1"),
     ("for i in $(seq 30); do pgrep -x flgreet-ui >/dev/null && break; sleep 1; done;"
-     " pgrep -x flgreet-ui >/dev/null && echo greeter-up", "greeter-up"),
+     " pgrep -x flgreet-ui >/dev/null && echo greeter-$((6*7))", "greeter-42"),
     # the login screen holds the seat, and the M6 drawing test below needs it:
     # take tty1 out of inittab (this VM only) and stop the greeter
     ("{ [ -f /etc/inittab.orig ] && mv /etc/inittab.orig /etc/inittab; }; cp /etc/inittab /etc/inittab.orig;"
      " sed -i '/^1:2345/d' /etc/inittab; telinit q; pkill -x flgreet; pkill -x flcomp; sleep 2;"
-     " echo greeter-stopped", "greeter-stopped"),
+     " pgrep -x flgreet-ui >/dev/null || echo stopped-$((6*7))", "stopped-42"),
     # M5: flsh is the shell of new users
     ("flsh -c 'echo $((6 * 7)) $FLSH_VERSION'", "42 0.1"),
     ("{ id tester >/dev/null 2>&1 || useradd -m tester; } && passwd -d tester >/dev/null"
@@ -196,6 +196,12 @@ class Console:
         self.sock.sendall(line.encode() + b"\r")
 
 
+def strip_echo(out):
+    """The console echoes the command that was typed: drop that first line, so that a marker can only
+    match what the command printed, never the command itself."""
+    return out.split("\n", 1)[1] if "\n" in out else ""
+
+
 def step(name, fn):
     print(f"  {name} ... ", end="", flush=True)
     try:
@@ -253,7 +259,7 @@ def main():
             failed = boot_failures  # a failed boot step fails the test
             for cmd, want in CHECKS:
                 con.send(cmd)
-                out = con.expect("@@# ", 90)
+                out = strip_echo(con.expect("@@# ", 90))
                 ok = want in out
                 label = cmd if len(cmd) <= 34 else cmd[:31] + "..."
                 print(f"  {label:<34} {'ok' if ok else 'FAIL'}")

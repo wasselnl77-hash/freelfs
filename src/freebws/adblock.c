@@ -41,6 +41,10 @@ struct list {
 	time_t mtime;
 };
 
+/* never blocked, whatever the lists say: the Cloudflare challenge (Turnstile) the check pages load in a
+ * third-party frame; a blocked challenge leaves "Verify you are human" waiting for ever */
+#define BUILTIN_ALLOW "@@||challenges.cloudflare.com^\n@@||cloudflare.com/cdn-cgi/challenge-platform/\n"
+
 static struct A {
 	GPtrArray *lists;
 	char *adb_dir, *built_dir, *lists_dir, *store_path;
@@ -159,7 +163,7 @@ static void lists_load(void)
 	g_free(conf);
 	GChecksum *cs = g_checksum_new(G_CHECKSUM_SHA256);
 	char b[128];
-	snprintf(b, sizeof b, "abp%d\n", ABP_CONVERTER_VERSION);
+	snprintf(b, sizeof b, "abp%d\n%s", ABP_CONVERTER_VERSION, BUILTIN_ALLOW);
 	g_checksum_update(cs, (guchar *)b, -1);
 	for (guint i = 0; i < A.lists->len; i++) {
 		struct list *l = g_ptr_array_index(A.lists, i);
@@ -304,6 +308,7 @@ static int build_lists(void)
 		abp_add_list(c_abp, t, n);
 		g_free(t);
 	}
+	abp_add_list(c_abp, BUILTIN_ALLOW, strlen(BUILTIN_ALLOW));
 	abp_finish(c_abp);
 	const struct abp_stats *st = abp_stats(c_abp);
 	fprintf(stderr, "freebws: adblock: %u lines: network block %u, exception %u, important %u, skipped %u; "

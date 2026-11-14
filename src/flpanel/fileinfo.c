@@ -287,18 +287,50 @@ static int exec_args(const char *desktop, const char *file, char **argv, int max
 	return n > 0 ? 0 : -1;
 }
 
-void fileinfo_open_with(const char *desk, const char *path)
+void fileinfo_open_with(struct panel *p, const char *desk, const char *path)
 {
 	char *argv[32] = {0};
-	if (exec_args(desk, path, argv, 32) < 0)
+	if (exec_args(desk, path, argv, 32) < 0) {
+		dlg_error(p, "Cannot open the file", "The application's launcher has no usable Exec= line.");
 		return;
+	}
+	char prog[256];
+	snprintf(prog, sizeof prog, "%s", argv[0]);
+	/* close-on-exec pipe: empty when exec worked, carries errno when it did not */
+	int ep[2];
+	if (pipe2(ep, O_CLOEXEC) < 0) {
+		dlg_error(p, "Cannot open the file", "No pipe for the command.");
+		goto out;
+	}
 	pid_t pid = fork();
 	if (pid == 0) {
+		close(ep[0]);
 		setsid();
 		signal(SIGCHLD, SIG_DFL);
 		execvp(argv[0], argv);
+		int e = errno;
+		ssize_t wr = write(ep[1], &e, sizeof e);
+		(void)wr;
 		_exit(127);
 	}
+	close(ep[1]);
+	if (pid < 0) {
+		close(ep[0]);
+		dlg_error(p, "Cannot open the file", "fork failed.");
+		goto out;
+	}
+	int e = 0;
+	ssize_t r;
+	do
+		r = read(ep[0], &e, sizeof e);
+	while (r < 0 && errno == EINTR);
+	close(ep[0]);
+	if (r == (ssize_t)sizeof e) {
+		char msg[400];
+		snprintf(msg, sizeof msg, "Cannot start %s: %s", prog, strerror(e));
+		dlg_error(p, "Cannot open the file", msg);
+	}
+out:
 	for (int i = 0; argv[i]; i++)
 		free(argv[i]);
 }

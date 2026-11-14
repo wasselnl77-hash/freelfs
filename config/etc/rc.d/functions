@@ -107,3 +107,55 @@ enabled_services() {
 		case $s in !*) ;; *) echo "$s" ;; esac
 	done
 }
+
+# ---- shutdown helpers (rc 0|6, rc.shutdown) ----------------------------------------------
+
+# say TEXT -- a progress line on the console and, when the console is not the screen, on tty1 too
+say() {
+	printf '%s\n' "$*"
+	case $(cat /proc/consoles 2> /dev/null) in
+		*tty0*) ;;
+		*) [ -w /dev/tty1 ] && printf '%s\n' "$*" > /dev/tty1 2> /dev/null ;;
+	esac
+	return 0
+}
+
+# text_console -- the screen shows the console again (the compositor may have died holding the
+# virtual terminal in graphics mode, and then nothing below would be visible)
+text_console() {
+	[ -x /usr/sbin/flsplash ] && timeout -k 1 3 /usr/sbin/flsplash --text 2> /dev/null
+	timeout -k 1 2 chvt 1 2> /dev/null
+	printf '\033[0m\033[?25h' > /dev/tty1 2> /dev/null
+	return 0
+}
+
+# force_power 0|6 -- last resort, no questions: sync, unmount what can be, then power off (0) or
+# reboot (6) through the kernel itself (halt -f / reboot -f call reboot(2); the sysrq keys are the
+# fallback when even that fails). Every step has a time limit, none of them can wait for a hung driver.
+force_power() {
+	say "Shutdown is taking too long: forcing it"
+	echo 1 > /proc/sys/kernel/sysrq 2> /dev/null
+	timeout -k 1 4 sync
+	timeout -k 1 5 umount -a -r -O no_netdev -t notmpfs,nosysfs,noproc,nodevtmpfs,nodevpts,nocgroup2 2> /dev/null
+	timeout -k 1 3 sync
+	if [ "$1" = 6 ]; then
+		say "Rebooting (forced)."
+		timeout -k 1 3 reboot -f
+		echo b > /proc/sysrq-trigger
+	else
+		say "Powering off (forced)."
+		timeout -k 1 3 halt -f -p
+		echo o > /proc/sysrq-trigger
+	fi
+	sleep 5
+}
+
+# shutdown_watchdog 0|6 SECONDS -- after SECONDS the shutdown is forced, whatever is stuck. Same
+# session as rc, so killall5 leaves it alone; its pid is in /run/flshutdown.wd.
+shutdown_watchdog() {
+	(
+		sleep "$2"
+		force_power "$1"
+	) < /dev/null &
+	echo $! > /run/flshutdown.wd
+}

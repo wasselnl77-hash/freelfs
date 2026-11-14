@@ -14,8 +14,16 @@ CMDFILE: one shell command per line, '#' lines skipped. Lines starting with '@':
     @mouse X Y            absolute pointer, pixels of a 1280x800 screen (needs -device usb-tablet in QEMU-ARGS)
     @click                left click
     @desktop              wait for the greeter, press Enter (tester has no password), wait for the panel
-    @poweroffwait SECS    wait up to SECS for QEMU to exit (prints exited/NOT exited)
-Console transcript: $FLFS_WORK/logs/live-run.log. Exit 0 when the VM was driven to the end.
+    @poweroffwait SECS    wait up to SECS for QEMU to exit; NOT exited, a slow power-off (over 20 s from
+                          the call) or a missing "Powering off." line in the console FAIL the run
+    @greeter              wait for the login screen (flgreet-ui running); no key is pressed; FAILS if it never comes
+    @ok TEXT :: CMD       run CMD in the guest as root; FAILS unless it exits 0 (TEXT names the check)
+    @waitok SECS TEXT :: CMD   like @ok, but CMD is tried every second for up to SECS seconds
+    @shotok FILE          like @shot (kept for old files), or (almost) one colour
+    @shotcolors FILE MIN  FAILS unless the screendump FILE has at least MIN distinct colours
+    @shot FILE            screendump; also FAILS when the file is missing or blank
+Console transcript: $FLFS_WORK/logs/live-run.log. Exit 1 when any check failed (see the RESULT line),
+0 when the VM was driven to the end and all passed.
 """
 import argparse, importlib.util, os, re, socket, subprocess, sys, tempfile, time
 
@@ -88,6 +96,60 @@ def button(name, n=1):
         qmp([{"type": "btn", "data": {"button": name, "down": False}}], 0.12)
 
 
+FAILS = []
+
+
+def fail(msg):
+    FAILS.append(msg)
+    print("FAIL:", msg, flush=True)
+
+
+def shot_blank(fn):
+    """None when the PPM at fn is a real picture, else the reason."""
+    try:
+        d = open(fn, "rb").read()
+    except OSError:
+        return "missing"
+    m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", d)
+    if not m:
+        return "not a PPM"
+    px = d[m.end():]
+    n = len(px) // 3
+    if n < 1000:
+        return "empty"
+    step = max(1, n // 20000)
+    from collections import Counter
+    c = Counter(px[i * 3:i * 3 + 3] for i in range(0, n, step))
+    top = c.most_common(1)[0][1] / sum(c.values())
+    return "one colour (%d%%)" % (top * 100) if top > 0.985 else None
+
+
+def shot_check(fn, what):
+    r = shot_blank(fn)
+    if r:
+        fail(f"{what}: screendump {os.path.basename(fn)} is {r}")
+
+
+def shot_colours(fn):
+    """Number of distinct colours in a sample of the PPM (a gradient picture or a video frame has hundreds,
+    a blank or flat window a handful), or -1 when it cannot be read."""
+    try:
+        d = open(fn, "rb").read()
+        m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", d)
+        px = d[m.end():]
+    except (OSError, AttributeError):
+        return -1
+    return len({px[i:i + 3] for i in range(0, len(px) - 3, 3 * 7)})
+
+
+def guest_ok(con, text, cmdline):
+    """Run cmdline in the guest; True when it exits 0. The verdict token is computed, so the console's
+    echo of the command cannot contain it."""
+    con.send(f"( {cmdline} ) >/tmp/ok.out 2>&1; echo OK$?T$((6*7))")
+    out = ANSI.sub("", con.expect(":~#", 120)).replace("\r", "")
+    return "OK0T42" in out
+
+
 with open(LOG, "w") as log:
     qemu = subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -138,8 +200,27 @@ with open(LOG, "w") as log:
                         monitor("sendkey " + de.get(ch, ("shift-" + ch.lower()) if ch.isupper() else ch), 0.15)
                 elif w[0] == "mon":
                     monitor(line[1:].split(None, 1)[1], 1.0)
-                elif w[0] == "shot":
+                elif w[0] in ("shot", "shotok"):
                     monitor(f"screendump {w[1]}", 1.5)
+                    shot_check(w[1], "@" + w[0])
+                elif w[0] == "shotcolors":	# @shotcolors FILE MIN: FAILS unless the picture has at least MIN colours
+                    n = shot_colours(w[1])
+                    print("colours in %s: %d" % (os.path.basename(w[1]), n))
+                    if n < int(w[2]):
+                        fail("%s has %d colours, expected at least %s (blank or flat window?)" % (os.path.basename(w[1]), n, w[2]))
+                elif w[0] in ("ok", "waitok"):
+                    secs = int(w[1]) if w[0] == "waitok" else 0
+                    body = line.split(None, 2)[2] if w[0] == "waitok" else line.split(None, 1)[1]
+                    what, _, c = body.partition("::")
+                    t0 = time.monotonic()
+                    while True:
+                        good = guest_ok(con, what, c.strip())
+                        if good or time.monotonic() - t0 >= secs:
+                            break
+                        time.sleep(1)
+                    print(("ok: " if good else "NOT ok: ") + what.strip() + (" (%d s)" % (time.monotonic() - t0) if secs else ""))
+                    if not good:
+                        fail(what.strip() + "  [" + c.strip()[:120] + "]")
                 elif w[0] == "mouse":
                     qmp([{"type": "abs", "data": {"axis": "x", "value": int(w[1]) * 32767 // 1279}},
                          {"type": "abs", "data": {"axis": "y", "value": int(w[2]) * 32767 // 799}}], 0.4)
@@ -162,18 +243,49 @@ with open(LOG, "w") as log:
                         qmp([{"type": "btn", "data": {"button": "left", "down": True}}], 0.03)
                         qmp([{"type": "btn", "data": {"button": "left", "down": False}}], 0.03)
                     time.sleep(0.5)
-                elif w[0] == "desktop":
-                    con.send("for i in $(seq 60); do pgrep -x flgreet-ui >/dev/null && break; sleep 1; done; echo greeter-up")
-                    con.expect("greeter-up", 90)
-                    con.expect(":~#", 10)
+                elif w[0] in ("greeter", "desktop"):
+                    if not guest_ok(con, "greeter", "for i in $(seq 90); do pgrep -x flgreet-ui && exit 0; sleep 1; done; exit 1"):
+                        fail("the login screen (flgreet-ui) did not come up")
+                    if w[0] == "greeter":
+                        time.sleep(3)
+                        continue
                     time.sleep(3)
                     monitor("sendkey ret")
-                    time.sleep(15)
+                    if not guest_ok(con, "panel", "for i in $(seq 60); do pgrep -x flpanel && exit 0; sleep 1; done; exit 1"):
+                        fail("no desktop (flpanel) 60 s after Enter on the login screen")
+                    time.sleep(3)
                 elif w[0] == "poweroffwait":
-                    end = time.monotonic() + float(w[1])
+                    t0 = time.monotonic()
+                    end = t0 + float(w[1])
+                    seen = ""
                     while time.monotonic() < end and qemu.poll() is None:
-                        time.sleep(0.5)
-                    print("@poweroffwait:", "exited" if qemu.poll() is not None else "NOT exited")
+                        con.sock.settimeout(0.5)
+                        try:
+                            data = con.sock.recv(4096)
+                        except socket.timeout:
+                            continue
+                        except OSError:
+                            break
+                        if not data:
+                            break
+                        chunk = con.dec.decode(data)
+                        log.write(chunk)
+                        log.flush()
+                        seen += chunk
+                    for _ in range(20):
+                        if qemu.poll() is not None:
+                            break
+                        time.sleep(0.1)
+                    took = time.monotonic() - t0
+                    gone = qemu.poll() is not None
+                    print("@poweroffwait:", "exited after %.0f s" % took if gone else "NOT exited after %.0f s" % took)
+                    if not gone:
+                        fail("the machine did not power off within %s s" % w[1])
+                    else:
+                        if took > 20:
+                            fail("power-off took %.0f s (budget 20 s)" % took)
+                        if "Powering off" not in seen and "Rebooting" not in seen:
+                            fail("the console never showed 'Powering off.' (rc.shutdown did not run to its end)")
                     break
                 continue
             con.send(line)
@@ -188,3 +300,6 @@ with open(LOG, "w") as log:
                 qemu.wait(10)
             except Exception:
                 qemu.kill()
+
+print("RESULT:", "FAIL (%d): %s" % (len(FAILS), "; ".join(FAILS)) if FAILS else "PASS")
+sys.exit(1 if FAILS else 0)
