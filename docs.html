@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs - FreeLFS</title>
+<meta name="description" content="How to install FreeLFS, frequently asked questions, and the planned roadmap.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <p><a class="brand" href="index.html"><img src="logo.svg" alt="FreeLFS logo" width="40" height="40"> FreeLFS</a></p>
+  <nav aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="download.html">Download</a>
+    <a href="testers.html">Testers</a>
+    <a href="docs.html" aria-current="page">Docs</a>
+  </nav>
+</header>
+
+<main>
+<h1>Docs</h1>
+
+<h2>Install guide</h2>
+<p>Only install on a spare computer or in a virtual machine. The installer erases the whole disk you pick.</p>
+<ol>
+  <li>Boot the live ISO from a USB stick (see <a href="download.html">Download</a>) and log in. The user is <code>tester</code>, with no password.</li>
+  <li>Open the <strong>FreeLFS install</strong> icon on the live desktop.</li>
+  <li>Go through the steps: language, keyboard, Wi-Fi, disk, account, time zone, summary, install.</li>
+  <li>When it finishes, reboot and remove the stick.</li>
+</ol>
+<p>Installing next to other systems and manual partitioning are not tested yet. Use a whole disk.</p>
+
+<h2>FAQ</h2>
+<h3>Why from scratch?</h3>
+<p>FreeLFS wants its own package manager, boot loader, shell, compositor and desktop, all in C, with no parent distro. Building the system from scratch is how it gets there.</p>
+
+<h3 id="freebws">FreeBWS or Firefox?</h3>
+<p>Firefox from the Software Store is recommended for heavy sites. FreeBWS is the light browser for 1 GB computers. It is a community project, and help is wanted: its known problems include a Cloudflare check and Google login.</p>
+
+<h3>Hardware support?</h3>
+<p>AMD graphics work on the one AMD laptop tested partly; other AMD chips are prepared but untested. Intel needs testers, and Intel 3D drivers come later; until then Intel uses software OpenGL. 32-bit is not planned. See the <a href="download.html">Download</a> page for the table.</p>
+
+<h3>What is a rolling release?</h3>
+<p>There are no numbered releases. The packages follow the newest stable upstream releases, and the kernel is the newest 7.x stable, with 6.18 LTS as a fallback package. Before every change, flpkg takes a btrfs snapshot. At boot you can choose "Start an earlier state" from the boot menu.</p>
+
+<h3>How do I update?</h3>
+<p>Open the Packages app and use Update, or run <code>flpkg upgrade --sync</code> in the Terminal. The update notifier tells you when updates are waiting.</p>
+
+<h2>Roadmap (all planned)</h2>
+<p>Nothing here is finished, and no dates are set.</p>
+<ul>
+  <li><strong>Translations:</strong> the desktop and its apps in 12 languages (en_US, en_GB, de, fr, es, it, pt_BR, nl, pl, cs, sv, tr). English is the fallback.</li>
+  <li><strong>Hardware app:</strong> device overview, drivers and firmware, power and CPU, sensors, disk health, and memory settings.</li>
+  <li><strong>Installer:</strong> a world map for the time zone, more keyboard layouts with a test field, a hostname and auto-login, a swap choice, a hardware check, and later disk encryption, manual partitioning and dual-boot.</li>
+</ul>
+</main>
+
+<footer>
+  <h2>Help us!</h2>
+  <ul>
+    <li><a href="docs.html#freebws">FreeBWS</a>: our own light web browser is a community project. Bug fixes are very welcome (<a href="https://github.com/wasselnl77-hash/freelfs/issues">issues</a>).</li>
+    <li><a href="https://github.com/wasselnl77-hash/freelfs/issues/new?title=Contributor%20application">Apply to be a contributor</a>: tell us what you'd like to work on (code, testing, translations, docs).</li>
+    <li>Buy me a coffee! (coming soon)</li>
+  </ul>
+  <p>FreeLFS is pre-alpha. Its own code is MIT licensed. <a href="https://github.com/wasselnl77-hash/freelfs">Source and issues on GitHub</a>.</p>
+</footer>
+</body>
+</html>
