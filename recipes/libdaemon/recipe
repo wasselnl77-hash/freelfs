@@ -1,0 +1,16 @@
+pkgname=libdaemon
+version=0.14
+release=1
+summary="Small library for writing UNIX daemons"
+url=http://0pointer.de/lennart/projects/libdaemon/
+license=(LGPL-2.1-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+source=(http://0pointer.de/lennart/projects/libdaemon/libdaemon-$version.tar.gz)
+sha256=(fd23eb5f6f986dcc7e708307355ba3289abe03cc381fc47a80bca4a50aa6b834)
+build_style=autotools
+# Avahi's daemon needs it (pid files, daemonizing). No docs, no lynx.
+configure_args=(--disable-static --disable-lynx --localstatedir=/var)
+
+check() { :; }

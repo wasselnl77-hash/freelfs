@@ -1,0 +1,17 @@
+pkgname=libusb
+version=1.0.30
+release=1
+summary="Library for user-space access to USB devices"
+url=https://libusb.info/
+license=(LGPL-2.1-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc udev)
+source=(https://github.com/libusb/libusb/releases/download/v$version/libusb-$version.tar.bz2)
+sha256=(fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf)
+build_style=autotools
+# Needed by the CUPS usb backend (USB printers). The kernel has no usblp driver, libusb is the
+# way to reach a USB printer.
+configure_args=(--disable-static --disable-examples-build --disable-tests-build)
+
+check() { :; }

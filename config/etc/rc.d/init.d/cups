@@ -1,0 +1,30 @@
+#!/bin/bash
+# /etc/rc.d/init.d/cups -- printing, on demand. This service only runs flsocketd, which owns
+# /run/cups/cups.sock and starts cupsd (and avahi-daemon, for printer discovery) at the first
+# connection: lp, lpstat, lpadmin or Settings > Printers. cupsd exits after 60 s idle, so nothing
+# but flsocketd (about 0.2 MB) stays in RAM when nobody prints.
+
+. /etc/rc.d/functions
+
+start_cups() {
+	install -d -m 755 /run/cups /var/spool/cups /var/log/cups /var/cache/cups
+	setsid /usr/sbin/flsocketd -m 0666 /run/cups/cups.sock -- /usr/libexec/flcupsd \
+		< /dev/null > /dev/null 2>&1 &
+	echo $! > /run/flsocketd-cups.pid
+	sleep 0.2
+	pid_alive /run/flsocketd-cups.pid
+}
+
+stop_cups() {
+	pid_stop /run/flsocketd-cups.pid
+	# cupsd or avahi-daemon started on demand, if one is running now
+	local p
+	for p in cupsd avahi-daemon; do pkill -x "$p" 2> /dev/null; done
+	return 0
+}
+
+case $1 in
+	stop) step "Stopping printing (on demand)" stop_cups ;;
+	restart) "$0" stop; "$0" start ;;
+	*) daemon_service "$1" "printing (on demand)" /run/flsocketd-cups.pid start_cups ;;
+esac

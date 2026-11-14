@@ -10,7 +10,8 @@ DESTDIR ?=
 # the protocol is flcomp's; the recipe copies it here
 PROTO ?= ../flcomp/protocol/fl-shell.xml
 
-OBJS = flsettings.o wifi.o pages.o datetime.o snapshots.o wallpaper.o about.o workspaces.o fl-shell-protocol.o
+OBJS = flsettings.o wifi.o pages.o datetime.o snapshots.o wallpaper.o about.o workspaces.o display.o bluetooth.o \
+	printers.o cmd.o fl-shell-protocol.o
 
 flsettings: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $$(pkg-config --libs $(PKGS))

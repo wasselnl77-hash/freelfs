@@ -1,12 +1,12 @@
 # flsettings, from src/flsettings in the FreeLFS tree.
 pkgname=flsettings
 version=0.1
-release=11
+release=12
 summary="FreeLFS settings: theme, accent colour, wallpaper, sounds, panel labels, display, mouse and touchpad, keyboard, date and time, Wi-Fi"
 license=(MIT)
 arch=(x86_64)
 groups=(desktop)
-depends=(glibc flui wayland dbus fltime libpng libjpeg-turbo zlib)
+depends=(glibc flui wayland dbus fldisplay fltime libpng libjpeg-turbo zlib)
 makedepends=(flui dbus libpng libjpeg-turbo zlib)
 source=()
 sha256=()

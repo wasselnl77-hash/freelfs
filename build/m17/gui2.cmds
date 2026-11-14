@@ -1,0 +1,39 @@
+# desktop icon menu (Open with, Properties) and the tray moon (night light)
+@desktop
+mkdir -p /home/tester/Desktop; echo hello > /home/tester/Desktop/note.txt; chown -R 1000:999 /home/tester/Desktop
+@wait 8
+@mouse 76 154
+@click right
+@wait 2
+@mouse 52 641
+@click
+@wait 2
+@shot @OUT@/g2-openwith.ppm
+@key esc
+@mouse 600 300
+@click
+@mouse 76 154
+@click right
+@wait 2
+@mouse 47 737
+@click
+@wait 3
+@shot @OUT@/g3-properties.ppm
+pgrep -x flpanel >/dev/null && echo panel-alive
+@mouse 1018 777
+@click
+@wait 2
+@shot @OUT@/g4-moon.ppm
+@mouse 1110 697
+@wait 1
+@mouse 1112 696
+@wait 1
+@click
+@wait 5
+@shot @OUT@/g5-moon-on.ppm
+grep -h "night" /home/tester/.config/freelfs/desktop.conf
+grep "night light" /run/user/1000/flcomp.log
+cat /proc/$(pgrep -x flpanel)/environ | tr '\0' '\n' | grep -E "FLUI|XDG_CONFIG|^HOME|^PATH"
+find / -xdev -name 'desktop.conf*' 2>/dev/null | head
+ls -la /home/tester/.config 2>&1 | head -5
+ls -la /home/tester/.config/freelfs/

@@ -25,14 +25,24 @@ written to /etc/keyboard.conf (LAYOUT=de; $FL_KEYBOARD_CONF overrides) when
 the user may write it; otherwise only keyboard= in desktop.conf is saved and
 the window says so.
 
-Display: the resolutions and refresh rates of the screen (fl_shell output_mode),
-scale 100, 125, 150 or 200 % (only as far as the desktop stays at least 640 x 400),
-brightness and night light. Apply sends fl_shell set_output; flcomp switches at
-once and goes back after 15 seconds unless Keep is pressed (the banner at the top
-counts down). Only a kept mode and scale are written to desktop.conf (mode=,
-scale=). Brightness is the backlight's sysfs file (FLSETTINGS_BACKLIGHT=DIR for
-tests); it needs write access: the udev rule 90-flsettings-backlight.rules gives
-group seat that. Without a backlight (desktop monitors) the page says so.
+Display (display.c, screens on fldisplay): an arrangement of the outputs as rectangles (drag to move;
+they snap edge to edge), and per output the resolution and refresh dropdown, scale 100-200 %, Enabled and
+Primary. Apply runs `fldisplay set NAME mode=WxH@HZ scale=S pos=X,Y enabled=0|1 primary=1` for each changed
+output, then a "Keep these settings?" bar counts down 15 s; Keep leaves it, otherwise `fldisplay revert`
+runs (also when Settings closes during the countdown). `fldisplay list` gives one tab-separated line per
+output: NAME, connected|disconnected, WxH@HZ or -, SCALE, X,Y, enabled|disabled, primary|-, MODES.
+Night light: nightlight=off|on|auto, nightlight_temp 2700..6500 (the warmth slider), nightlight_from and
+nightlight_to HH:MM; night_light=0|1 and night_warmth are written too, for flcomp's older keys.
+Brightness is the backlight's sysfs file (FLSETTINGS_BACKLIGHT=DIR for tests); it needs write access: the
+udev rule 90-flsettings-backlight.rules gives group seat that. Without a backlight the page says so.
+Wallpaper is on this page too (`--page wallpaper` opens it).
+Bluetooth (bluetooth.c): bluetoothctl only (show, power, devices, info, --timeout 10 scan on, pair, trust,
+connect, disconnect, remove). Paired devices with connect/disconnect, Forget and the battery; nearby devices
+after Search (10 s), Pair runs pair, trust and connect. No adapter: "No Bluetooth adapter found".
+Printers (printers.c): CUPS tools only (lpstat -p -d, lpinfo --include-schemes dnssd,ipp,ipps,usb -v,
+lpadmin -E -m everywhere / -x, lpoptions -d, lp, cancel -a). Set as default, test page, cancel jobs, remove
+(asked first); without lpstat: "Printing is not installed". Every command is a helper sequence (cmd.c):
+it runs with pipes read by the event loop, never blocking the window; a failure shows its stderr.
 Mouse & touchpad: speed, acceleration profile, left-handed, natural scrolling for
 mouse and touchpad separately, tap to click, disable while typing; flcomp applies
 them through libinput. Keyboard: the four layouts (also written to

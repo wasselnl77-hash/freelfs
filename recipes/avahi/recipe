@@ -1,0 +1,37 @@
+pkgname=avahi
+version=0.8
+release=1
+summary="mDNS/DNS-SD daemon and client library (printer discovery)"
+url=https://avahi.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc expat dbus libdaemon)
+sysgroups=("avahi 84")
+sysusers=("avahi 84 84 /run/avahi-daemon /usr/bin/false 'Avahi mDNS daemon'")
+source=(https://github.com/avahi/avahi/releases/download/v$version/avahi-$version.tar.gz)
+sha256=(060309d7a333d38d951bc27598c677af1796934dbd98e1024e7ad8de798fedda)
+build_style=autotools
+# Only here so that CUPS can find driverless IPP printers (its dnssd backend speaks to
+# avahi-daemon over D-Bus). Everything with a GUI toolkit, Python, Mono, glib, the autoipd and
+# the compat libraries is off. The daemon is not an rc service of its own: the cups service
+# starts it together with cupsd (and stops it with it), so it costs no RAM at idle.
+configure_args=(--sysconfdir=/etc --localstatedir=/var --disable-static --disable-nls
+	--disable-qt3 --disable-qt4 --disable-qt5 --disable-gtk --disable-gtk3 --disable-gobject
+	--disable-glib --disable-python --disable-pygobject --disable-python-dbus --disable-mono
+	--disable-monodoc --disable-introspection --disable-libevent --disable-autoipd
+	--disable-manpages --disable-xmltoman --disable-doxygen-doc --disable-compat-libdns_sd
+	--disable-compat-howl --with-distro=none --with-xml=expat
+	--with-avahi-user=avahi --with-avahi-group=avahi --with-autoipd-user=avahi
+	--with-autoipd-group=avahi --with-dbus-sys=/usr/share/dbus-1/system.d)
+
+check() { :; }
+
+package() {
+	make DESTDIR="$pkgdir" install
+	rm -rf "$pkgdir/run" "$pkgdir/var/run" "$pkgdir/usr/share/man"
+	# the ssh/sftp advertisements and the DNS helper are not wanted on a desktop
+	rm -f "$pkgdir"/etc/avahi/services/*.service "$pkgdir/etc/avahi/avahi-dnsconfd.action" \
+		"$pkgdir/usr/sbin/avahi-dnsconfd"
+	rm -f "$pkgdir"/usr/lib/*.la
+}

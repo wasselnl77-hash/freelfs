@@ -1,8 +1,10 @@
 /* flsettings -- theme, panel labels, keyboard, Wi-Fi
  * SPDX-License-Identifier: MIT
  *
- * Pages behind a sidebar: General (below), Display, Mouse & touchpad and
- * Keyboard (pages.c), Workspaces (workspaces.c), Date & time (datetime.c), Wi-Fi (wifi.c), Snapshots, About (about.c, with
+ * Pages behind a sidebar: General (below), Display (display.c: screens, night light, brightness,
+ *   wallpaper), Mouse & touchpad and
+ * Keyboard (pages.c), Workspaces (workspaces.c), Date & time (datetime.c), Wi-Fi (wifi.c), Bluetooth
+ * (bluetooth.c), Printers (printers.c), Snapshots, About (about.c, with
  * "Save a report"). `flsettings --page wifi` opens on the
  * Wi-Fi page; when Settings is already running, the new process tells the old
  * one over $XDG_RUNTIME_DIR/flsettings.sock and exits.
@@ -28,6 +30,9 @@
 
 #include "fl-shell-client-protocol.h"
 #include "about.h"
+#include "bluetooth.h"
+#include "display.h"
+#include "printers.h"
 #include "datetime.h"
 #include "snapshots.h"
 #include "pages.h"
@@ -36,8 +41,9 @@
 #include "workspaces.h"
 
 enum { ID_DARK = 1, ID_LIGHT, ID_LABELS, ID_SOUNDS, ID_SOUND_TEST, ID_THEMES, ID_PAGE_GENERAL, ID_PAGE_WIFI, ID_PAGE_DISPLAY, ID_PAGE_INPUT,
-       ID_PAGE_KEYBOARD, ID_PAGE_DATETIME, ID_PAGE_SNAPSHOTS, ID_PAGE_ABOUT, ID_PAGE_WORKSPACES, ID_SCROLL, ID_KBD = 20, ID_ACCENT = 60 /* .. 65 */ };
-enum { PAGE_GENERAL, PAGE_DISPLAY, PAGE_INPUT, PAGE_KEYBOARD, PAGE_WIFI, PAGE_DATETIME, PAGE_SNAPSHOTS, PAGE_ABOUT, PAGE_WORKSPACES };
+       ID_PAGE_KEYBOARD, ID_PAGE_DATETIME, ID_PAGE_SNAPSHOTS, ID_PAGE_ABOUT, ID_PAGE_WORKSPACES, ID_SCROLL, ID_PAGE_BLUETOOTH = 17, ID_PAGE_PRINTERS, ID_KBD = 20, ID_ACCENT = 60 /* .. 65 */ };
+enum { PAGE_GENERAL, PAGE_DISPLAY, PAGE_INPUT, PAGE_KEYBOARD, PAGE_WIFI, PAGE_DATETIME, PAGE_SNAPSHOTS, PAGE_ABOUT,
+       PAGE_WORKSPACES, PAGE_BLUETOOTH, PAGE_PRINTERS };
 #define SIDEBAR 168
 
 struct settings {
@@ -54,6 +60,9 @@ struct settings {
 	struct snapshots *snap;
 	struct about *about;
 	struct workspaces *ws;
+	struct display *disp;
+	struct bluetooth *bt;
+	struct printers *pr;
 	int sock;
 };
 
@@ -67,6 +76,9 @@ static void set_page(struct settings *s, int page)
 	wifi_show(s->wifi, page == PAGE_WIFI);
 	dt_show(s->dt, page == PAGE_DATETIME);
 	snap_show(s->snap, page == PAGE_SNAPSHOTS);
+	disp_show(s->disp, page == PAGE_DISPLAY);
+	bt_show(s->bt, page == PAGE_BLUETOOTH);
+	pr_show(s->pr, page == PAGE_PRINTERS);
 	if (page == PAGE_ABOUT)
 		about_show(s->about);
 	pages_show(s->pg, page >= PAGE_DISPLAY && page <= PAGE_KEYBOARD ? page - PAGE_DISPLAY : -1);
@@ -229,6 +241,12 @@ static void draw_scrolled(fl_ui *ui, struct settings *s, fl_rect view)
 		s->content_h = about_draw(s->about, ui, c);
 	else if (s->page == PAGE_WORKSPACES)
 		s->content_h = ws_draw(s->ws, ui, c);
+	else if (s->page == PAGE_DISPLAY)
+		s->content_h = disp_draw(s->disp, ui, c);
+	else if (s->page == PAGE_BLUETOOTH)
+		s->content_h = bt_draw(s->bt, ui, c);
+	else if (s->page == PAGE_PRINTERS)
+		s->content_h = pr_draw(s->pr, ui, c);
 	else
 		s->content_h = pages_draw(s->pg, s->page - PAGE_DISPLAY, ui, c);
 	ui->mx = mx;
@@ -241,7 +259,7 @@ static void draw_scrolled(fl_ui *ui, struct settings *s, fl_rect view)
 	ui->cv.clip = old_clip;
 }
 
-static int sidebar_item(fl_ui *ui, uint32_t id, fl_rect r, fl_icon ic, const char *label, int on)
+static int sidebar_item(fl_ui *ui, uint32_t id, fl_rect r, fl_icon ic, const char *svg, const char *label, int on)
 {
 	int res = fl_widget(ui, id, r, FL_FOCUSABLE);
 	fl_fill_rect(&ui->cv, r, on ? fl_th.select : (res & FL_HOVER) ? fl_th.raised : 0);
@@ -249,7 +267,10 @@ static int sidebar_item(fl_ui *ui, uint32_t id, fl_rect r, fl_icon ic, const cha
 		fl_fill_rect(&ui->cv, fl_r(r.x, r.y, 3, r.h), fl_th.accent);
 	if (res & FL_FOCUS)
 		fl_stroke_rect(&ui->cv, r, 1, fl_th.accent);
-	fl_icon_draw(&ui->cv, ic, r.x + 16, r.y + (r.h - 16) / 2, 16, on ? fl_th.accent : fl_th.dim);
+	if (svg)
+		pg_glyph(ui, svg, r.x + 16, r.y + (r.h - 16) / 2, 16, on ? fl_th.accent : fl_th.dim);
+	else
+		fl_icon_draw(&ui->cv, ic, r.x + 16, r.y + (r.h - 16) / 2, 16, on ? fl_th.accent : fl_th.dim);
 	fl_text_in(&ui->cv, on ? ui->f_med : ui->f_reg, fl_r(r.x + 44, r.y, r.w - 44, r.h), FL_LEFT, 0,
 	           on ? fl_th.strong : fl_th.text, label);
 	if ((res & FL_FOCUS) && (ui->key == XKB_KEY_Return || ui->key == XKB_KEY_space)) {
@@ -267,19 +288,21 @@ static void draw(fl_ui *ui, void *ud)
 	fl_rect side = fl_cut_left(&c, SIDEBAR);
 	fl_fill_rect(&ui->cv, side, fl_th.bg);
 	fl_fill_rect(&ui->cv, fl_r(side.x + side.w - 1, side.y, 1, side.h), fl_th.line);
-	static const struct { int page, id; fl_icon icon; const char *name; } items[] = {
-		{PAGE_GENERAL, ID_PAGE_GENERAL, FL_ICON_SETTINGS, "General"},
-		{PAGE_DISPLAY, ID_PAGE_DISPLAY, FL_ICON_DISPLAY, "Display"},
-		{PAGE_INPUT, ID_PAGE_INPUT, FL_ICON_MOUSE, "Mouse & touchpad"},
-		{PAGE_KEYBOARD, ID_PAGE_KEYBOARD, FL_ICON_KEYBOARD, "Keyboard"},
-		{PAGE_WORKSPACES, ID_PAGE_WORKSPACES, FL_ICON_WINDOW, "Workspaces"},
-		{PAGE_DATETIME, ID_PAGE_DATETIME, FL_ICON_CLOCK, "Date & time"},
-		{PAGE_WIFI, ID_PAGE_WIFI, FL_ICON_WIFI, "Wi-Fi"},
-		{PAGE_SNAPSHOTS, ID_PAGE_SNAPSHOTS, FL_ICON_DRIVE, "Snapshots"},
-		{PAGE_ABOUT, ID_PAGE_ABOUT, FL_ICON_DOC, "About"},
+	static const struct { int page, id; fl_icon icon; const char *svg; const char *name; } items[] = {
+		{PAGE_GENERAL, ID_PAGE_GENERAL, FL_ICON_SETTINGS, NULL, "General"},
+		{PAGE_DISPLAY, ID_PAGE_DISPLAY, FL_ICON_DISPLAY, NULL, "Display"},
+		{PAGE_INPUT, ID_PAGE_INPUT, FL_ICON_MOUSE, NULL, "Mouse & touchpad"},
+		{PAGE_KEYBOARD, ID_PAGE_KEYBOARD, FL_ICON_KEYBOARD, NULL, "Keyboard"},
+		{PAGE_WORKSPACES, ID_PAGE_WORKSPACES, FL_ICON_WINDOW, NULL, "Workspaces"},
+		{PAGE_DATETIME, ID_PAGE_DATETIME, FL_ICON_CLOCK, NULL, "Date & time"},
+		{PAGE_WIFI, ID_PAGE_WIFI, FL_ICON_WIFI, NULL, "Wi-Fi"},
+		{PAGE_BLUETOOTH, ID_PAGE_BLUETOOTH, FL_ICON_WIFI, PG_SVG_BLUETOOTH, "Bluetooth"},
+		{PAGE_PRINTERS, ID_PAGE_PRINTERS, FL_ICON_DOC, PG_SVG_PRINTER, "Printers"},
+		{PAGE_SNAPSHOTS, ID_PAGE_SNAPSHOTS, FL_ICON_DRIVE, NULL, "Snapshots"},
+		{PAGE_ABOUT, ID_PAGE_ABOUT, FL_ICON_DOC, NULL, "About"},
 	};
 	for (int i = 0; i < (int)(sizeof items / sizeof items[0]); i++)
-		if (sidebar_item(ui, (uint32_t)items[i].id, fl_r(side.x, side.y + 12 + i * 40, side.w - 1, 40), items[i].icon,
+		if (sidebar_item(ui, (uint32_t)items[i].id, fl_r(side.x, side.y + 12 + i * 40, side.w - 1, 40), items[i].icon, items[i].svg,
 		                 items[i].name, s->page == items[i].page))
 			set_page(s, items[i].page);
 	if (s->page == PAGE_WIFI) {
@@ -306,13 +329,15 @@ static int sock_path(struct sockaddr_un *a)
 static int page_by_name(const char *n)
 {
 	return !strcmp(n, "wifi") || !strcmp(n, "network") ? PAGE_WIFI
-	     : !strcmp(n, "display") ? PAGE_DISPLAY
+	     : !strcmp(n, "display") || !strcmp(n, "wallpaper") ? PAGE_DISPLAY
 	     : !strcmp(n, "mouse") || !strcmp(n, "input") || !strcmp(n, "touchpad") ? PAGE_INPUT
 	     : !strcmp(n, "keyboard") ? PAGE_KEYBOARD
 	     : !strcmp(n, "datetime") || !strcmp(n, "time") || !strcmp(n, "clock") || !strcmp(n, "timezone") ? PAGE_DATETIME
 	     : !strcmp(n, "snapshots") || !strcmp(n, "snapshot") || !strcmp(n, "rollback") ? PAGE_SNAPSHOTS
 	     : !strcmp(n, "workspaces") || !strcmp(n, "workspace") || !strcmp(n, "desktops") ? PAGE_WORKSPACES
 	     : !strcmp(n, "about") || !strcmp(n, "report") ? PAGE_ABOUT
+	     : !strcmp(n, "bluetooth") || !strcmp(n, "bt") ? PAGE_BLUETOOTH
+	     : !strcmp(n, "printers") || !strcmp(n, "printer") ? PAGE_PRINTERS
 	     : PAGE_GENERAL;
 }
 
@@ -329,7 +354,8 @@ static int hand_over(int page)
 		close(fd);
 		return 0;
 	}
-	static const char *const names[] = {"general", "display", "mouse", "keyboard", "wifi", "datetime", "snapshots", "about", "workspaces"};
+	static const char *const names[] = {"general", "display", "mouse", "keyboard", "wifi", "datetime", "snapshots", "about", "workspaces",
+	                                    "bluetooth", "printers"};
 	char msg[32];
 	snprintf(msg, sizeof msg, "page %s\n", names[page]);
 	int ok = write(fd, msg, strlen(msg)) > 0;
@@ -387,9 +413,9 @@ int main(int argc, char **argv)
 			}
 			return 0;
 		} else {
-			fprintf(stderr, "usage: flsettings [--page general|display|mouse|keyboard|workspaces|datetime|wifi|snapshots|about]\n"
+			fprintf(stderr, "usage: flsettings [--page general|display|wallpaper|mouse|keyboard|workspaces|datetime|wifi|bluetooth|printers|snapshots|about]\n"
 			                "       flsettings --set-wallpaper FILE.png|FILE.jpg\n"
-			                "Theme, panel labels, display, mouse and touchpad, keyboard, workspaces, date and time, Wi-Fi\n");
+			                "Theme, panel labels, display, mouse and touchpad, keyboard, workspaces, date and time, Wi-Fi, Bluetooth, printers\n");
 			return !strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ? 0 : 2;
 		}
 	}
@@ -433,6 +459,18 @@ int main(int argc, char **argv)
 	snap_set_win(s.snap, w);
 	snap_show(s.snap, s.page == PAGE_SNAPSHOTS);
 	s.ws = ws_new(s.app, s.head, s.small);
+	s.disp = disp_new(s.app, s.head, s.small, s.pg);
+	if (s.disp)
+		disp_set_win(s.disp, w);
+	disp_show(s.disp, s.page == PAGE_DISPLAY);
+	s.bt = bt_new(s.app, s.head, s.small);
+	if (s.bt)
+		bt_set_win(s.bt, w);
+	bt_show(s.bt, s.page == PAGE_BLUETOOTH);
+	s.pr = pr_new(s.app, s.head, s.small);
+	if (s.pr)
+		pr_set_win(s.pr, w);
+	pr_show(s.pr, s.page == PAGE_PRINTERS);
 	s.about = about_new(s.app, s.head, s.small);
 	about_set_win(s.about, w);
 	if (s.page == PAGE_ABOUT)
@@ -453,6 +491,9 @@ int main(int argc, char **argv)
 	snap_free(s.snap);
 	about_free(s.about);
 	ws_free(s.ws);
+	disp_free(s.disp);
+	bt_free(s.bt);
+	pr_free(s.pr);
 	pages_free(s.pg);
 	fl_app_free(s.app);
 	return 0;

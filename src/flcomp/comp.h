@@ -122,8 +122,9 @@ struct popup {
 struct comp {
 	struct wl_display *dpy;
 	struct wl_event_loop *loop;
-	int w, h, refresh;		/* output: the desktop's size (logical) and refresh in mHz */
-	int pw, ph, scale;		/* the screen's mode in pixels; scale in percent (100..200) */
+	int w, h, refresh;		/* the desktop's size (logical; all enabled outputs together) and the primary's refresh in mHz */
+	int pw, ph, scale;		/* the primary output's mode in pixels; its scale in percent (100..200) */
+	struct rect prim;		/* the primary output on the desktop (logical pixels): panel, maximize, fullscreen */
 	uint32_t *shadow;		/* w*h XRGB, always complete */
 	bool headless, active;
 	struct damage dmg, prev;
@@ -399,7 +400,11 @@ struct conf {
 	int repeat_delay, repeat_rate;	/* ms, keys per second */
 	bool numlock;
 	bool night;
-	int night_warmth;		/* 0..100 */
+	int night_warmth;		/* 0..100 (old keys night_light, night_warmth: used when nightlight= is absent) */
+	int nl_mode;			/* nightlight=off|on|auto: 0, 1, 2; -1: key absent (wins over night_light) */
+	int nl_old;			/* night_light=0|1|auto, the older key: 0, 1, 2; -1: absent */
+	int nl_temp;			/* nightlight_temp=2700..6500, 0: absent */
+	int nl_from, nl_to;		/* nightlight_from/_to as minutes after midnight (20:00, 07:00) */
 	int brightness;			/* percent, -1: leave alone */
 	int mode_w, mode_h, mode_hz;	/* mode=WxH@HZ, 0: the display's preferred */
 	int scale;
@@ -452,10 +457,30 @@ void wall_reload(void);
 void windows_fit_output(void);				/* xdg.c */
 void outputs_send_mode(void);				/* main.c: wl_output after a change */
 int output_pending_secs(void);
+/* fl_shell 9 (fldisplay): flags 1 mode, 2 scale, 4 position, 8 enabled, 16 primary */
+bool output_configure(const char *name, unsigned flags, int w, int h, int hz, int scale, int x, int y, int enabled, int primary);
+bool output_revert_config(void);
+void output_send_list(struct wl_resource *shell);	/* version 9 bindings: every output and its modes */
 bool output_scale_ok(int pw, int ph, int scale);
 
 /* drm.c: backend (also the headless one) */
 struct outmode { int w, h, hz; bool preferred; };
+#define MAX_OUT 8
+/* One display output (a connector). The backend fills the connector facts, output.c the policy
+ * (scale, position, primary) and the layout: dx, dy, lw, lh say where its picture is in the
+ * shadow. Positions are logical pixels (mode size * 100 / scale). */
+struct output {
+	char name[32];
+	bool connected, enabled, primary;
+	int w, h, hz;			/* current mode in pixels, the last one while the output is off */
+	int scale;			/* percent */
+	int x, y;			/* configured position on the desktop */
+	int dx, dy, lw, lh;		/* in the shadow, and the logical size (enabled outputs only) */
+	struct outmode modes[64];	/* no duplicates, preferred first */
+	int nmodes;
+};
+extern struct output OUT[MAX_OUT];
+extern int NOUT;
 int backend_init(void);
 void backend_start(void);
 void backend_present(const struct damage *d);
@@ -463,11 +488,18 @@ bool backend_busy(void);
 void backend_switch_vt(int n);
 void backend_fini(void);
 int backend_drm_fd(void);	/* -1: headless */
-int backend_modes(struct outmode *out, int max);	/* the display's modes, no duplicates */
-bool backend_set_mode(int w, int h, int hz);		/* false: refused, nothing changed */
+bool backend_probe(void);	/* (re)read the connectors into OUT; true: something changed */
+bool backend_out_set(struct output *o, bool enable, int w, int h, int hz);	/* false: refused, nothing changed */
+void backend_tint(const double rgb[3]);		/* night light: colour factors 0..1 on every output */
 void backend_input_apply(void);			/* libinput settings from CF, every device */
 void backend_set_leds(int leds);			/* 1 num, 2 caps, 4 scroll */
-void backend_night_changed(void);			/* CF.night, CF.night_warmth */
+void output_hotplug(void);				/* output.c: the connectors changed (backend_probe said so) */
+bool output_ready(void);				/* output.c: layout done */
+/* nightlight.c */
+void night_init(void);
+void night_conf_changed(void);
+void night_outputs_changed(void);
+const char *config_get_raw(const char *key, char *buf, size_t n);	/* config.c: value of KEY in desktop.conf, or NULL */
 
 #include "xwm.h"
 

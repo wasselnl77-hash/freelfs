@@ -241,3 +241,9 @@ ccad8ee5dadb1271fd4727ad14d9bd77a64e505608766c4e98267d9aede40d3d  xcb-util-image
 94d0038ef92bb65b86d08f004197c56f8d81f82f9ac7a25c202a88afd653a30b  gmmlib-22.10.2.tar.gz  https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.2.tar.gz
 93e82dc3c3682feab12b8c861be8762730349d09d8c20f7dd78c0f533049e24a  intel-media-driver-26.4.2.tar.gz  https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.4.2.tar.gz
 895bca0285fd4118800912a54527c0ae0d0c6e62591e807c3c96c6b342c4c5e2  spirv-llvm-translator-22.1.8.tar.gz  https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v22.1.8.tar.gz
+6952c39eb5f8b0ee712cc50ab3bcff03be17c410dd97ca640f4849d9a1653ba3  bluez-5.88.tar.xz  https://www.kernel.org/pub/linux/bluetooth/bluez-5.88.tar.xz
+a1ada76ef35e5af9c2fbd063754dc9e37a8d989417c6eb1ecebb089b1383ae9e  sbc-2.2.tar.xz  https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz
+ab4d9cd7f3e58060091d2b24972223d6401675f11c49b65abf4f6ef31dea22ff  cups-2.4.20-source.tar.gz  https://github.com/OpenPrinting/cups/releases/download/v2.4.20/cups-2.4.20-source.tar.gz
+fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf  libusb-1.0.30.tar.bz2  https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2
+060309d7a333d38d951bc27598c677af1796934dbd98e1024e7ad8de798fedda  avahi-0.8.tar.gz  https://github.com/avahi/avahi/releases/download/v0.8/avahi-0.8.tar.gz
+fd23eb5f6f986dcc7e708307355ba3289abe03cc381fc47a80bca4a50aa6b834  libdaemon-0.14.tar.gz  http://0pointer.de/lennart/projects/libdaemon/libdaemon-0.14.tar.gz

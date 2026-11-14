@@ -1,0 +1,30 @@
+# Settings pages Display, Bluetooth, Printers: open, picture, still running; bluetooth: no adapter
+@desktop
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flsettings --page display >/tmp/s1.log 2>&1 </dev/null &'
+@wait 6
+@shot @OUT@/p1-display.ppm
+pgrep -x flsettings && echo display-alive
+pkill -x flsettings
+@wait 1
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flsettings --page bluetooth >/tmp/s2.log 2>&1 </dev/null &'
+@wait 6
+@shot @OUT@/p2-bluetooth.ppm
+pgrep -x flsettings && echo bluetooth-alive
+pkill -x flsettings
+@wait 1
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flsettings --page printers >/tmp/s3.log 2>&1 </dev/null &'
+@wait 8
+@shot @OUT@/p3-printers.ppm
+pgrep -x flsettings && echo printers-alive
+pkill -x flsettings
+@wait 1
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; setsid flsettings --page wallpaper >/tmp/s4.log 2>&1 </dev/null &'
+@wait 5
+@shot @OUT@/p4-wallpaper.ppm
+pgrep -x flsettings && echo wallpaper-alive
+cat /tmp/s1.log /tmp/s2.log /tmp/s3.log /tmp/s4.log | head
+grep -ci "crash\|segfault" /run/user/1000/flcomp.log
+pgrep -x bluetoothd || echo no-bluetoothd
+pgrep -x cupsd || echo no-cupsd
+pgrep -x flsocketd && echo flsocketd-running
+su -s /bin/sh tester -c 'timeout 10 bluetoothctl show 2>&1 | head -3'

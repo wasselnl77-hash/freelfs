@@ -1,0 +1,37 @@
+pkgname=bluez
+version=5.88
+release=1
+summary="Bluetooth stack: bluetoothd, bluetoothctl and libbluetooth"
+url=https://www.bluez.org/
+license=(GPL-2.0-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc glib dbus udev readline)
+source=(https://www.kernel.org/pub/linux/bluetooth/bluez-$version.tar.xz)
+sha256=(6952c39eb5f8b0ee712cc50ab3bcff03be17c410dd97ca640f4849d9a1653ba3)
+build_style=autotools
+# Minimal: the daemon, bluetoothctl and the library (PipeWire's bluez5 plugin wants the headers).
+# Off: obex (needs libical), mesh and btpclient (need ell), midi (alsa seq), the CUPS backend,
+# deprecated hci* tools, the test scripts, man pages (rst2man), systemd units and libsystemd.
+# Left on: A2DP/AVRCP for headphones, HID and HOG for keyboards and mice, the input plugin (UHID
+# is built into the kernel). udev rules go to /usr/lib/udev; the D-Bus policy is ours (below).
+# The bluetoothd daemon is started by /etc/rc.d/init.d/bluetooth only when an adapter exists.
+configure_args=(--sysconfdir=/etc --localstatedir=/var --libexecdir=/usr/libexec
+	--with-dbusconfdir=/usr/share --with-udevdir=/usr/lib/udev
+	--enable-library --enable-client --enable-monitor
+	--disable-systemd --disable-manpages --disable-obex --disable-mesh --disable-btpclient
+	--disable-midi --disable-cups --disable-test --disable-tools --disable-deprecated
+	--disable-sixaxis --disable-nfc)
+
+check() { :; }
+
+# config/bluez: 90-flbluetooth.rules (starts the rc service on hotplug) and seat-dbus.conf: users in group seat may use org.bluez (no logind here, so the
+# stock at_console policy never matches), and bluez and the audio server may call each other.
+package() {
+	make DESTDIR="$pkgdir" install
+	install -Dm644 "$startdir/../../config/bluez/seat-dbus.conf" \
+		"$pkgdir/usr/share/dbus-1/system.d/bluetooth-seat.conf"
+	install -Dm644 "$startdir/../../config/bluez/90-flbluetooth.rules" \
+		"$pkgdir/usr/lib/udev/rules.d/90-flbluetooth.rules"
+	rm -rf "$pkgdir/var/lib/bluetooth" "$pkgdir"/usr/lib/*.la
+}

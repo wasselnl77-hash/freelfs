@@ -1,0 +1,3 @@
+# FreeLFS: PDF to what a driverless printer takes. No cups-filters: two small scripts.
+application/pdf application/vnd.cups-pdf 66 pdftopdf
+application/pdf image/pwg-raster 200 pdftopwg

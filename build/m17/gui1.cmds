@@ -1,0 +1,4 @@
+@desktop
+mkdir -p /home/tester/Desktop; echo hello > /home/tester/Desktop/note.txt; chown -R 1000:999 /home/tester/Desktop
+@wait 8
+@shot @OUT@/g1-icons.ppm

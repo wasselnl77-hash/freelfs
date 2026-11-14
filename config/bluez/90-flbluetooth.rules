@@ -1,0 +1,3 @@
+# bluetoothd runs only while an adapter exists (see /etc/rc.d/init.d/bluetooth)
+ACTION=="add", SUBSYSTEM=="bluetooth", KERNEL=="hci[0-9]*", RUN+="/etc/rc.d/init.d/bluetooth start"
+ACTION=="remove", SUBSYSTEM=="bluetooth", KERNEL=="hci[0-9]*", RUN+="/etc/rc.d/init.d/bluetooth maybe-stop"

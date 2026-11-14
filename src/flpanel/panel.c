@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/stat.h>
 #include <flui.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -312,6 +313,8 @@ static void tray_tick(void *ud)
 	struct panel *p = ud;
 	if (tray_read_sys(p))
 		fl_win_redraw(p->pw);
+	if (quick_tick(p)) /* quick.c: the Bluetooth icon came or went */
+		fl_win_redraw(p->pw);
 	p->tray_tick++;
 	/* the volume: every 25 s, or once a minute when wpctl keeps failing */
 	int every = p->vol_fails >= 3 ? 12 : 5;
@@ -526,6 +529,7 @@ void panel_flyouts_close(struct panel *p, int except)
 		wsmenu_close(p);
 	if (except != FLY_CTX)
 		ctx_close(p);
+	quick_flyouts_close(p, except);
 }
 
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx)
@@ -817,6 +821,9 @@ static void draw_panel(fl_ui *ui, void *ud)
 		x -= 4;
 	}
 
+	/* Bluetooth (when there is an adapter) and the night light, left of the network icon */
+	quick_tray(p, ui, &x);
+
 	/* keyboard layout */
 	{
 		char lab[16];
@@ -986,6 +993,8 @@ int main(int argc, char **argv)
 {
 	struct panel p = {0};
 	int open_menu = 0, open_fly = 0, open_ws = 0, show_cards = 0, show_center = 0, show_bat = 0;
+	int open_bt = 0, open_qs = 0;
+	const char *props_path = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--demo"))
 			p.demo = 1;
@@ -1001,14 +1010,23 @@ int main(int argc, char **argv)
 			open_fly = 1;
 		else if (!strcmp(argv[i], "--workspaces"))
 			open_ws = p.demo = 1;
+		else if (!strcmp(argv[i], "--bluetooth"))
+			open_bt = p.demo = 1;
+		else if (!strcmp(argv[i], "--quick"))
+			open_qs = p.demo = 1;
+		else if (!strcmp(argv[i], "--properties") && i + 1 < argc)
+			props_path = argv[++i], p.demo = 1;
 		else {
 			fprintf(stderr, "usage: flpanel [--demo] [--menu] [--volume] [--workspaces] [--cards] [--center] [--battery]\n"
+			                "               [--bluetooth] [--quick]\n"
 			                "  --demo  fake windows and a fixed clock (for screenshots)\n"
 			                "  --menu  start with the menu open\n"
 			                "  --volume  start with the volume flyout open\n"
 			                "  --workspaces  demo with the pager's menu open (FLUI_PPM=FILE writes FILE and FILE.N)\n"
 			                "  --cards, --center, --battery  demo with notification cards, the centre or the\n"
-			                "          battery flyout shown (FLUI_PPM=FILE writes file, file.3, file.4, file.5)\n");
+			                "          battery flyout shown (FLUI_PPM=FILE writes file, file.3, file.4, file.5)\n"
+			                "  --bluetooth, --quick  demo with the Bluetooth or the quick settings flyout shown\n"
+			                "  --properties PATH  demo with the Properties window of PATH open\n");
 			return !strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ? 0 : 2;
 		}
 	}
@@ -1064,7 +1082,8 @@ int main(int argc, char **argv)
 	notify_init(&p);
 	battery_init(&p);
 	desk_init(&p);
-	wsmenu_init(&p); /* last: the other windows keep their numbers in FLUI_PPM file names */
+	wsmenu_init(&p); /* the other windows keep their numbers in FLUI_PPM file names */
+	quick_init(&p);  /* after them: the Bluetooth and quick settings flyouts */
 
 	if (p.demo) {
 		struct win demo[2] = {
@@ -1076,6 +1095,12 @@ int main(int argc, char **argv)
 		p.nwins = 2;
 		snprintf(p.layout, sizeof p.layout, "de");
 		p.ws_cols = p.ws_rows = 2;
+		quick_demo(&p, open_bt, open_qs);
+		if (props_path) {
+			struct stat st;
+			int dir = stat(props_path, &st) == 0 && S_ISDIR(st.st_mode);
+			props_open(&p, props_path, dir);
+		}
 	}
 	if (fl_app_ppm(p.app)) {
 		int any = show_cards || show_center || show_bat;

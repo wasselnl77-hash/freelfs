@@ -1,0 +1,26 @@
+# fldisplay in the live session on a virtio-gpu with two outputs (FLFS_VM_VGA=-device virtio-vga,max_outputs=2)
+@desktop
+@shot @OUT@/d0-before.ppm
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0; fldisplay list; echo list-rc=$?'
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0; fldisplay set Virtual-1 mode=1024x768@60; echo set-mode-rc=$?; fldisplay list | head -1'
+@wait 2
+@shot @OUT@/d1-1024.ppm
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0; fldisplay set Virtual-1 scale=1.25; echo set-scale-rc=$?'
+@wait 2
+@shot @OUT@/d2-scale125.ppm
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0; fldisplay revert; echo revert-rc=$?; fldisplay list | head -1'
+@wait 2
+@shot @OUT@/d3-reverted.ppm
+su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0; fldisplay set Virtual-2 enabled=1 pos=1280,0; echo set-second-rc=$?; fldisplay list'
+@wait 2
+@shot @OUT@/d4-second.ppm
+grep -h "output\." /home/tester/.config/freelfs/desktop.conf
+tail -5 /run/user/1000/flcomp.log
+# night light: the colour shift (picture before and after) and the log line that says hardware or software
+su -s /bin/sh tester -c 'fldisplay nightlight on temp=3000'
+@wait 4
+@shot @OUT@/d5-night.ppm
+grep "night light" /run/user/1000/flcomp.log
+su -s /bin/sh tester -c 'fldisplay nightlight off'
+@wait 4
+@shot @OUT@/d6-night-off.ppm

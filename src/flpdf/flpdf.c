@@ -101,6 +101,30 @@ struct P {
 	int msg_err;
 };
 
+#include <stdio.h>
+/* Ctrl+P: the file goes to the default printer through CUPS (`lp`, Settings > Printers sets it
+ * up). The first call starts cupsd on demand, which takes a second or two. */
+static int print_file(const char *path, char *msg, size_t cap)
+{
+	char cmd[1200];
+	if (strchr(path, '\''))
+		return snprintf(msg, cap, "Cannot print a file name with a quote in it"), 1;
+	snprintf(cmd, sizeof cmd, "lp -- '%s' 2>&1", path);
+	FILE *f = popen(cmd, "r");
+	if (!f)
+		return snprintf(msg, cap, "Cannot run lp"), 1;
+	char out[200] = "";
+	size_t n = fread(out, 1, sizeof out - 1, f);
+	out[n] = 0;
+	out[strcspn(out, "\n")] = 0;
+	int st = pclose(f);
+	if (st != 0)
+		snprintf(msg, cap, "Printing failed: %s", out[0] ? out : "no printer set up (Settings > Printers)");
+	else
+		snprintf(msg, cap, "Sent to the printer");
+	return st != 0;
+}
+
 /* ---- small helpers ----------------------------------------------------------------------- */
 
 static void say(struct P *p, int err, const char *fmt, ...)
@@ -702,7 +726,15 @@ static void keys(fl_ui *ui, struct P *p, fl_rect view)
 	case XKB_KEY_n:
 	case XKB_KEY_N: goto_page(p, cur + 1, 0); break;
 	case XKB_KEY_p:
-	case XKB_KEY_P: goto_page(p, cur - 1, 0); break;
+	case XKB_KEY_P:
+		if (ctrl) {	/* Ctrl+P prints, plain P is the previous page */
+			char m[240];
+			int bad = print_file(p->path, m, sizeof m);
+			say(p, bad, "%s", m);
+		} else {
+			goto_page(p, cur - 1, 0);
+		}
+		break;
 	case XKB_KEY_plus:
 	case XKB_KEY_equal:
 	case XKB_KEY_KP_Add:

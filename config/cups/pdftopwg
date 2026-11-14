@@ -1,0 +1,11 @@
+#!/bin/sh
+# FreeLFS: a PDF for a printer that only takes PWG raster (many driverless printers) is drawn by
+# mutool (MuPDF, already there for the PDF viewer) at 300 dpi. Arguments: job user title copies
+# options [file].
+f=$6
+if [ -z "$f" ]; then
+	f=$(mktemp /var/spool/cups/tmp/pdftopwg.XXXXXX) || exit 1
+	trap 'rm -f "$f"' EXIT
+	cat > "$f"
+fi
+exec mutool draw -q -r 300 -F pwg -o - "$f"

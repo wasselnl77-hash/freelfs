@@ -1,0 +1,5 @@
+@desktop
+su -s /bin/sh tester -c "env -i HOME=/home/tester PATH=/usr/local/bin:/usr/bin /bin/sh -c 'fldisplay nightlight on; echo rc=\$?'"
+ls -la /home/tester/.config/freelfs/
+@wait 4
+grep "night light" /run/user/1000/flcomp.log

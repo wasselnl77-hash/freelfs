@@ -16,10 +16,10 @@
 
 struct rect work_area(void)
 {
-	struct rect r = { 0, 0, C.w, C.h - C.panel_h };
+	struct rect r = { C.prim.x1, C.prim.y1, C.prim.x2, C.prim.y2 - C.panel_h };	/* the primary output */
 	if (CF.panel_top) {	/* panel_position=top */
-		r.y1 = C.panel_h;
-		r.y2 = C.h;
+		r.y1 = C.prim.y1 + C.panel_h;
+		r.y2 = C.prim.y2;
 	}
 	return r;
 }
@@ -202,7 +202,7 @@ void window_close(struct window *w)
 
 static void window_refit(struct window *w)
 {
-	struct rect a = w->fullscreen ? (struct rect){ 0, 0, C.w, C.h } : work_area();
+	struct rect a = w->fullscreen ? C.prim : work_area();
 	struct xinset in = xwm_insets(w);	/* the frame flcomp draws around an X window */
 	a.x1 += in.l;
 	a.y1 += in.t;
@@ -790,7 +790,7 @@ static void window_place(struct window *w)
 	int gw = geom_w(w), gh = geom_h(w);
 	struct xinset in = xwm_insets(w);
 	if (w->fullscreen || w->maximized) {
-		struct rect f = { 0, 0, C.w, C.h };
+		struct rect f = C.prim;
 		w->x = w->fullscreen ? f.x1 : a.x1;
 		w->y = w->fullscreen ? f.y1 : a.y1 + in.t;
 		return;

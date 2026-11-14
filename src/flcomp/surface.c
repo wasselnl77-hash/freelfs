@@ -99,22 +99,24 @@ void surface_origin(struct surface *s, int *x, int *y)
 		xwm_surface_origin(s, &px, &py);
 		break;
 	case ROLE_PANEL:
-		py = CF.panel_top ? 0 : C.h - C.panel_h;
+		px = C.prim.x1;
+		py = CF.panel_top ? C.prim.y1 : C.prim.y2 - C.panel_h;
 		break;
 	case ROLE_MENU:
-		py = CF.panel_top ? C.panel_h : C.h - C.panel_h - s->h;
+		px = C.prim.x1;
+		py = CF.panel_top ? C.prim.y1 + C.panel_h : C.prim.y2 - C.panel_h - s->h;
 		break;
 	case ROLE_FLYOUT:
 		px = C.flyout_x - s->w / 2;
-		if (px > C.w - s->w)
-			px = C.w - s->w;
-		if (px < 0)
-			px = 0;
-		py = CF.panel_top ? C.panel_h : C.h - C.panel_h - s->h;
+		if (px > C.prim.x2 - s->w)
+			px = C.prim.x2 - s->w;
+		if (px < C.prim.x1)
+			px = C.prim.x1;
+		py = CF.panel_top ? C.prim.y1 + C.panel_h : C.prim.y2 - C.panel_h - s->h;
 		break;
 	case ROLE_NOTIFY:
-		px = C.w - s->w - 16;
-		py = 16 + (CF.panel_top ? C.panel_h : 0);
+		px = C.prim.x2 - s->w - 16;
+		py = C.prim.y1 + 16 + (CF.panel_top ? C.panel_h : 0);
 		break;
 	case ROLE_DESKTOP:
 		px = C.desktop_x;

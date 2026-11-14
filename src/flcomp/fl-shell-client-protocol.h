@@ -202,6 +202,46 @@ struct fl_shell_listener {
 				 struct fl_shell *fl_shell,
 				 uint32_t id,
 				 uint32_t index);
+	/**
+	 * one display output (monitor connector)
+	 *
+	 * Sent for every connector on bind and after every change, each
+	 * followed by its output_mode_info events, and at the end of the
+	 * list one output_state (the primary output's scale and logical
+	 * size, pending 0). flags: 1 connected, 2 enabled (lit), 4
+	 * primary. width, height and refresh (Hz) are the output's current
+	 * mode in pixels (the last one used while it is disabled, 0 if it
+	 * never had one); scale is a percentage (100..200); x and y are
+	 * its place on the desktop in logical pixels (mode size divided by
+	 * scale), the top left of the leftmost output is not necessarily
+	 * 0,0.
+	 * @param name e.g. HDMI-A-1, eDP-1, Virtual-2
+	 * @since 9
+	 */
+	void (*output_info)(void *data,
+			    struct fl_shell *fl_shell,
+			    const char *name,
+			    uint32_t flags,
+			    int32_t x,
+			    int32_t y,
+			    uint32_t width,
+			    uint32_t height,
+			    uint32_t refresh,
+			    uint32_t scale);
+	/**
+	 * a mode of the output sent just before
+	 *
+	 * Preferred mode first. flags: 1 the mode in use, 2 the
+	 * display's preferred mode.
+	 * @param refresh Hz
+	 * @since 9
+	 */
+	void (*output_mode_info)(void *data,
+				 struct fl_shell *fl_shell,
+				 uint32_t width,
+				 uint32_t height,
+				 uint32_t refresh,
+				 uint32_t flags);
 };
 
 /**
@@ -236,6 +276,9 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
 #define FL_SHELL_TOGGLE_OVERVIEW 18
 #define FL_SHELL_SET_DESKTOP 19
 #define FL_SHELL_SET_WINDOW_ENTRY 20
+#define FL_SHELL_MAXIMIZE 21
+#define FL_SHELL_OUTPUT_CONFIGURE 22
+#define FL_SHELL_OUTPUT_REVERT 23
 
 /**
  * @ingroup iface_fl_shell
@@ -293,6 +336,14 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_WINDOW_WORKSPACE_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_INFO_SINCE_VERSION 9
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_MODE_INFO_SINCE_VERSION 9
 
 /**
  * @ingroup iface_fl_shell
@@ -378,6 +429,18 @@ fl_shell_add_listener(struct fl_shell *fl_shell,
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_SET_WINDOW_ENTRY_SINCE_VERSION 7
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_MAXIMIZE_SINCE_VERSION 8
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_CONFIGURE_SINCE_VERSION 9
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_REVERT_SINCE_VERSION 9
 
 /** @ingroup iface_fl_shell */
 static inline void
@@ -690,6 +753,53 @@ fl_shell_set_window_entry(struct fl_shell *fl_shell, uint32_t id, int32_t x, int
 {
 	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
 			 FL_SHELL_SET_WINDOW_ENTRY, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, id, x, y, w, h);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * Toggles a window between maximized and its old size (a snapped window is maximized).
+ * The panel's window menu uses it.
+ */
+static inline void
+fl_shell_maximize(struct fl_shell *fl_shell, uint32_t id)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_MAXIMIZE, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, id);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * Only for fldisplay (and Settings through it); other clients are ignored like for
+ * set_output. flags say which of the values count: 1 mode (width, height, refresh),
+ * 2 scale (percent, 100..200), 4 position (x, y), 8 enabled (the value of "enabled"),
+ * 16 primary (this output becomes the primary one; "primary" must be 1). The change is
+ * applied at once; it is saved in desktop.conf right away and the previous state of all
+ * outputs is remembered once for output_revert. There is no automatic revert (the caller
+ * asks the person "keep these settings?" and calls output_revert). A refused change
+ * (unknown or disconnected output, mode the display does not have, scale giving a
+ * desktop below 640x400, the last enabled output switched off) sends output_failed and
+ * changes nothing. Every binding of version 9 gets the new output_info list.
+ */
+static inline void
+fl_shell_output_configure(struct fl_shell *fl_shell, const char *name, uint32_t flags, uint32_t width, uint32_t height, uint32_t refresh, uint32_t scale, int32_t x, int32_t y, uint32_t enabled, uint32_t primary)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_OUTPUT_CONFIGURE, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0, name, flags, width, height, refresh, scale, x, y, enabled, primary);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ *
+ * Restores mode, scale, position, enabled and primary of every output and saves them.
+ * Without a remembered state it does nothing and sends output_failed.
+ */
+static inline void
+fl_shell_output_revert(struct fl_shell *fl_shell)
+{
+	wl_proxy_marshal_flags((struct wl_proxy *) fl_shell,
+			 FL_SHELL_OUTPUT_REVERT, NULL, wl_proxy_get_version((struct wl_proxy *) fl_shell), 0);
 }
 
 #ifdef  __cplusplus

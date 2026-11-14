@@ -68,7 +68,7 @@ static void output_bind(struct wl_client *c, void *data, uint32_t version, uint3
 	wl_resource_set_implementation(r, &output_impl, l, reslink_destroy);
 	wl_output_send_geometry(r, 0, 0, 0, 0, WL_OUTPUT_SUBPIXEL_UNKNOWN, "FreeLFS", "flcomp",
 				WL_OUTPUT_TRANSFORM_NORMAL);
-	wl_output_send_mode(r, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, C.w, C.h, C.refresh);
+	wl_output_send_mode(r, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, C.prim.x2 - C.prim.x1, C.prim.y2 - C.prim.y1, C.refresh);
 	if (version >= WL_OUTPUT_SCALE_SINCE_VERSION)
 		wl_output_send_scale(r, 1);
 	if (version >= WL_OUTPUT_DONE_SINCE_VERSION)
@@ -175,7 +175,7 @@ void outputs_send_mode(void)
 {
 	struct reslink *l;
 	wl_list_for_each(l, &C.outputs, link) {
-		wl_output_send_mode(l->res, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, C.w, C.h, C.refresh);
+		wl_output_send_mode(l->res, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, C.prim.x2 - C.prim.x1, C.prim.y2 - C.prim.y1, C.refresh);
 		if (wl_resource_get_version(l->res) >= WL_OUTPUT_DONE_SINCE_VERSION)
 			wl_output_send_done(l->res);
 	}
@@ -264,9 +264,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	output_init();
-	C.shadow = calloc((size_t)C.w * C.h, 4);
+	if (!C.shadow)
+		C.shadow = calloc((size_t)C.w * C.h, 4);
 	if (!C.shadow)
 		die("out of memory");
+	night_init();
 	wall_init();
 
 	surface_init();

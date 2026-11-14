@@ -1,0 +1,6 @@
+#!/bin/sh
+# FreeLFS stand-in for cups-filters' pdftopdf: a PDF goes to a printer that takes PDF as it is
+# (IPP Everywhere, AirPrint) unchanged. No page ranges, n-up or fitting to the page size: the
+# printer does what it can with the IPP job attributes CUPS sends. Arguments: job user title
+# copies options [file]; without a file the document is on stdin.
+if [ -n "$6" ]; then cat "$6"; else cat; fi

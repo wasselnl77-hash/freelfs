@@ -1,6 +1,6 @@
 pkgname=flpdf
 version=0.1
-release=2
+release=3
 summary="FreeLFS document viewer: PDF, XPS, EPUB, CBZ; contents, search, zoom"
 license=(MIT)
 arch=(x86_64)

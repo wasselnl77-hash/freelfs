@@ -178,7 +178,7 @@ static void sh_set_layout(struct wl_client *c, struct wl_resource *r, const char
  * change that), FLCOMP_TRUST_ANY=1 lifts it for the tests. */
 static bool trusted_client(struct wl_client *c)
 {
-	static const char *const ok[] = { "flpanel", "fllock", "flgreet", "flgreet-ui", "flsettings", NULL };
+	static const char *const ok[] = { "flpanel", "fllock", "flgreet", "flgreet-ui", "flsettings", "fldisplay", NULL };
 	if (getenv("FLCOMP_TRUST_ANY"))	/* whoever starts flcomp sets its environment (flgreet clears it) */
 		return true;
 	pid_t pid = 0;
@@ -219,6 +219,31 @@ static void sh_set_output(struct wl_client *c, struct wl_resource *r, uint32_t w
 			if (wl_resource_get_version(l->res) >= 3)
 				fl_shell_send_output_failed(l->res);
 	}
+}
+
+static void send_failed(void)
+{
+	struct reslink *l;
+	wl_list_for_each(l, &C.shells, link)
+		if (wl_resource_get_version(l->res) >= 3)
+			fl_shell_send_output_failed(l->res);
+}
+
+static void sh_output_configure(struct wl_client *c, struct wl_resource *r, const char *name, uint32_t flags,
+				uint32_t w, uint32_t h, uint32_t hz, uint32_t scale, int32_t x, int32_t y,
+				uint32_t enabled, uint32_t primary)
+{
+	if (!trusted_client(c))
+		return;
+	if (w > 16384 || h > 16384 || hz > 1000 || scale > 1000 ||
+	    !output_configure(name, flags, (int)w, (int)h, (int)hz, (int)scale, x, y, (int)enabled, (int)primary))
+		send_failed();
+}
+
+static void sh_output_revert_all(struct wl_client *c, struct wl_resource *r)
+{
+	if (trusted_client(c) && !output_revert_config())
+		send_failed();
 }
 
 static void sh_confirm_output(struct wl_client *c, struct wl_resource *r)
@@ -339,6 +364,8 @@ static const struct fl_shell_interface shell_impl = {
 	.set_output = sh_set_output,
 	.confirm_output = sh_confirm_output,
 	.revert_output = sh_revert_output,
+	.output_configure = sh_output_configure,
+	.output_revert = sh_output_revert_all,
 	.destroy = sh_destroy,
 	.set_panel = sh_set_panel,
 	.set_menu = sh_set_menu,
@@ -376,5 +403,5 @@ static void shell_bind(struct wl_client *c, void *data, uint32_t version, uint32
 
 void flshell_init(void)
 {
-	wl_global_create(C.dpy, &fl_shell_interface, 8, NULL, shell_bind);
+	wl_global_create(C.dpy, &fl_shell_interface, 9, NULL, shell_bind);
 }

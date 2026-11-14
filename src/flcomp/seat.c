@@ -1393,8 +1393,8 @@ void seat_init(void)
 	wl_list_init(&pointers);
 	wl_list_init(&keyboards);
 	wl_list_init(&data_devices);
-	C.px = C.w / 2.0;
-	C.py = C.h / 2.0;
+	C.px = (C.prim.x1 + C.prim.x2) / 2.0;
+	C.py = (C.prim.y1 + C.prim.y2) / 2.0;
 	xctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 	char layout[64] = "us";
 	numlock_wanted = CF.numlock;

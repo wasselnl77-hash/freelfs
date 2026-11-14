@@ -337,6 +337,57 @@ struct fl_shell_interface {
 				 int32_t y,
 				 int32_t w,
 				 int32_t h);
+	/**
+	 * maximize or restore a window
+	 *
+	 * Toggles a window between maximized and its old size (a snapped
+	 * window is maximized). The panel's window menu uses it.
+	 * @since 8
+	 */
+	void (*maximize)(struct wl_client *client,
+			 struct wl_resource *resource,
+			 uint32_t id);
+	/**
+	 * change one output; saved in desktop.conf as output.NAME=
+	 *
+	 * Only for fldisplay (and Settings through it); other clients
+	 * are ignored like for set_output. flags say which of the values
+	 * count: 1 mode (width, height, refresh), 2 scale (percent,
+	 * 100..200), 4 position (x, y), 8 enabled (the value of
+	 * "enabled"), 16 primary (this output becomes the primary one;
+	 * "primary" must be 1). The change is applied at once; it is saved
+	 * in desktop.conf right away and the previous state of all outputs
+	 * is remembered once for output_revert. There is no automatic
+	 * revert (the caller asks the person "keep these settings?" and
+	 * calls output_revert). A refused change (unknown or disconnected
+	 * output, mode the display does not have, scale giving a desktop
+	 * below 640x400, the last enabled output switched off) sends
+	 * output_failed and changes nothing. Every binding of version 9
+	 * gets the new output_info list.
+	 * @since 9
+	 */
+	void (*output_configure)(struct wl_client *client,
+				 struct wl_resource *resource,
+				 const char *name,
+				 uint32_t flags,
+				 uint32_t width,
+				 uint32_t height,
+				 uint32_t refresh,
+				 uint32_t scale,
+				 int32_t x,
+				 int32_t y,
+				 uint32_t enabled,
+				 uint32_t primary);
+	/**
+	 * go back to the outputs as they were before the last output_configure
+	 *
+	 * Restores mode, scale, position, enabled and primary of every
+	 * output and saves them. Without a remembered state it does
+	 * nothing and sends output_failed.
+	 * @since 9
+	 */
+	void (*output_revert)(struct wl_client *client,
+			      struct wl_resource *resource);
 };
 
 #define FL_SHELL_WINDOW_ADDED 0
@@ -353,6 +404,8 @@ struct fl_shell_interface {
 #define FL_SHELL_LOCK_STATE 11
 #define FL_SHELL_WORKSPACES 12
 #define FL_SHELL_WINDOW_WORKSPACE 13
+#define FL_SHELL_OUTPUT_INFO 14
+#define FL_SHELL_OUTPUT_MODE_INFO 15
 
 /**
  * @ingroup iface_fl_shell
@@ -410,6 +463,14 @@ struct fl_shell_interface {
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_WINDOW_WORKSPACE_SINCE_VERSION 5
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_INFO_SINCE_VERSION 9
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_MODE_INFO_SINCE_VERSION 9
 
 /**
  * @ingroup iface_fl_shell
@@ -495,6 +556,18 @@ struct fl_shell_interface {
  * @ingroup iface_fl_shell
  */
 #define FL_SHELL_SET_WINDOW_ENTRY_SINCE_VERSION 7
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_MAXIMIZE_SINCE_VERSION 8
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_CONFIGURE_SINCE_VERSION 9
+/**
+ * @ingroup iface_fl_shell
+ */
+#define FL_SHELL_OUTPUT_REVERT_SINCE_VERSION 9
 
 /**
  * @ingroup iface_fl_shell
@@ -654,6 +727,30 @@ static inline void
 fl_shell_send_window_workspace(struct wl_resource *resource_, uint32_t id, uint32_t index)
 {
 	wl_resource_post_event(resource_, FL_SHELL_WINDOW_WORKSPACE, id, index);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ * Sends an output_info event to the client owning the resource.
+ * @param resource_ The client's resource
+ * @param name e.g. HDMI-A-1, eDP-1, Virtual-2
+ */
+static inline void
+fl_shell_send_output_info(struct wl_resource *resource_, const char *name, uint32_t flags, int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t refresh, uint32_t scale)
+{
+	wl_resource_post_event(resource_, FL_SHELL_OUTPUT_INFO, name, flags, x, y, width, height, refresh, scale);
+}
+
+/**
+ * @ingroup iface_fl_shell
+ * Sends an output_mode_info event to the client owning the resource.
+ * @param resource_ The client's resource
+ * @param refresh Hz
+ */
+static inline void
+fl_shell_send_output_mode_info(struct wl_resource *resource_, uint32_t width, uint32_t height, uint32_t refresh, uint32_t flags)
+{
+	wl_resource_post_event(resource_, FL_SHELL_OUTPUT_MODE_INFO, width, height, refresh, flags);
 }
 
 #ifdef  __cplusplus

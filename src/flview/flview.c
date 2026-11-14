@@ -515,6 +515,30 @@ struct V {
 	const char *script; /* FLVIEW_KEYS="Right,Right,Delete": key presses to run in the first frame (tests) */
 };
 
+#include <stdio.h>
+/* Ctrl+P: the file goes to the default printer through CUPS (`lp`, Settings > Printers sets it
+ * up). The first call starts cupsd on demand, which takes a second or two. */
+static int print_file(const char *path, char *msg, size_t cap)
+{
+	char cmd[1200];
+	if (strchr(path, '\''))
+		return snprintf(msg, cap, "Cannot print a file name with a quote in it"), 1;
+	snprintf(cmd, sizeof cmd, "lp -- '%s' 2>&1", path);
+	FILE *f = popen(cmd, "r");
+	if (!f)
+		return snprintf(msg, cap, "Cannot run lp"), 1;
+	char out[200] = "";
+	size_t n = fread(out, 1, sizeof out - 1, f);
+	out[n] = 0;
+	out[strcspn(out, "\n")] = 0;
+	int st = pclose(f);
+	if (st != 0)
+		snprintf(msg, cap, "Printing failed: %s", out[0] ? out : "no printer set up (Settings > Printers)");
+	else
+		snprintf(msg, cap, "Sent to the printer");
+	return st != 0;
+}
+
 static void say(struct V *v, int err, const char *fmt, ...)
 {
 	va_list ap;
@@ -1336,6 +1360,15 @@ static void keys(fl_ui *ui, struct V *v, fl_rect c)
 	case XKB_KEY_r:
 	case XKB_KEY_R:
 		act_rotate(v, c, shift ? 3 : 1);
+		break;
+	case XKB_KEY_p:
+	case XKB_KEY_P:
+		if (ctrl && v->n > 0) {
+			char pth[1100], m[240];
+			path_of(v, v->cur, pth, sizeof pth);
+			int bad = print_file(pth, m, sizeof m);
+			say(v, bad, "%s", m);
+		}
 		break;
 	case XKB_KEY_bracketleft: act_rotate(v, c, 3); break;
 	case XKB_KEY_bracketright: act_rotate(v, c, 1); break;

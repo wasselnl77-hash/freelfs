@@ -26,6 +26,11 @@ static const struct wl_interface *fl_shell_types[] = {
 	NULL,
 	NULL,
 	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 	&wl_surface_interface,
 	NULL,
 	&wl_surface_interface,
@@ -40,26 +45,29 @@ static const struct wl_interface *fl_shell_types[] = {
 
 static const struct wl_message fl_shell_requests[] = {
 	{ "destroy", "", fl_shell_types + 0 },
-	{ "set_panel", "ou", fl_shell_types + 5 },
-	{ "set_menu", "o", fl_shell_types + 7 },
+	{ "set_panel", "ou", fl_shell_types + 10 },
+	{ "set_menu", "o", fl_shell_types + 12 },
 	{ "activate", "u", fl_shell_types + 0 },
 	{ "minimize", "u", fl_shell_types + 0 },
 	{ "close", "u", fl_shell_types + 0 },
 	{ "set_keyboard_layout", "s", fl_shell_types + 0 },
 	{ "logout", "", fl_shell_types + 0 },
-	{ "set_flyout", "2oi", fl_shell_types + 8 },
+	{ "set_flyout", "2oi", fl_shell_types + 13 },
 	{ "set_output", "3uuuu", fl_shell_types + 0 },
 	{ "confirm_output", "3", fl_shell_types + 0 },
 	{ "revert_output", "3", fl_shell_types + 0 },
 	{ "show_osd", "3uuu", fl_shell_types + 0 },
-	{ "set_notifications", "4o", fl_shell_types + 10 },
-	{ "lock", "4o", fl_shell_types + 11 },
+	{ "set_notifications", "4o", fl_shell_types + 15 },
+	{ "lock", "4o", fl_shell_types + 16 },
 	{ "unlock", "4", fl_shell_types + 0 },
 	{ "set_workspace", "5u", fl_shell_types + 0 },
 	{ "move_window", "5uu", fl_shell_types + 0 },
 	{ "toggle_overview", "5", fl_shell_types + 0 },
-	{ "set_desktop", "6oii", fl_shell_types + 12 },
+	{ "set_desktop", "6oii", fl_shell_types + 17 },
 	{ "set_window_entry", "7uiiii", fl_shell_types + 0 },
+	{ "maximize", "8u", fl_shell_types + 0 },
+	{ "output_configure", "9suuuuuiiuu", fl_shell_types + 0 },
+	{ "output_revert", "9", fl_shell_types + 0 },
 };
 
 static const struct wl_message fl_shell_events[] = {
@@ -77,11 +85,13 @@ static const struct wl_message fl_shell_events[] = {
 	{ "lock_state", "4u", fl_shell_types + 0 },
 	{ "workspaces", "5uuu", fl_shell_types + 0 },
 	{ "window_workspace", "5uu", fl_shell_types + 0 },
+	{ "output_info", "9suiiuuuu", fl_shell_types + 0 },
+	{ "output_mode_info", "9uuuu", fl_shell_types + 0 },
 };
 
 WL_PRIVATE const struct wl_interface fl_shell_interface = {
-	"fl_shell", 7,
-	21, fl_shell_requests,
-	14, fl_shell_events,
+	"fl_shell", 9,
+	24, fl_shell_requests,
+	16, fl_shell_events,
 };
 

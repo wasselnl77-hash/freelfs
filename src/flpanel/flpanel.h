@@ -5,6 +5,7 @@
 #define FLPANEL_H
 
 #include <flui.h>
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
@@ -92,7 +93,7 @@ static inline void panel_hide(fl_win *w)
 }
 
 /* which flyout is open; one at a time (panel.c) */
-enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC, FLY_WS, FLY_CTX };
+enum { FLY_NONE, FLY_VOL, FLY_BAT, FLY_NC, FLY_WS, FLY_CTX, FLY_BT, FLY_QS };
 void panel_flyouts_close(struct panel *p, int except);
 void panel_open_flyout(struct panel *p, int kind, fl_win *w, int cx); /* closes the others, then shows w */
 
@@ -188,6 +189,26 @@ static inline int fl_shq(char *out, size_t cap, const char *in)
 void menu_init(struct panel *p);
 void desk_reposition(struct panel *p); /* the panel moved or changed height: the icons keep clear of it */
 void desk_init(struct panel *p); /* deskicons.c: icons on the desktop (fl_shell version 6) */
+/* deskicons.c: a text/uri-list dropped on the desktop: copied (move 0) or moved (move 1) into ~/Desktop
+ * in a child process, a taken name gets " (2)". Nothing calls it until the drop protocol exists. */
+void desk_import_uris(struct panel *p, const char *list, int move);
+
+/* ---- fileinfo.c: the desktop icons' Open with and Properties ---- */
+#define APP_MAX 12
+struct app_choice {
+	char desk[PATH_MAX], name[96]; /* the .desktop file and its Name= */
+};
+/* the apps that open the file, into out; mime gets its type. Returns how many. */
+int fileinfo_apps(const char *path, struct app_choice *out, int max, char *mime, size_t mcap);
+void fileinfo_open_with(const char *desk, const char *path);
+void props_open(struct panel *p, const char *path, int is_dir); /* one Properties window at a time */
+
+/* ---- quick.c: the tray's Bluetooth and night light icons, and their flyouts ---- */
+void quick_init(struct panel *p);
+void quick_tray(struct panel *p, fl_ui *ui, int *x); /* draws the two icons, moves *x left past them */
+int quick_tick(struct panel *p); /* every 5 s: 1 when the Bluetooth icon came or went */
+void quick_flyouts_close(struct panel *p, int except);
+void quick_demo(struct panel *p, int bt, int qs); /* --demo: fake devices; the flyouts the options ask for */
 #define FLY_W 260
 #define FLY_H 76
 void vol_set_pct(struct panel *p, int pct);

@@ -1,0 +1,36 @@
+# CUPS on demand with a fake IPP printer (ippeveprinter): lpadmin -m everywhere, lp, completed job
+@desktop
+pgrep -x cupsd || echo cupsd-not-running-at-idle
+ps -o rss,comm -C flsocketd
+printf '#!/bin/sh\ncp "$1" /tmp/job-received.pdf\nexit 0\n' > /tmp/ippcmd.sh; chmod +x /tmp/ippcmd.sh
+mkdir -p /tmp/ippspool
+setsid ippeveprinter -r off -p 8631 -f application/pdf -c /tmp/ippcmd.sh -d /tmp/ippspool -k -n localhost "Fake Printer" > /tmp/ippeve.log 2>&1 < /dev/null &
+@wait 3
+cat /tmp/ippeve.log | head -5
+pgrep -x ippeveprinter && echo ippeve-running
+@put @OUT@/t.pdf /tmp/t.pdf
+chmod 644 /tmp/t.pdf
+su -s /bin/sh tester -c 'lpstat -p -d 2>&1 | head -3; echo lpstat-rc=$?'
+pgrep -x cupsd && echo cupsd-started-on-demand
+su -s /bin/sh tester -c 'lpinfo --include-schemes dnssd,ipp,ipps,usb -v 2>&1 | head -5; echo lpinfo-done'
+su -s /bin/sh tester -c 'lpadmin -p FAKE -E -v ipp://localhost:8631/ipp/print -m everywhere; echo lpadmin-rc=$?'
+su -s /bin/sh tester -c 'lpoptions -d FAKE; lpstat -p -d; lpstat -e'
+su -s /bin/sh tester -c 'lp -d FAKE /tmp/t.pdf; echo lp-rc=$?'
+@wait 8
+su -s /bin/sh tester -c 'lpstat -W completed -o FAKE; lpstat -p FAKE'
+ls -l /tmp/job-received.pdf; cmp /tmp/t.pdf /tmp/job-received.pdf && echo job-identical
+tail -5 /var/log/cups/error_log
+@shot @OUT@/c1-print.ppm
+# a second printer that only takes PWG raster: the PDF is drawn by mutool (pdftopwg)
+setsid ippeveprinter -r off -p 8632 -f image/pwg-raster -c /tmp/ippcmd2.sh -d /tmp/ippspool2 -k -n localhost "Raster Printer" > /tmp/ippeve2.log 2>&1 < /dev/null &
+printf '#!/bin/sh\ncp "$1" /tmp/job-received.pwg\nexit 0\n' > /tmp/ippcmd2.sh; chmod +x /tmp/ippcmd2.sh; mkdir -p /tmp/ippspool2
+@wait 2
+su -s /bin/sh tester -c 'lpadmin -p RASTER -E -v ipp://localhost:8632/ipp/print -m everywhere; echo lpadmin2-rc=$?; lp -d RASTER /tmp/t.pdf; echo lp2-rc=$?'
+@wait 10
+ls -l /tmp/job-received.pwg; head -c 4 /tmp/job-received.pwg | od -c | head -1
+tail -3 /var/log/cups/error_log
+su -s /bin/sh tester -c 'lpadmin -x FAKE; lpadmin -x RASTER; echo remove-rc=$?; lpstat -p 2>&1 | head -2'
+# the idle exit: cupsd leaves after IdleExitTimeout (60 s)
+@wait 75
+pgrep -x cupsd || echo cupsd-exited-when-idle
+pgrep -x avahi-daemon || echo avahi-exited-too

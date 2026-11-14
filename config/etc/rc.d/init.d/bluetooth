@@ -1,0 +1,47 @@
+#!/bin/bash
+# /etc/rc.d/init.d/bluetooth -- bluetoothd, only while a Bluetooth adapter exists. At boot it
+# starts if one is present already; udev (90-flbluetooth.rules) calls "start" when an adapter
+# appears (hci0 after btusb and its firmware) and "maybe-stop" when one goes away. Without an
+# adapter (QEMU, most desktops) nothing runs and nothing is allocated.
+
+. /etc/rc.d/functions
+
+have_adapter() { compgen -G '/sys/class/bluetooth/hci[0-9]*' > /dev/null; }
+
+start_bluetoothd() {
+	install -d -m 755 /var/lib/bluetooth
+	setsid /usr/libexec/bluetooth/bluetoothd < /dev/null >> /var/log/bluetooth.log 2>&1 &
+	echo $! > /run/bluetoothd.pid
+	sleep 0.3
+	pid_alive /run/bluetoothd.pid || return 1
+	# A default pairing agent (NoInputNoOutput, "just works": headphones, speakers, mice), so that
+	# a one-shot `bluetoothctl pair MAC` from Settings does not fail with "No agent is registered".
+	# bluetoothctl reads its commands from stdin; `tail -f` keeps the pipe open and is its parent.
+	(sleep 1; exec setsid sh -c 'exec tail -f /dev/null | exec bluetoothctl --agent NoInputNoOutput' \
+		< /dev/null > /dev/null 2>&1) &
+	return 0
+}
+
+stop_bluetoothd() {
+	pkill -f 'bluetoothctl --agent NoInputNoOutput' 2> /dev/null
+	pkill -x -f 'tail -f /dev/null' 2> /dev/null
+	pid_stop /run/bluetoothd.pid
+}
+
+case $1 in
+	start)
+		if ! have_adapter; then
+			stat_busy "Bluetooth (no adapter, not started)"
+			stat_done
+			exit 0
+		fi
+		daemon_service start "Bluetooth (bluetoothd)" /run/bluetoothd.pid start_bluetoothd
+		;;
+	maybe-stop)
+		have_adapter || step "Stopping Bluetooth (bluetoothd)" stop_bluetoothd
+		;;
+	*)
+		[ "$1" = stop ] && { step "Stopping Bluetooth (bluetoothd)" stop_bluetoothd; exit; }
+		daemon_service "$1" "Bluetooth (bluetoothd)" /run/bluetoothd.pid start_bluetoothd
+		;;
+esac

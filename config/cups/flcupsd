@@ -1,0 +1,28 @@
+#!/bin/bash
+# Started by flsocketd at the first connection to /run/cups/cups.sock (fd 3 is the listening
+# socket, UPSTART_FDS=3). Runs avahi-daemon for printer discovery next to cupsd, and stops it when
+# cupsd exits (cupsd exits by itself after IdleExitTimeout seconds without jobs).
+install -d -m 755 -o avahi -g avahi /run/avahi-daemon 2> /dev/null
+install -d -m 755 /run/cups
+if [ -x /usr/sbin/avahi-daemon ] && ! [ -e /run/avahi-daemon/pid ]; then
+	/usr/sbin/avahi-daemon --no-chroot --no-rlimits < /dev/null > /dev/null 2>&1 &
+	avahi=$!
+fi
+# cupsd should leave after IdleExitTimeout of its own, but on this build it stayed (events keep its
+# timer short), so this script ends it: nothing queued in the spool (control files c*), no client
+# connected to the socket, for 60 s in a row.
+/usr/sbin/cupsd -f -l &
+cupsd=$!
+idle=0
+while kill -0 "$cupsd" 2> /dev/null; do
+	sleep 5
+	busy=0
+	compgen -G '/var/spool/cups/c[0-9]*' > /dev/null && busy=1
+	[ "$(awk '$NF == "/run/cups/cups.sock" && $6 == "03"' /proc/net/unix | wc -l)" -gt 0 ] && busy=1
+	if [ $busy = 1 ]; then idle=0; else idle=$((idle + 5)); fi
+	[ $idle -ge 60 ] && kill "$cupsd"
+done
+wait "$cupsd"
+rc=$?
+[ -n "$avahi" ] && kill "$avahi" 2> /dev/null && wait "$avahi" 2> /dev/null
+exit $rc

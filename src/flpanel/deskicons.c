@@ -9,18 +9,23 @@
  * click opens. Positions and "show desktop icons" are kept in
  * $XDG_CONFIG_HOME/freelfs/desktop-icons.conf (the session's own config). ~/Desktop is looked at
  * every few seconds, so files made elsewhere appear.
- * Not done: dropping files from Files onto the desktop (no drag-and-drop target here), Open with,
- * Properties.
+ * The icon menu: Open, Open with (files; the apps of the file's type, fileinfo.c), Rename, Move to
+ * Trash, Properties (fileinfo.c). The desktop menu: wallpaper and display settings (flsettings).
+ * Not done: the drop of files from Files (flui and flcomp have no drag and drop yet: the target
+ * side is desk_import_uris, the source side is Files' own drag), desktop icons dragged into Files.
  * SPDX-License-Identifier: MIT
  */
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <flui.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
@@ -35,7 +40,11 @@
 #define INPUT_BG 0x01000000	/* alpha 1: invisible, but it takes the pointer */
 
 enum { IT_APP, IT_FILE, IT_DIR };
-enum { C_NEWDIR = 1, C_NEWFILE, C_TERM, C_WALL, C_SETTINGS, C_TOGGLE, C_OPEN, C_RENAME, C_TRASH };
+enum {
+	C_NEWDIR = 1, C_NEWFILE, C_TERM, C_WALL, C_SETTINGS, C_TOGGLE, C_OPEN, C_RENAME, C_TRASH,
+	C_OPENWITH, C_PROPS, C_DISPLAY,
+	C_CHOICE = 100	/* C_CHOICE + i: the i-th app of Open with */
+};
 enum { K_NEWDIR = 1, K_NEWFILE, K_RENAME };
 
 struct item {
@@ -63,8 +72,11 @@ static struct desk {
 	int cw, ch;	/* the size of the surface now */
 	int drag, dragging, px, py, rb, rbx, rby;
 	/* the menu's subject, copied when it opens: the list may change under it */
-	int menu_kind;
+	int menu_kind, menu_cx;
 	char menu_key[300], menu_path[512];
+	/* Open with: the apps offered for menu_path, picked by code C_CHOICE + i */
+	struct app_choice choice[APP_MAX];
+	int nchoice;
 } D = { .drag = -1 };
 
 /* ---- grid -------------------------------------------------------------------------------------- */
@@ -436,11 +448,162 @@ static void new_here(int kind)
 	}
 }
 
+/* ---- files dropped on the desktop --------------------------------------------------------------
+ * text/uri-list (RFC 2483): one file:// URI per line, lines starting with # are comments, and
+ * the lines end in CRLF or LF. The drop (the Wayland side is not wired yet) hands the list here.
+ * The destination names are picked here: a taken name gets " (2)", " (3)" in front of the
+ * extension. One sh runs all the moves or copies (mv, or cp -R for a copy), in a child process
+ * that the panel does not wait for: a double fork, so the worker is reaped by init and the panel
+ * needs no SIGCHLD handling. The desktop's scan shows the new files within 4 s. */
+
+#define DROP_MAX 64
+
+static int hexval(int c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+/* the local paths of a text/uri-list, percent-decoded; file://host/... is left out */
+static int uri_paths(const char *list, char (*out)[PATH_MAX], int max)
+{
+	int n = 0;
+	const char *s = list;
+	while (*s && n < max) {
+		const char *e = strpbrk(s, "\r\n");
+		size_t len = e ? (size_t)(e - s) : strlen(s);
+		if (len > 8 && s[0] != '#' && !strncmp(s, "file:///", 8)) {
+			char path[PATH_MAX];
+			size_t k = 0;
+			for (size_t i = 7; i < len && k + 1 < sizeof path; i++) {
+				if (s[i] == '%' && i + 2 < len && hexval((unsigned char)s[i + 1]) >= 0 &&
+				    hexval((unsigned char)s[i + 2]) >= 0) {
+					path[k++] = (char)(hexval((unsigned char)s[i + 1]) * 16 + hexval((unsigned char)s[i + 2]));
+					i += 2;
+				} else {
+					path[k++] = s[i];
+				}
+			}
+			path[k] = 0;
+			if (path[0] == '/' && k > 1) {
+				snprintf(out[n], PATH_MAX, "%s", path);
+				n++;
+			}
+		}
+		if (!e)
+			break;
+		s = e + 1;
+	}
+	return n;
+}
+
+/* NAME in dir, or NAME (2), NAME (3) ... before the extension, whichever is free */
+static void dest_name(const char *dir, const char *name, char *out, size_t cap)
+{
+	const char *dot = strrchr(name, '.');
+	if (dot == name)
+		dot = NULL; /* a dot file has no extension */
+	size_t base = dot ? (size_t)(dot - name) : strlen(name);
+	for (int n = 1; n < 1000; n++) {
+		if (n == 1)
+			snprintf(out, cap, "%s", name);
+		else
+			snprintf(out, cap, "%.*s (%d)%s", (int)base, name, n, dot ? dot : "");
+		char path[PATH_MAX + 300];
+		snprintf(path, sizeof path, "%s/%s", dir, out);
+		struct stat st;
+		if (lstat(path, &st) != 0)
+			return;
+	}
+}
+
+void desk_import_uris(struct panel *p, const char *list, int move)
+{
+	static char src[DROP_MAX][PATH_MAX], dst[DROP_MAX][PATH_MAX];
+	if (!D.w || !list)
+		return;
+	(void)p;
+	int n = uri_paths(list, src, DROP_MAX), k = 0;
+	char *argv[4 + 2 * DROP_MAX + 1];
+	int a = 0;
+	const char *script = move
+		? "while [ $# -ge 2 ]; do mv -- \"$1\" \"$2\" || true; shift 2; done"
+		: "while [ $# -ge 2 ]; do cp -R -- \"$1\" \"$2\" || true; shift 2; done";
+	argv[a++] = "sh";
+	argv[a++] = "-c";
+	argv[a++] = (char *)script;
+	argv[a++] = "sh";
+	for (int i = 0; i < n; i++) {
+		const char *slash = strrchr(src[i], '/');
+		const char *name = slash ? slash + 1 : src[i];
+		if (!name[0])
+			continue;
+		char here[PATH_MAX];
+		snprintf(here, sizeof here, "%s", src[i]);
+		char *cut = strrchr(here, '/');
+		if (cut)
+			*cut = 0;
+		if (move && !strcmp(here, D.dir))
+			continue; /* already on the desktop */
+		char picked[256];
+		dest_name(D.dir, name, picked, sizeof picked);
+		snprintf(dst[k], sizeof dst[k], "%s/%s", D.dir, picked);
+		argv[a++] = src[i];
+		argv[a++] = dst[k];
+		k++;
+	}
+	argv[a] = NULL;
+	if (k == 0)
+		return;
+	pid_t mid = fork();
+	if (mid < 0)
+		return;
+	if (mid == 0) {
+		pid_t worker = fork();
+		if (worker == 0) {
+			signal(SIGCHLD, SIG_DFL);
+			execv("/bin/sh", argv);
+			_exit(127);
+		}
+		_exit(worker < 0 ? 1 : 0);
+	}
+	waitpid(mid, NULL, 0); /* the middle one exits at once */
+}
+
+static void desk_pick(struct panel *p, uintptr_t ud, int code);
+
+/* Open with: the apps for the file, as a second menu at the same place */
+static void open_with_menu(struct panel *p)
+{
+	char mime[128];
+	struct ctx_item it[APP_MAX];
+	int n = fileinfo_apps(D.menu_path, D.choice, APP_MAX, mime, sizeof mime);
+	D.nchoice = n;
+	if (n == 0) {
+		static const struct ctx_item none[] = {{"No app opens this file", 0, 0}};
+		ctx_open(p, D.menu_cx, none, 1, desk_pick, 0);
+		return;
+	}
+	for (int i = 0; i < n; i++)
+		it[i] = (struct ctx_item){D.choice[i].name, 1, C_CHOICE + i};
+	ctx_open(p, D.menu_cx, it, n, desk_pick, 0);
+}
+
 static void desk_pick(struct panel *p, uintptr_t ud, int code)
 {
 	(void)ud;
-	(void)p;
 	char err[200];
+	if (code >= C_CHOICE) {
+		int i = code - C_CHOICE;
+		if (i < D.nchoice)
+			fileinfo_open_with(D.choice[i].desk, D.menu_path);
+		return;
+	}
 	switch (code) {
 	case C_NEWDIR:
 		new_here(K_NEWDIR);
@@ -457,7 +620,16 @@ static void desk_pick(struct panel *p, uintptr_t ud, int code)
 		break;
 	}
 	case C_WALL:
-		launch("flsettings --page general", 0);	/* the wallpaper is on the General page */
+		launch("flsettings --page wallpaper", 0);
+		break;
+	case C_DISPLAY:
+		launch("flsettings --page display", 0);
+		break;
+	case C_OPENWITH:
+		open_with_menu(p);
+		break;
+	case C_PROPS:
+		props_open(p, D.menu_path, D.menu_kind == IT_DIR);
 		break;
 	case C_SETTINGS:
 		launch("flsettings", 0);
@@ -495,10 +667,11 @@ static void desk_menu(int cx)
 		{"Open terminal here", 1, C_TERM},
 		{NULL, 0, 0},
 		{"Change wallpaper\xe2\x80\xa6", 1, C_WALL},
+		{"Display settings\xe2\x80\xa6", 1, C_DISPLAY},
 		{"Settings", 1, C_SETTINGS},
 		{NULL, 0, 0},
 	};
-	struct ctx_item all[8];
+	struct ctx_item all[12];
 	int n = 0;
 	for (size_t i = 0; i < sizeof it / sizeof it[0]; i++)
 		all[n++] = it[i];
@@ -509,15 +682,20 @@ static void desk_menu(int cx)
 static void item_menu(const struct item *it, int cx)
 {
 	D.menu_kind = it->kind;
+	D.menu_cx = cx;
 	snprintf(D.menu_key, sizeof D.menu_key, "%s", it->key);
 	snprintf(D.menu_path, sizeof D.menu_path, "%s", it->path);
-	struct ctx_item all[4];
+	struct ctx_item all[8];
 	int n = 0;
 	all[n++] = (struct ctx_item){"Open", 1, C_OPEN};
+	if (it->kind == IT_FILE)
+		all[n++] = (struct ctx_item){"Open with\xe2\x80\xa6", 1, C_OPENWITH};
 	if (it->kind != IT_APP) {
 		all[n++] = (struct ctx_item){NULL, 0, 0};
 		all[n++] = (struct ctx_item){"Rename\xe2\x80\xa6", 1, C_RENAME};
 		all[n++] = (struct ctx_item){"Move to Trash", 1, C_TRASH};
+		all[n++] = (struct ctx_item){NULL, 0, 0};
+		all[n++] = (struct ctx_item){"Properties", 1, C_PROPS};
 	}
 	ctx_open(D.p, cx, all, n, desk_pick, 0);
 }

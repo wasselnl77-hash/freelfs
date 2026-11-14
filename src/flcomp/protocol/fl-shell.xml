@@ -2,7 +2,7 @@
 <protocol name="fl_shell">
   <copyright>SPDX-License-Identifier: MIT</copyright>
 
-  <interface name="fl_shell" version="8">
+  <interface name="fl_shell" version="9">
     <description summary="FreeLFS desktop shell protocol">
       Private protocol between flcomp and the desktop programs (flpanel,
       flsettings). The panel owns the bottom panel and the start menu; the
@@ -314,6 +314,70 @@
         The panel's window menu uses it.
       </description>
       <arg name="id" type="uint"/>
+    </request>
+
+    <!-- version 9: several outputs (fldisplay, Settings > Display) -->
+
+    <event name="output_info" since="9">
+      <description summary="one display output (monitor connector)">
+        Sent for every connector on bind and after every change, each followed by its
+        output_mode_info events, and at the end of the list one output_state (the primary
+        output's scale and logical size, pending 0). flags: 1 connected, 2 enabled (lit),
+        4 primary. width, height and refresh (Hz) are the output's current mode in pixels (the
+        last one used while it is disabled, 0 if it never had one); scale is a percentage
+        (100..200); x and y are its place on the desktop in logical pixels (mode size divided by
+        scale), the top left of the leftmost output is not necessarily 0,0.
+      </description>
+      <arg name="name" type="string" summary="e.g. HDMI-A-1, eDP-1, Virtual-2"/>
+      <arg name="flags" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh" type="uint"/>
+      <arg name="scale" type="uint"/>
+    </event>
+
+    <event name="output_mode_info" since="9">
+      <description summary="a mode of the output sent just before">
+        Preferred mode first. flags: 1 the mode in use, 2 the display's preferred mode.
+      </description>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh" type="uint" summary="Hz"/>
+      <arg name="flags" type="uint"/>
+    </event>
+
+    <request name="output_configure" since="9">
+      <description summary="change one output; saved in desktop.conf as output.NAME=">
+        Only for fldisplay (and Settings through it); other clients are ignored like for
+        set_output. flags say which of the values count: 1 mode (width, height, refresh),
+        2 scale (percent, 100..200), 4 position (x, y), 8 enabled (the value of "enabled"),
+        16 primary (this output becomes the primary one; "primary" must be 1). The change is
+        applied at once; it is saved in desktop.conf right away and the previous state of all
+        outputs is remembered once for output_revert. There is no automatic revert (the caller
+        asks the person "keep these settings?" and calls output_revert). A refused change
+        (unknown or disconnected output, mode the display does not have, scale giving a
+        desktop below 640x400, the last enabled output switched off) sends output_failed and
+        changes nothing. Every binding of version 9 gets the new output_info list.
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="flags" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh" type="uint"/>
+      <arg name="scale" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="enabled" type="uint"/>
+      <arg name="primary" type="uint"/>
+    </request>
+
+    <request name="output_revert" since="9">
+      <description summary="go back to the outputs as they were before the last output_configure">
+        Restores mode, scale, position, enabled and primary of every output and saves them.
+        Without a remembered state it does nothing and sends output_failed.
+      </description>
     </request>
   </interface>
 </protocol>

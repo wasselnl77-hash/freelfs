@@ -1,0 +1,12 @@
+# no adapter in QEMU: the service is up but starts nothing; bluetoothd by hand answers over D-Bus to a seat user
+@desktop
+/etc/rc.d/init.d/bluetooth status; echo status-rc=$?
+ls /sys/class/bluetooth 2>&1 | head -2
+pgrep -x bluetoothd || echo no-bluetoothd-without-adapter
+setsid /usr/libexec/bluetooth/bluetoothd -n > /tmp/bluetoothd.log 2>&1 < /dev/null &
+@wait 3
+su -s /bin/sh tester -c 'timeout 10 bluetoothctl show 2>&1 | head -3'
+su -s /bin/sh tester -c 'timeout 10 bluetoothctl devices 2>&1 | head -3'
+cat /tmp/bluetoothd.log | head -5
+ls /usr/lib/spa-0.2/bluez5/ | head -3
+pkill -x bluetoothd

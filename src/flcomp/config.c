@@ -11,11 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 struct conf CF = {
 	.pointer_speed = 0, .tap = true, .typing_disable = true, .repeat_delay = 600, .repeat_rate = 25,
-	.night_warmth = 50, .brightness = -1, .scale = 100, .lock_on_lid = true,
+	.night_warmth = 50, .nl_mode = -1, .nl_old = -1, .nl_from = 20 * 60, .nl_to = 7 * 60, .brightness = -1, .scale = 100, .lock_on_lid = true,
 	.ws_cols = 2, .ws_rows = 2, .anim = ANIM_ON, .anim_speed = 100, .title_h = 34, .panel_h = 44,
 };
 
@@ -60,11 +61,25 @@ static void parse_line(struct conf *c, const char *k, const char *v)
 		c->repeat_rate = clampi(n, 1, 100);
 	else if (!strcmp(k, "numlock"))
 		c->numlock = n != 0;
-	else if (!strcmp(k, "night_light"))
-		c->night = n != 0;
+	else if (!strcmp(k, "night_light")) {	/* 0 (default), 1, auto: from night_light_from to night_light_to */
+		c->night = n != 0 || !strcmp(v, "on");
+		c->nl_old = !strcmp(v, "auto") ? 2 : c->night ? 1 : 0;
+	} else if (!strcmp(k, "nightlight"))	/* the newer spelling: off, on, auto; wins over night_light */
+		c->nl_mode = !strcmp(v, "auto") ? 2 : (n != 0 || !strcmp(v, "on")) ? 1 : 0;
 	else if (!strcmp(k, "night_warmth"))
 		c->night_warmth = clampi(n, 0, 100);
-	else if (!strcmp(k, "brightness"))
+	else if (!strcmp(k, "night_light_temp") || !strcmp(k, "nightlight_temp"))	/* 2700..6500 K, default 4000 */
+		c->nl_temp = clampi(n, 2700, 6500);
+	else if (!strncmp(k, "night_light_", 12) && (!strcmp(k + 12, "from") || !strcmp(k + 12, "to")) ||
+		 !strncmp(k, "nightlight_", 11) && (!strcmp(k + 11, "from") || !strcmp(k + 11, "to"))) {
+		int hh, mm;
+		if (sscanf(v, "%d:%d", &hh, &mm) == 2 && hh >= 0 && hh < 24 && mm >= 0 && mm < 60) {
+			if (strstr(k, "from"))
+				c->nl_from = hh * 60 + mm;
+			else
+				c->nl_to = hh * 60 + mm;
+		}
+	} else if (!strcmp(k, "brightness"))
 		c->brightness = clampi(n, 0, 100);
 	else if (!strcmp(k, "power_saver"))
 		c->power_saver = n != 0;
@@ -128,6 +143,26 @@ static void load(struct conf *c)
 		parse_line(c, s, v);
 	}
 	fclose(f);
+}
+
+/* The value of one key as written in desktop.conf (the last one wins), or NULL: for the keys
+ * flcomp keeps itself, like output.NAME= (output.c). */
+const char *config_get_raw(const char *key, char *buf, size_t n)
+{
+	char path[512], line[400];
+	conf_path(path, sizeof path);
+	FILE *f = fopen(path, "r");
+	const char *found = NULL;
+	size_t kn = strlen(key);
+	while (f && fgets(line, sizeof line, f))
+		if (!strncmp(line, key, kn) && line[kn] == '=') {
+			snprintf(buf, n, "%s", line + kn + 1);
+			buf[strcspn(buf, "\r\n")] = 0;
+			found = buf;
+		}
+	if (f)
+		fclose(f);
+	return found;
 }
 
 /* The panel brightness at start, from brightness=; Settings writes the same
@@ -197,8 +232,9 @@ static void apply(const struct conf *old, bool first)
 	}
 	if (!first && (old->title_h != CF.title_h || old->buttons_left != CF.buttons_left))
 		xwm_frames_changed();
-	if (old->night != CF.night || old->night_warmth != CF.night_warmth || (first && CF.night))
-		backend_night_changed();
+	if (first || old->night != CF.night || old->night_warmth != CF.night_warmth || old->nl_mode != CF.nl_mode || old->nl_old != CF.nl_old ||
+	    old->nl_temp != CF.nl_temp || old->nl_from != CF.nl_from || old->nl_to != CF.nl_to)
+		night_conf_changed();
 }
 
 static int conf_cb(int fd, uint32_t mask, void *data)
@@ -216,7 +252,7 @@ static int conf_cb(int fd, uint32_t mask, void *data)
 		return 0;
 	struct conf old = CF, fresh = {
 		.tap = true, .typing_disable = true, .repeat_delay = 600, .repeat_rate = 25,
-		.night_warmth = 50, .brightness = -1, .scale = 100, .lock_on_lid = true,
+		.night_warmth = 50, .nl_mode = -1, .nl_old = -1, .nl_from = 20 * 60, .nl_to = 7 * 60, .brightness = -1, .scale = 100, .lock_on_lid = true,
 		.ws_cols = 2, .ws_rows = 2, .anim = ANIM_ON, .anim_speed = 100, .title_h = 34, .panel_h = 44,
 	};
 	load(&fresh);
@@ -242,6 +278,14 @@ void config_init(void)
 	if (!sl)
 		return;
 	*sl = 0;
+	/* the directory may not exist yet (first session): create it, or the file is never watched */
+	for (char *q = conf_dir + 1; *q; q++)
+		if (*q == '/') {
+			*q = 0;
+			mkdir(conf_dir, 0755);
+			*q = '/';
+		}
+	mkdir(conf_dir, 0755);
 	int fd = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
 	if (fd < 0)
 		return;

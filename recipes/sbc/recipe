@@ -1,0 +1,17 @@
+pkgname=sbc
+version=2.2
+release=1
+summary="Bluetooth SBC audio codec library (A2DP)"
+url=https://www.bluez.org/
+license=(LGPL-2.1-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+source=(https://www.kernel.org/pub/linux/bluetooth/sbc-$version.tar.xz)
+sha256=(a1ada76ef35e5af9c2fbd063754dc9e37a8d989417c6eb1ecebb089b1383ae9e)
+build_style=autotools
+# The library only: sbcenc/sbcdec need libsndfile, which the base does not have. PipeWire's
+# bluez5 plugin links it to carry A2DP (BT headphones, SBC and SBC-XQ).
+configure_args=(--disable-tools --disable-tester --disable-static)
+
+check() { :; }

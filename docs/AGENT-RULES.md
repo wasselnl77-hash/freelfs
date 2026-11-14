@@ -40,3 +40,10 @@ Read this fully before starting. Plan: docs/ROADMAP-NEXT.md. Look: docs/PLAN.md 
 - The tree is a git repo now (branch main). Do NOT commit, push, branch or
   rewrite history; the coordinator reviews and commits. `git diff` / `git status`
   are fine and useful to check your own changes.
+
+## Waiting for a process
+
+Never wait with `while pgrep -f "PATTERN"` or `until ! pgrep -f "PATTERN"`. The pattern also appears in your own shell's command line, so pgrep matches the loop itself and it never ends; such loops have run for days. Instead:
+- wait on the PID: `while kill -0 $PID 2>/dev/null; do sleep 5; done`
+- or use `pgrep -x NAME`
+- or start the job with `run_in_background` and let the harness tell you when it ends.

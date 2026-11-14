@@ -1,0 +1,68 @@
+pkgname=cups
+version=2.4.20
+release=3
+summary="CUPS print server for driverless (IPP Everywhere) printers, started on demand"
+url=https://openprinting.github.io/cups/
+license=(Apache-2.0)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc zlib openssl avahi libusb dbus bash flsocketd mupdf)
+sysusers=("lp 4 9 /var/spool/lpd /usr/bin/false 'Printing daemon'")
+owner=("/var/spool/cups 0 9 0710" "/var/spool/cups/tmp 0 9 1770" "/var/cache/cups 0 9 0770" "/var/cache/cups/rss 0 9 0770")
+source=(https://github.com/OpenPrinting/cups/releases/download/v$version/cups-$version-source.tar.gz)
+sha256=(ab4d9cd7f3e58060091d2b24972223d6401675f11c49b65abf4f6ef31dea22ff)
+build_style=autotools
+# The lightest working set, decided after reading what an IPP Everywhere queue needs:
+# * cups alone, no cups-filters/libcupsfilters/libppd/qpdf and no Ghostscript. `lpadmin -m
+#   everywhere` writes a PPD from the printer's own attributes. For a printer that takes PDF
+#   the PPD wants application/vnd.cups-pdf, which cups-filters' pdftopdf (needs qpdf, C++)
+#   makes from application/pdf: two small scripts of ours stand in (config/cups): pdftopdf passes
+#   the PDF through, pdftopwg draws it with mutool (already installed for the PDF viewer) for
+#   printers that only take PWG raster. JPEG and PNG use CUPS's own imagetoraster + rastertopwg.
+#   Not covered: Apple raster (urf)-only printers, plain text and PostScript files (texttopdf
+#   and pdftops live in cups-filters), page ranges and n-up. Print in FreeLFS apps sends PDF or
+#   an image.
+# * --with-tls=openssl for ipps:// printers (no GnuTLS in the base). --with-dnssd=avahi: the
+#   dnssd backend (needs avahi-daemon, which the cups rc service starts with cupsd).
+#   --enable-libusb: USB printers (the kernel has no usblp).
+# * --with-ondemand=upstart: cupsd takes its listening socket from the environment
+#   (UPSTART_EVENTS=socket, UPSTART_FDS=n) and, with -l, exits after IdleExitTimeout without
+#   jobs (flcupsd also watches for it, see there). flsocketd (a 15 kB program, 1.5 MB RSS) owns /run/cups/cups.sock and starts cupsd
+#   at the first connection, so cupsd is not resident when nobody prints.
+# * no PAM, no GSSAPI, no systemd, no web interface (/ on the socket only), English only.
+configure_args=(--sysconfdir=/etc --localstatedir=/var --sbindir=/usr/sbin --with-tls=openssl
+	--with-dnssd=avahi --enable-libusb --disable-pam --disable-gssapi --disable-systemd
+	--disable-unit-tests --with-ondemand=upstart --with-languages=en --with-cups-user=lp
+	--with-cups-group=lp --with-system-groups=seat --without-rcdir
+	--with-dbusdir=/usr/share/dbus-1 --with-components=all --with-domainsocket=/run/cups/cups.sock
+	--with-rundir=/run/cups --without-icondir --without-menudir)
+
+check() { :; }
+
+# The stock cupsd.conf/cups-files.conf of the build are kept (policies, SystemGroup seat from
+# --with-system-groups, PeerCred: a seat user who runs lpadmin is authenticated by the socket's
+# peer credentials, no password), changed by sed: no TCP listener (only /run/cups/cups.sock),
+# no browsing or sharing, no web interface, cupsd exits after 60 s idle (it runs with -l).
+# config/cups/flcupsd starts avahi-daemon (for the dnssd backend) next to cupsd.
+package() {
+	local c=$startdir/../../config/cups
+	make DESTDIR="$pkgdir" install
+	rm -rf "$pkgdir/run" "$pkgdir/var/run" "$pkgdir/usr/share/doc" "$pkgdir/usr/share/cups/doc-root"
+	rm -rf "$pkgdir/usr/share/cups/templates" "$pkgdir/usr/share/man" "$pkgdir/usr/share/locale"
+	rm -rf "$pkgdir"/etc/rc* "$pkgdir"/etc/init.d "$pkgdir"/etc/xdg "$pkgdir"/etc/dbus-1 2> /dev/null || true
+	sed -i -e '/^Listen localhost/d' -e 's/^Browsing .*/Browsing No/' -e 's/^WebInterface .*/WebInterface No/' \
+		-e 's/^IdleExitTimeout .*/IdleExitTimeout 60/' "$pkgdir/etc/cups/cupsd.conf"
+	grep -q '^IdleExitTimeout' "$pkgdir/etc/cups/cupsd.conf" || echo 'IdleExitTimeout 60' >> "$pkgdir/etc/cups/cupsd.conf"
+	sed -i 's/^Browsing .*/Browsing No/' "$pkgdir/etc/cups/cupsd.conf"
+	# the administration tools live in /usr/sbin, which a normal user's PATH does not have: Settings
+	# and the person at a shell call lpadmin and lpinfo by name
+	for t in lpadmin lpinfo lpmove cupsctl cupsaccept cupsreject cupsenable cupsdisable; do
+		[ -e "$pkgdir/usr/sbin/$t" ] && ln -sf "../sbin/$t" "$pkgdir/usr/bin/$t"
+	done
+	install -Dm755 "$c/pdftopdf" "$pkgdir/usr/lib/cups/filter/pdftopdf"
+	install -Dm755 "$c/pdftopwg" "$pkgdir/usr/lib/cups/filter/pdftopwg"
+	install -Dm644 "$c/freelfs.types" "$pkgdir/usr/share/cups/mime/freelfs.types"
+	install -Dm644 "$c/freelfs.convs" "$pkgdir/usr/share/cups/mime/freelfs.convs"
+	install -Dm755 "$c/flcupsd" "$pkgdir/usr/libexec/flcupsd"
+	install -dm755 "$pkgdir/var/spool/cups" "$pkgdir/var/log/cups" "$pkgdir/var/cache/cups"
+}

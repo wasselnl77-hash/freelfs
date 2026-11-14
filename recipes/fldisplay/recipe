@@ -1,0 +1,28 @@
+# fldisplay, from src/fldisplay in the FreeLFS tree: list and change the display outputs
+# (resolution, scale, position, primary, on/off) and the night light through flcomp (fl_shell 9).
+# Settings > Display runs it; it is also the command line way.
+pkgname=fldisplay
+version=0.1
+release=1
+summary="Command line control of display outputs and night light (flcomp)"
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc wayland flcomp)
+makedepends=(wayland)
+source=()
+sha256=()
+
+build() {
+	mkdir -p "$srcdir/flcomp"
+	cp -r "$startdir/../../src/fldisplay" "$srcdir/fldisplay"
+	cp -r "$startdir/../../src/flcomp/protocol" "$srcdir/flcomp/protocol"
+	cd "$srcdir/fldisplay"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/fldisplay"
+	make DESTDIR="$pkgdir" install
+}

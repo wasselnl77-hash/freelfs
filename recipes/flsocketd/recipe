@@ -1,0 +1,25 @@
+# flsocketd, from src/flsocketd in the FreeLFS tree: a tiny on-demand launcher. It listens on a
+# Unix socket and starts a daemon at the first connection, handing the socket over the way
+# upstart does (UPSTART_EVENTS=socket, UPSTART_FDS=3), and starts it again after it exited.
+pkgname=flsocketd
+version=0.1
+release=1
+summary="Start a daemon when someone connects to its socket (CUPS on demand)"
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+source=()
+sha256=()
+
+build() {
+	cp -r "$startdir/../../src/flsocketd" "$srcdir/flsocketd"
+	cd "$srcdir/flsocketd"
+	make clean
+	make
+}
+
+package() {
+	cd "$srcdir/flsocketd"
+	make DESTDIR="$pkgdir" install
+}

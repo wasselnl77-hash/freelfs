@@ -73,7 +73,7 @@ and OPTIONS=, default us) and can be changed at run time with
 fl_shell.set_keyboard_layout (not saved).
 
 Globals: wl_compositor 4, wl_subcompositor 1, wl_shm, wl_output 3, wl_seat 5, xwayland_shell_v1 1 (Xwayland only),
-wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 7.
+wl_data_device_manager 3, xdg_wm_base 3, zwp_linux_dmabuf_v1 3, fl_shell 9.
 
 desktop.conf (config.c, ~/.config/freelfs/desktop.conf, $FLUI_CONF; watched with
 inotify, changes apply at once, except display mode and scale)
@@ -327,3 +327,27 @@ Source map
                indicator, Alt-Tab frame and lock caret; wallpaper=accent|NAME|user:NAME, swapped live
   sound.c      system sounds: runs flsound (login, tick, screenshot, error); sounds=0 silences it
   flshell.c    fl_shell
+
+Outputs and night light (round 17, output.c, nightlight.c, drm.c)
+  Every connector is an output (name like HDMI-A-1, eDP-1, Virtual-1). Enabled outputs form one
+  desktop: the shadow buffer is their bounding box in logical pixels (mode size * 100 / scale,
+  scale 100..200 per output, any step; flcomp enlarges the picture per output, bilinear, so
+  clients always draw at scale 1 and wp_fractional_scale is not needed). The primary output
+  carries the panel, start menu, notifications, maximize/fullscreen/snap (C.prim); wl_output and
+  the panel see the primary's logical size only. The other outputs are extra desktop space for
+  windows and the pointer. Settings are saved as
+    output.NAME=mode=1920x1080@60 scale=1.25 pos=0,0 enabled=1 primary=1
+  in desktop.conf by flcomp (after fl_shell output_configure, i.e. `fldisplay set`), applied at
+  start and when the kernel reports a hotplug (udev "drm" change, 300 ms settle). The old mode=
+  and scale= keys apply to the primary until it has an output.NAME line. fl_shell 9 adds
+  output_info / output_mode_info events and output_configure / output_revert requests (for
+  fldisplay only; no automatic revert: the caller asks and calls `fldisplay revert`).
+  Limits: panel, overview, lock text and the desktop icon layer assume the primary is at the
+  top left (icons stay at 0,0); the pointer can enter empty corners between differently sized
+  outputs; snapping at the screen edge uses the whole desktop's edges. FLCOMP_HEADLESS_OUTPUTS=N
+  (1..4) gives N fake outputs for tests (src/fldisplay/tests/check.sh).
+  Night light: night_light=0|1|auto (and nightlight=off|on|auto, which wins), night_light_temp
+  (2700..6500, default 4000), night_light_from / _to (HH:MM, 20:00 and 07:00; the same with
+  nightlight_ prefix). Fades in 2 s; auto is checked every 30 s. Colour factors go to the CRTC
+  gamma table; outputs whose CRTC has none (virtio-gpu) get a per-pixel table in the copy to the
+  screen. The log says "night light on (3000K, ...)".

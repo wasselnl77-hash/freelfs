@@ -629,10 +629,10 @@ static struct rect entry_rect(struct window *w)
 	if (C.panel)
 		surface_origin(C.panel, &px, &py);
 	else
-		py = CF.panel_top ? 0 : C.h - C.panel_h;
+		py = CF.panel_top ? C.prim.y1 : C.prim.y2 - C.panel_h;
 	if (w->has_entry)
 		return shifted(w->entry, px, py);
-	return (struct rect){ C.w / 2 - 24, py + 4, C.w / 2 + 24, py + (C.panel_h > 8 ? C.panel_h - 4 : 4) };
+	return (struct rect){ (C.prim.x1 + C.prim.x2) / 2 - 24, py + 4, (C.prim.x1 + C.prim.x2) / 2 + 24, py + (C.panel_h > 8 ? C.panel_h - 4 : 4) };
 }
 
 void anim_window_minimize(struct window *w)

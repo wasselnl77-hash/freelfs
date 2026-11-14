@@ -267,3 +267,10 @@ https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files/archive/refs
 https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.2.tar.gz
 https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.4.2.tar.gz
 https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v22.1.8.tar.gz
+# Round 17: Bluetooth (bluez, sbc), printing (cups, avahi, libdaemon, libusb)
+https://www.kernel.org/pub/linux/bluetooth/bluez-5.88.tar.xz
+https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz
+https://github.com/OpenPrinting/cups/releases/download/v2.4.20/cups-2.4.20-source.tar.gz
+https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2
+https://github.com/avahi/avahi/releases/download/v0.8/avahi-0.8.tar.gz
+http://0pointer.de/lennart/projects/libdaemon/libdaemon-0.14.tar.gz
