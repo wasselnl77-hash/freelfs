@@ -43,7 +43,9 @@ if "--" in argv:
 ap = argparse.ArgumentParser()
 ap.add_argument("--iso")
 ap.add_argument("--disk")
+ap.add_argument("--stick", help="a USB stick image (build/m21/mkstick.py) as the only boot device")
 ap.add_argument("--mem", default="1G")
+ap.add_argument("--bootkeys", help="keys sent to the boot menu: 'SECONDS:KEY,...' e.g. 1:spc,1.5:spc,9:down,9.5:ret (the first key stops the countdown)")
 ap.add_argument("--keep", action="store_true", help="leave QEMU running at the end")
 ap.add_argument("cmdfile")
 args = ap.parse_args(argv)
@@ -60,6 +62,8 @@ if args.disk:
     env["FLFS_IMG"] = args.disk
 if args.iso:
     cmd += ["--iso", args.iso]
+if args.stick:
+    cmd += ["--stick", args.stick]
 qmp_path = os.path.join(tmp, "qmp")
 cmd += ["--", "-monitor", f"unix:{mon},server=on,wait=off", "-qmp", f"unix:{qmp_path},server=on,wait=off", "-usb"] + extra
 
@@ -69,7 +73,13 @@ def monitor(text, wait=0.3):
     m.connect(mon)
     m.sendall(text.encode() + b"\n")
     time.sleep(wait)
+    m.settimeout(0.2)
+    try:
+        reply = m.recv(65536).decode(errors="replace")
+    except OSError:
+        reply = ""
     m.close()
+    return reply
 
 
 def qmp(events, wait=0.3):
@@ -177,6 +187,19 @@ def guest_ok(con, text, cmdline):
 
 with open(LOG, "w") as log:
     qemu = subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT)
+    if args.bootkeys:
+        import threading
+
+        def send_bootkeys():
+            t0 = time.monotonic()
+            for item in args.bootkeys.split(","):
+                at, _, key = item.partition(":")
+                time.sleep(max(0, float(at) - (time.monotonic() - t0)))
+                try:
+                    monitor("sendkey " + key, 0.1)
+                except OSError:
+                    pass
+        threading.Thread(target=send_bootkeys, daemon=True).start()
     try:
         for _ in range(100):
             if os.path.exists(path):
@@ -224,7 +247,9 @@ with open(LOG, "w") as log:
                               "=": "shift-0", "?": "shift-minus", "\n": "ret", "y": "z", "z": "y", "Y": "shift-z", "Z": "shift-y"}
                         monitor("sendkey " + de.get(ch, ("shift-" + ch.lower()) if ch.isupper() else ch), 0.15)
                 elif w[0] == "mon":
-                    monitor(line[1:].split(None, 1)[1], 1.0)
+                    reply = monitor(line[1:].split(None, 1)[1], 1.0)
+                    err = [l for l in reply.replace("\r", "").splitlines() if "rror" in l or "not " in l]
+                    print("@mon %s%s" % (line[1:].split(None, 1)[1], "  -> " + " | ".join(err) if err else ""))
                 elif w[0] in ("shot", "shotok"):
                     monitor(f"screendump {w[1]}", 1.5)
                     shot_check(w[1], "@" + w[0])

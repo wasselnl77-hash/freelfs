@@ -7,6 +7,7 @@
 #   ./build/51-qemu.sh                  graphical window + serial console
 #   ./build/51-qemu.sh --serial         serial console only (no window)
 #   ./build/51-qemu.sh --iso FILE       boot an ISO (the live ISO) as a CD, no disk
+#   ./build/51-qemu.sh --stick FILE     boot a USB stick image (m21: Ventoy layout) from an xHCI controller
 #   ./build/51-qemu.sh -- QEMU-ARGS...  extra arguments for QEMU
 #
 # FLFS_VM_MEM (default 2G) and FLFS_VM_CPUS (default 2) size the VM;
@@ -21,11 +22,12 @@ set -euo pipefail
 . "$(dirname "$0")/config.sh"
 . "$(dirname "$0")/lib.sh"
 
-display=() iso=
+display=() iso= stick=
 while [ $# -gt 0 ]; do
 	case $1 in
 		--serial) display=(-display none) ;;
 		--iso) iso=${2:?usage: --iso FILE}; shift ;;
+		--stick) stick=${2:?usage: --stick FILE}; shift ;;
 		--) shift; break ;;
 		*) die "usage: $0 [--serial] [-- QEMU-ARGS...]" ;;
 	esac
@@ -35,7 +37,9 @@ done
 # a display backend of its own in FLFS_VM_VGA (egl-headless for virgl) replaces the "none" of --serial
 case ${FLFS_VM_VGA:-} in *-display*) display=() ;; esac
 
-if [ -n "$iso" ]; then
+if [ -n "$stick" ]; then
+	[ -f "$stick" ] || die "no stick image $stick"
+elif [ -n "$iso" ]; then
 	[ -f "$iso" ] || die "no ISO $iso"
 else
 	[ -f "$FLFS_IMG" ] || die "no image (run ./build/50-image.sh)"
@@ -63,6 +67,9 @@ vars=${FLFS_VM_VARS:-$FLFS_WORK/ovmf-vars.fd}
 
 drive=(-drive "file=$FLFS_IMG,format=raw,if=virtio")
 [ -z "$iso" ] || drive=(-drive "file=$iso,format=raw,media=cdrom,readonly=on")
+# --stick: a USB stick (a Ventoy-style image, build/m21/mkstick.py) is the only boot device, as on a laptop
+[ -z "$stick" ] || drive=(-device qemu-xhci,id=xstick -drive "file=$stick,format=raw,if=none,id=stick" \
+	-device usb-storage,drive=stick,id=stickdev,bus=xstick.0,bootindex=0)
 accel=()
 [ -r /dev/kvm ] && [ -w /dev/kvm ] && accel=(-enable-kvm -cpu host)
 

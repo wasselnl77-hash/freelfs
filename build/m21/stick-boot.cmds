@@ -1,0 +1,59 @@
+# Round 21, bug 1: the system is booted FROM a Ventoy-style stick (an exFAT partition holding the ISO, a FAT VTOYEFI
+# partition that boots it), the way the user's laptop boots. 1 GB of RAM: no "Load into RAM".
+# Checks: the stick belongs to the live user (no "permission denied"), a file is written to it from the shell AND
+# through Files, eject in Files is refused with the reason, and apps still open.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@ok the system runs from the stick: its ISO is a file on the exFAT partition :: grep -q '^/dev/sda1 /run/live/src exfat' /proc/mounts
+@ok flinitrd mounted it for the live user and the seat group :: grep '^/dev/sda1 /run/live/src exfat' /proc/mounts | grep -q 'uid=1000,gid=98'
+@ok at 1 GB the system stays on the stick (no RAM copy) :: ! test -e /run/live/toram
+@waitok 40 flmount bound the stick under /drives :: grep -q '^/dev/sda1 /drives/' /proc/mounts
+@ok flmount lists it as the "FreeLFS boot stick", class boot :: su -s /bin/sh tester -c 'flmount list' | awk -F'\t' '$1=="/dev/sda1" && $2=="FreeLFS boot stick" && $6=="boot"' | grep -q .
+@ok the files on the stick belong to the live user, not root :: test "$(stat -c %u /run/live/src/freelfs-live-r21.iso)" = 1000
+@ok the stick is writable now :: ! grep '^/dev/sda1 /run/live/src' /proc/mounts | grep -q ' ro[ ,]'
+@ok tester writes a file to the stick from the shell :: su -s /bin/sh tester -c 'echo shell-ok > /drives/Ventoy/from-shell.txt' && grep -q shell-ok /drives/Ventoy/from-shell.txt
+su -s /bin/sh tester -c 'cd /drives/Ventoy; set -a; . /tmp/sessenv; setsid flfiles /drives/Ventoy </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@shot @OUT@/sb-1-files.ppm
+@shotcolors @OUT@/sb-1-files.ppm 40
+# write through Files: Ctrl+Shift+N (new folder), name, Enter
+@key ctrl-shift-n
+@wait 2
+@key ctrl-a
+@type viafiles
+@key ret
+@wait 3
+@waitok 15 Files made the folder on the stick :: test -d /drives/Ventoy/viafiles
+@ok ... and it belongs to the live user :: test "$(stat -c %u /drives/Ventoy/viafiles)" = 1000
+@shot @OUT@/sb-2-files-after-mkdir.ppm
+# eject in Files: the button is there and answers with the reason
+@mouse 321 490
+@click
+@wait 4
+@shot @OUT@/sb-3-eject-refused.ppm
+@shotdiff @OUT@/sb-2-files-after-mkdir.ppm @OUT@/sb-3-eject-refused.ppm 3000 150 40 1010 600
+@ok flmount eject is refused with the reason :: ! su -s /bin/sh tester -c 'flmount eject /dev/sda1' 2> /tmp/ej.err; grep -q "FreeLFS is running from this stick. Shut down first, or boot with 'Load into RAM'" /tmp/ej.err
+@ok flmount unmount is refused with the same reason :: ! su -s /bin/sh tester -c 'flmount unmount /dev/sda1' 2> /tmp/um.err; grep -q "Load into RAM" /tmp/um.err
+@ok the stick is still there and still mounted :: test -e /sys/block/sda && grep -q '^/dev/sda1 /run/live/src' /proc/mounts && grep -q '^/dev/sda1 /drives/' /proc/mounts
+@ok what was written is still readable :: grep -q shell-ok /drives/Ventoy/from-shell.txt && test -d /drives/Ventoy/viafiles
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/sb-4-gm.ppm
+@shotdiff @OUT@/sb-3-eject-refused.ppm @OUT@/sb-4-gm.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/sb-4-gm.ppm 150
+@ok General Manager runs in Home :: test "$(readlink /proc/$(pgrep -u tester -x general-manager | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager
+@key meta_l
+@wait 2
+@type settings
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/sb-5-settings.ppm
+@shotcolors @OUT@/sb-5-settings.ppm 100
+cat /tmp/ej.err; grep -E "uid|gid" /proc/mounts | grep sda1 | cut -c1-160

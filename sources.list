@@ -278,3 +278,6 @@ https://github.com/PapirusDevelopmentTeam/papirus-icon-theme/archive/refs/tags/2
 # Round 20: pciutils (lspci), usbutils (lsusb)
 https://mirrors.edge.kernel.org/pub/software/utils/pciutils/pciutils-3.14.0.tar.xz
 https://www.kernel.org/pub/linux/utils/usb/usbutils/usbutils-018.tar.xz
+# Round 21: efivar and efibootmgr (UEFI boot entries from the running system)
+https://github.com/rhboot/efivar/archive/refs/tags/39.tar.gz
+https://github.com/rhboot/efibootmgr/archive/refs/tags/18.tar.gz

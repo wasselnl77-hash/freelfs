@@ -1,0 +1,58 @@
+# Round 21: the file chooser (xdg-desktop-portal FileChooser, what Flatpak Firefox's "+" / upload opens) in a real compositor.
+# The bug (r20 laptop): "I cannot open any folder". A click ran its action at the end of the pass but the window was not
+# redrawn, so the dialog kept the old picture until the next event. Here an app asks for a file (gdbus call, as the portal
+# frontend does), the dialog is used with the real pointer and keys, and pictures decide: after each click the window must
+# change at once. 1280x800 screen, the dialog opens at x=150 y=28.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q DBUS_SESSION /tmp/sessenv && chmod 644 /tmp/sessenv
+@ok folders and a file to choose from :: su -s /bin/sh tester -c 'rm -rf ~/Documents; mkdir -p ~/Documents/Reports ~/Documents/Notes; echo hello > ~/Documents/Reports/inside.txt; echo hi > ~/Documents/top-file.txt'
+@put @OUT@/portal-client /tmp/portal-client
+# the "app": it asks for a file and STAYS on the bus until the answer (xdg-desktop-portal closes a request whose caller left)
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid /tmp/portal-client open > /tmp/pc.out 2>&1 &'
+@waitok 30 the app's request was accepted :: grep -q requested /tmp/pc.out
+@waitok 20 the file dialog is a window of flportal :: pgrep -x flportal
+@wait 3
+@shot @OUT@/pf-1-open.ppm
+@shotcolors @OUT@/pf-1-open.ppm 40
+# double click on the Documents folder (the third row): its content must show at once
+@mouse 398 204
+@dclick
+@wait 1.5
+@shot @OUT@/pf-2-documents.ppm
+@shotdiff @OUT@/pf-1-open.ppm @OUT@/pf-2-documents.ppm 3000 330 110 1005 515
+# the folder in the path bar: Documents' own content is Notes, Reports, top-file.txt (three rows, not eight)
+@shotdiff @OUT@/pf-1-open.ppm @OUT@/pf-2-documents.ppm 150 266 70 1000 102
+# Backspace goes up again (keyboard focus stayed in the list): the path bar shows the first picture's folder again
+@key backspace
+@wait 1.5
+@shot @OUT@/pf-3-up.ppm
+@shotsame @OUT@/pf-1-open.ppm @OUT@/pf-3-up.ppm 80 266 70 1000 102
+@shotdiff @OUT@/pf-2-documents.ppm @OUT@/pf-3-up.ppm 3000 330 110 1005 515
+# a sidebar place: Pictures
+@mouse 217 309
+@click
+@wait 1.5
+@shot @OUT@/pf-4-pictures.ppm
+@shotdiff @OUT@/pf-3-up.ppm @OUT@/pf-4-pictures.ppm 3000 330 110 1005 515
+# back home, then the keyboard: Down, Down, Down selects the third row (Documents), Enter opens it
+@mouse 210 159
+@click
+@wait 1.5
+@key down
+@key down
+@key down
+@key ret
+@wait 1.5
+@shot @OUT@/pf-5-keys.ppm
+@shotdiff @OUT@/pf-3-up.ppm @OUT@/pf-5-keys.ppm 3000 330 110 1005 515
+# in Documents: Notes, Reports, top-file.txt: click the file, Enter: the dialog answers with its URI
+@mouse 398 204
+@click
+@wait 1
+@key ret
+@wait 3
+@wait 2
+@shot @OUT@/pf-6-after-open.ppm
+cat /tmp/pc.out
+@waitok 15 the portal answered with the file's URI :: grep -q 'uri file:///home/tester/Documents/top-file.txt' /tmp/pc.out
+@ok the answer is "chosen" (response 0) :: grep -q '^response 0' /tmp/pc.out

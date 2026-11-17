@@ -229,6 +229,7 @@ cat > "$W/flboot.conf" <<-EOF
 	# flboot.conf -- written by build/53-iso.sh for the live ISO
 	timeout 3
 	cmdline $base $quiet $extra
+	entry FreeLFS live (Load into RAM)|\\vmlinuz-$kver|$base $quiet flive.toram=1 $extra
 	entry FreeLFS live (verbose: flive.debug)|\\vmlinuz-$kver|$base flive.debug $extra
 EOF
 tool mcopy -i "$W/esp.img" "$W/flboot.conf" ::/flboot/flboot.conf

@@ -25,7 +25,7 @@ endif
 # The menu font: Terminus (SIL Open Font License), from kbd.
 FONT ?= /usr/share/consolefonts/Lat2-Terminus16.psfu.gz
 
-OBJS = start.o main.o lib.o fs.o conf.o gfx.o menu.o boot.o font.o
+OBJS = start.o main.o lib.o fs.o conf.o gfx.o menu.o boot.o other.o font.o
 
 all: flboot.efi
 

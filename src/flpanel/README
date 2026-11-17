@@ -143,3 +143,7 @@ hides the icons; the right-click menu turns them back on). Right click on the em
 New text file, Open terminal here (flterm in ~/Desktop), Change wallpaper (flsettings --page general, the
 wallpaper is on that page), Settings, Show or Hide desktop icons. Right click on an icon: Open, Rename,
 Move to Trash (freedesktop trash, ~/.local/share/Trash). Not done: drop from Files, Open with, Properties.
+
+Taskbar tooltip (round 21): hovering a taskbar entry shows the window's title in a flat box right after the last entry (always in
+the default icon-only mode; with panel_labels=1 only when the title is cut). It is drawn in the panel strip itself: a popup surface
+would take the click away from the entry. Test: build/m21-features.sh taskbar-tip.

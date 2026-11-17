@@ -19,7 +19,7 @@ Tabs
                 Memory is PSS: the program's share of its memory, a page shared by several
                 programs split between them (smaps_rollup, read every 2 s at most; the resident
                 size where that cannot be read). Flatpak apps count by their application id
-                ("flatpak run org.mozilla.firefox"). Disk is read+write bytes per
+                (the sandbox root's /.flatpak-info, [Application] name=; the app-flatpak-ID-N.scope cgroup; exported .desktop files with X-Flatpak=). Disk is read+write bytes per
                 second from /proc/PID/io, which only your own processes allow: others show a
                 dash. Network per process is always a dash (needs root); the header shows the
                 total of all adapters.

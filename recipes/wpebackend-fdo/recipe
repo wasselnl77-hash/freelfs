@@ -1,6 +1,6 @@
 pkgname=wpebackend-fdo
 version=1.16.1
-release=1
+release=2
 summary="WPE backend on freedesktop.org (Wayland, EGL/dmabuf/shm export)"
 url=https://wpewebkit.org/
 license=(BSD-2-Clause)
@@ -10,6 +10,9 @@ depends=(glibc glib libwpe wayland libepoxy)
 makedepends=(meson ninja)
 source=(https://wpewebkit.org/releases/wpebackend-fdo-$version.tar.xz)
 sha256=(544ae14012f8e7e426b8cb522eb0aaaac831ad7c35601d1cf31d37670e0ebb3b)
+# release 2: get_surface_feedback creates its object (see the patch): without it closing a view killed the web process's
+# Wayland connection and every other view in that process (a login popup's opener) stopped painting
+prepare() { patch -Np1 -i "$startdir/wpebackend-fdo-$version-surface-feedback.patch"; }
 build_style=meson
 configure_args=(-D build_docs=false)
 check() { :; }

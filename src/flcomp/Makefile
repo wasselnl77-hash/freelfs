@@ -117,6 +117,14 @@ tests/shmclient: tests/shmclient.c fl-shell-client-protocol.h fl-shell-client-pr
 		fl-shell-client-protocol.c fl-screencopy-client-protocol.c xdg-shell-client-protocol.c linux-dmabuf-unstable-v1-client-protocol.c xdg-decoration-unstable-v1-client-protocol.c \
 		$(shell pkg-config --libs wayland-client)
 
+tests/csdclient: tests/csdclient.c xdg-shell-client-protocol.h xdg-shell-client-protocol.c
+	$(CC) $(CFLAGS) -I. $(shell pkg-config --cflags wayland-client) -o $@ $< xdg-shell-client-protocol.c \
+		$(shell pkg-config --libs wayland-client)
+
+# a client with client-side decorations (GTK-like: shadow margin, set_window_geometry): maximize, fullscreen, tiling, move, resize
+check-csd: flcomp tests/csdclient
+	./tests/csd.sh
+
 xdg-decoration-unstable-v1-client-protocol.h: $(DECO_XML)
 	$(SCANNER) client-header $< $@
 xdg-decoration-unstable-v1-client-protocol.c: $(DECO_XML)
@@ -147,7 +155,7 @@ install: flcomp
 	install -Dm644 README $(DESTDIR)$(PREFIX)/share/doc/flcomp/README
 
 clean:
-	rm -f $(OBJS) flcomp tests/shmclient tests/xclient $(GEN) \
+	rm -f $(OBJS) flcomp tests/shmclient tests/xclient tests/csdclient $(GEN) \
 		fl-shell-client-protocol.[ch] fl-screencopy-client-protocol.[ch] xdg-shell-client-protocol.[ch] \
 		linux-dmabuf-unstable-v1-client-protocol.[ch]
 

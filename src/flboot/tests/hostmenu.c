@@ -182,7 +182,17 @@ int main(int argc, char **argv)
 
 	static struct config cfg;
 	conf_load(&cfg);
+	if (getenv("FLBOOT_FAKE_OTHER")) { /* what other.c adds on a real firmware */
+		static const int kinds[] = {K_FIRMWARE, K_BOOTNEXT, K_CHAIN};
+		static char *titles[] = {"Firmware setup (BIOS)", "Firmware option: UEFI USB stick", "Other drive: EFI boot program (drive 1)"};
+		for (int i = 0; i < 3; i++) {
+			struct entry *e = &cfg.entries[cfg.n++];
+			e->kind = kinds[i];
+			e->title = titles[i];
+			e->cmdline = "";
+		}
+	}
 	int r = menu_run(&cfg);
-	printf("chosen: %d\ntitle: %s\ncmdline: %s\n", r, cfg.entries[r].title, cfg.entries[r].cmdline);
+	printf("chosen: %d\ntitle: %s\ncmdline: %s\nkind: %d\n", r, cfg.entries[r].title, cfg.entries[r].cmdline, cfg.entries[r].kind);
 	return 0;
 }

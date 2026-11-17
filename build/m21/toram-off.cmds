@@ -1,0 +1,5 @@
+# flive.toram=0 on the stick's boot entries at 6 GB (where it would load automatically): the system stays on the stick.
+@desktop
+@ok flive.toram=0 is on the kernel command line :: grep -q 'flive.toram=0' /proc/cmdline
+@ok no RAM copy at 6 GB :: ! test -e /run/live/toram && grep -q '^/dev/sda1 /run/live/src' /proc/mounts
+@ok the stick is the boot stick, eject refused :: ! su -s /bin/sh tester -c 'flmount eject /dev/sda1' 2>/tmp/ej.err; grep -q "Load into RAM" /tmp/ej.err

@@ -48,3 +48,13 @@ Testing
                         FLPORTAL_TEST_SELECT / _NAME / _OVERLAY). python3 with PyGObject checks
                         the answers. PORTAL_OUT=DIR keeps the pictures, TMPDIR=... moves the
                         scratch directory; tests/ppm2png.py makes PNGs.
+
+Round 21: the file chooser could not open any folder on the laptop (Firefox upload dialog). Two bugs, both found by using the dialog
+in a real compositor (build/m21/portal-folder.cmds with build/m21/portal-client.c, an app that keeps its D-Bus connection: a one-shot
+`gdbus call` shows the dialog for a moment only, because xdg-desktop-portal closes a request whose caller left the bus):
+(1) the list widget was registered before the rows; libflui gives no hover to other widgets while one is the active (pressed) widget, so
+the rows never saw a click: no selection, no double click, no Enter on a folder. The list widget lets go of the press at once now (the rows sit on top of it); it stays the first focusable widget, because libflui drops the keyboard focus of a press that no focusable widget took (registering it after the rows broke the keys).
+(2) an action (a click in the sidebar, Back, a folder opened by key) ran at the end of the pass and nothing redrew the window, so
+the old picture stayed until the next event. Every pass that consumed input now asks for one more. Not tested: files handed to a
+sandboxed app through the document portal (needs a Flatpak app; the dialog answers file:// URIs and xdg-desktop-portal registers
+them for a Flatpak caller), files on /drives (same code path as the home folder; the Places list has them).

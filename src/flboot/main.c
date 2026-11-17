@@ -20,6 +20,7 @@ EFI_STATUS efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
 	conf_load(&c);
 	if (!c.n)
 		fatal(L"no kernels (\\vmlinuz-*) on the EFI system partition", 0);
+	conf_add_other(&c);
 
 	for (;;) {
 		int i = menu_run(&c);

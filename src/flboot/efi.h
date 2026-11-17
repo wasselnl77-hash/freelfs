@@ -135,10 +135,19 @@ typedef struct {
 	EFI_TABLE_HEADER Hdr;
 	EFI_UNUSED GetTime, SetTime, GetWakeupTime, SetWakeupTime;
 	EFI_UNUSED SetVirtualAddressMap, ConvertPointer;
-	EFI_UNUSED GetVariable, GetNextVariableName, SetVariable;
+	EFI_STATUS(EFIAPI *GetVariable)(const CHAR16 *, const EFI_GUID *, UINT32 *, UINTN *, void *);
+	EFI_UNUSED GetNextVariableName;
+	EFI_STATUS(EFIAPI *SetVariable)(const CHAR16 *, const EFI_GUID *, UINT32, UINTN, const void *);
 	EFI_UNUSED GetNextHighMonotonicCount;
 	void(EFIAPI *ResetSystem)(UINT32, EFI_STATUS, UINTN, void *);
 } EFI_RUNTIME_SERVICES;
+
+#define EFI_GLOBAL_VARIABLE_GUID \
+	{0x8be4df61, 0x93ca, 0x11d2, {0xaa, 0x0d, 0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}}
+#define EFI_DEVICE_PATH_PROTOCOL_GUID \
+	{0x09576e91, 0x6d3f, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}}
+#define EFI_VARIABLE_NV_BS_RT 7 /* non-volatile, boot services, runtime */
+#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI 1ULL
 
 #define EfiResetCold 0
 #define EfiResetShutdown 2

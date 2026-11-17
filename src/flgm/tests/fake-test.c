@@ -174,6 +174,11 @@ static void build_extra(void)
 	wr(p, "[Desktop Entry]\nType=Application\nName=Firefox\n"
 	      "Exec=flatpak run --branch=stable --arch=x86_64 --command=firefox org.mozilla.firefox @@u %%u @@\n"
 	      "Icon=org.mozilla.firefox\n");
+	/* as flatpak exports it: the absolute path of flatpak, and X-Flatpak= */
+	snprintf(p, sizeof p, "%s/applications/org.gnome.Calculator.desktop", xdg);
+	wr(p, "[Desktop Entry]\nType=Application\nName=Calculator\n"
+	      "Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=gnome-calculator org.gnome.Calculator\n"
+	      "Icon=org.gnome.Calculator\nX-Flatpak=org.gnome.Calculator\n");
 	setenv("XDG_DATA_HOME", xdg, 1);
 	setenv("XDG_DATA_DIRS", PROC_DIR "/../no-such-dir", 1);
 	apps_load();
@@ -184,6 +189,27 @@ static void build_extra(void)
 	snprintf(p, sizeof p, PROC_DIR "/2002/smaps_rollup");
 	wr(p, "Pss: 5000 kB\nPss_Anon: 3000 kB\n");
 	proc_entry_pp(2003, 2002, "Web Content", 6003, 40, "/app/lib/firefox/firefox -contentproc -childID 1", 0);
+
+	/* the real shape (r20 laptop): the command lines name no application id. The sandbox's root has
+	 * .flatpak-info; the bwrap that watches it is outside. */
+	proc_entry_pp(2100, 1, "bwrap", 6100, 3, "bwrap --args 41 -- /usr/libexec/flatpak-bwrap", 0);
+	proc_entry_pp(2101, 2100, "gnome-calculato", 6101, 30, "/app/bin/gnome-calculator", 0);
+	proc_entry_pp(2102, 2101, "dconf-service", 6102, 3, "/app/libexec/dconf-service", 0);
+	proc_entry_pp(2200, 1, "worker", 6200, 3, "/app/bin/worker --foo", 0);
+	proc_entry_pp(2300, 1, "cgapp", 6300, 3, "/app/bin/cgapp", 0);
+	proc_entry_pp(2400, 1, "notflatpak", 6400, 3, "/usr/bin/notflatpak", 0);
+	static const int fpids[] = {2101, 2102, 2200};
+	static const char *const fpapp[] = {"org.gnome.Calculator", "org.gnome.Calculator", "org.example.NoDesktop"};
+	for (int i = 0; i < 3; i++) {
+		snprintf(p, sizeof p, PROC_DIR "/%d/root", fpids[i]);
+		dir(p);
+		snprintf(p, sizeof p, PROC_DIR "/%d/root/.flatpak-info", fpids[i]);
+		wr(p, "[Application]\nname=%s\nruntime=runtime/org.gnome.Platform/x86_64/48\n\n[Instance]\ninstance-id=123\n", fpapp[i]);
+	}
+	snprintf(p, sizeof p, PROC_DIR "/2300/cgroup");
+	wr(p, "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-flatpak-org.test.Cg-4242.scope\n");
+	snprintf(p, sizeof p, PROC_DIR "/2400/cgroup");
+	wr(p, "0::/user.slice/session-1.scope\n");
 }
 
 static int all_printable_utf8(const char *s)
@@ -310,6 +336,26 @@ int main(void)
 	CHECK(ff >= 0 && !strcmp(apps_get(ff)->name, "Firefox"), "flatpak desktop entry is an app (index %d)", ff);
 	CHECK(f0 && f1 && f2 && f3 && f0->app == ff && f1->app == ff && f2->app == ff && f3->app == ff,
 	      "flatpak launcher, bwrap, program and content process grouped under it");
+	{
+		int calc = -1, nod = -1, cg = -1;
+		for (int i = 0; i < apps_count(); i++) {
+			if (!strcmp(apps_get(i)->exec, "flatpak:org.gnome.Calculator"))
+				calc = i;
+			if (!strcmp(apps_get(i)->exec, "flatpak:org.example.NoDesktop"))
+				nod = i;
+			if (!strcmp(apps_get(i)->exec, "flatpak:org.test.Cg"))
+				cg = i;
+		}
+		struct proc *c0 = procs_find(&ps, 2100), *c1 = procs_find(&ps, 2101), *c2 = procs_find(&ps, 2102);
+		CHECK(calc >= 0 && !strcmp(apps_get(calc)->name, "Calculator") && !strcmp(apps_get(calc)->icon, "org.gnome.Calculator"),
+		      "exported desktop file (absolute /usr/bin/flatpak, X-Flatpak) gives name and icon (index %d)", calc);
+		CHECK(c1 && c2 && c1->app == calc && c2->app == calc,
+		      "sandbox processes found by /proc/PID/root/.flatpak-info although their command lines name no id");
+		CHECK(c0 && c0->app == calc, "the bwrap outside the sandbox joins its app");
+		CHECK(nod >= 0 && procs_find(&ps, 2200)->app == nod, "an app without an exported desktop file still is a group");
+		CHECK(cg >= 0 && procs_find(&ps, 2300)->app == cg, "app-flatpak-ID-N.scope cgroup is the second source");
+		CHECK(procs_find(&ps, 2400)->app < 0, "an ordinary process is no flatpak app");
+	}
 	CHECK(procs_app_mem(&ps, ff) == 11000, "group total %lu kB: PSS 5000 plus three RSS of 2000",
 	      (unsigned long)procs_app_mem(&ps, ff));
 
@@ -324,7 +370,7 @@ int main(void)
 	struct proc *rb = procs_find(&ps, 101);
 	CHECK(rb && !strcmp(rb->comm, "reborn") && rb->cpu < 100 * ps.ncpu + 1.0, "reused pid renamed, no cpu spike (%.2f)",
 	      rb ? rb->cpu : -1.0);
-	CHECK(ps.n >= 305 && ps.n <= 307, "second scan: %d processes", ps.n);
+	CHECK(ps.n >= 311 && ps.n <= 313, "second scan: %d processes", ps.n);
 
 	/* a second, quiet scan of the same tree */
 	procs_scan(&ps);

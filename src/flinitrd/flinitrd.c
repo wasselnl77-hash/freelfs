@@ -14,9 +14,19 @@
  * MS_RDONLY (ext4 with noload, so no journal replay) -- the stick holds
  * personal files and the internal disks of the machine are visible.
  *
+ * exFAT and FAT sticks are mounted with the owner of the live user (uid 1000, group seat 98) and masks that
+ * give that user read and write: those file systems have no owners on disk, the owner is fixed at the first
+ * mount, so flmount's later remount-writable would otherwise leave every file root's ("permission denied").
+ *
+ * Load into RAM: root.sfs is copied into a tmpfs, the system runs from the copy and the stick (or CD) is
+ * released completely: unmounted, loop devices detached, BLKROSET cleared. Then it is an ordinary removable
+ * drive. Automatic when the machine has 4 GiB more RAM than the image is big, flive.toram=1 forces it (needs
+ * the image plus 1 GiB), flive.toram=0 forbids it. A stick with a persistence image is never released
+ * automatically (the image is /home); flive.toram=1 wins over it.
+ *
  * Kernel command line: flive.timeout=SECONDS (default 20, how long to wait
  * for devices), flive.iso=PATTERN (default freelfs-live*.iso),
- * flive.debug (say what is tried).
+ * flive.toram=0|1, flive.debug (say what is tried).
  * SPDX-License-Identifier: MIT */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -48,12 +58,15 @@
 #endif
 
 #define LIVE "/run/live"
+#define LIVE_UID "1000" /* tester */
+#define LIVE_GID "98"   /* seat */
 #define MAX_SEEN 256
 #define MAX_DEPTH 3
 #define MAX_DIRENTS 20000
 
 static int timeout_s = 20;
-static int debug, no_persist;
+static int debug, no_persist, toram = -1; /* toram: -1 automatic, 0 never, 1 always */
+static int ram_loaded, persist_present;
 static char persist_img[PATH_MAX], persist_dev[272];
 static const char *iso_pattern = "freelfs-live*.iso";
 
@@ -105,6 +118,10 @@ static void read_cmdline(void)
 			iso_pattern = pat;
 		} else if (!strcmp(w, "flive.debug"))
 			debug = 1;
+		else if (!strcmp(w, "flive.toram=0"))
+			toram = 0;
+		else if (!strcmp(w, "flive.toram=1") || !strcmp(w, "flive.toram"))
+			toram = 1;
 		else if (!strcmp(w, "flive.nopersist"))
 			no_persist = 1;
 	}
@@ -238,11 +255,15 @@ static int try_mount(const char *src, const char *dir, const char *type)
 	if (!strcmp(type, "ext4"))
 		opts = "noload"; /* no journal replay: that would write */
 	else if (!strcmp(type, "vfat"))
-		opts = "iocharset=utf8,shortname=mixed,quiet";
+		opts = "uid=" LIVE_UID ",gid=" LIVE_GID ",fmask=0133,dmask=0022,iocharset=utf8,shortname=mixed,quiet";
+	else if (!strcmp(type, "exfat"))
+		opts = "uid=" LIVE_UID ",gid=" LIVE_GID ",fmask=0133,dmask=0022,iocharset=utf8";
 	mkdir(dir, 0755);
 	int rc = mount(src, dir, type, MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, opts);
 	if (rc && !strcmp(type, "vfat"))
-		rc = mount(src, dir, type, MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "quiet");
+		rc = mount(src, dir, type, MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "uid=" LIVE_UID ",gid=" LIVE_GID ",fmask=0133,dmask=0022,quiet");
+	if (rc && !strcmp(type, "exfat"))
+		rc = mount(src, dir, type, MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "uid=" LIVE_UID ",gid=" LIVE_GID ",fmask=0133,dmask=0022");
 	dbg("mount %s as %s: %s", src, type, rc ? strerror(errno) : "ok");
 	return rc;
 }
@@ -313,14 +334,142 @@ static int exists(const char *p)
 	return stat(p, &st) == 0 && S_ISREG(st.st_mode);
 }
 
+static unsigned long long meminfo_kb(const char *key)
+{
+	char buf[2048];
+	int fd = open("/proc/meminfo", O_RDONLY);
+	ssize_t n = fd < 0 ? 0 : read(fd, buf, sizeof buf - 1);
+	if (fd >= 0)
+		close(fd);
+	if (n <= 0)
+		return 0;
+	buf[n] = 0;
+	char *p = strstr(buf, key);
+	return p ? strtoull(p + strlen(key), NULL, 10) : 0;
+}
+
+/* Detach a loop device (the file system on it is unmounted already). */
+static void loop_detach(const char *dev)
+{
+	if (!dev[0])
+		return;
+	int fd = open(dev, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return;
+	int rc = ioctl(fd, LOOP_CLR_FD, 0);
+	dbg("detach %s: %s", dev, rc ? strerror(errno) : "ok");
+	close(fd);
+}
+
+/* Copy SFS into a tmpfs at LIVE/ram; the path of the copy in OUT. 0 when done. */
+static int copy_to_ram(const char *sfs, unsigned long long size, char *out, size_t outsz)
+{
+	char opts[64];
+	snprintf(opts, sizeof opts, "size=%llu,mode=0700", size + (32ull << 20));
+	if (mounted_tmpfs(LIVE "/ram", opts)) {
+		say("flinitrd: Load into RAM: cannot make the tmpfs: %s", strerror(errno));
+		return -1;
+	}
+	snprintf(out, outsz, "%s", LIVE "/ram/root.sfs");
+	int in = open(sfs, O_RDONLY | O_CLOEXEC), o = open(out, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+	char *buf = malloc(1 << 20);
+	int ok = in >= 0 && o >= 0 && buf;
+	unsigned long long done = 0;
+	int last = -1;
+	double t0 = now();
+	while (ok && done < size) {
+		ssize_t n = read(in, buf, 1 << 20);
+		if (n < 0 && errno == EINTR)
+			continue;
+		if (n <= 0) {
+			ok = 0;
+			break;
+		}
+		for (ssize_t w = 0; w < n;) {
+			ssize_t k = write(o, buf + w, n - w);
+			if (k < 0 && errno == EINTR)
+				continue;
+			if (k <= 0) {
+				ok = 0;
+				break;
+			}
+			w += k;
+		}
+		done += n;
+		/* the stick's pages would only fill the RAM the copy needs */
+		posix_fadvise(in, 0, 0, POSIX_FADV_DONTNEED);
+		int pc = (int)(done * 100 / size);
+		if (ok && pc != last && pc % 5 == 0) {
+			last = pc;
+			say("flinitrd: Load into RAM: %d%% (%llu of %llu MiB)", pc, done >> 20, size >> 20);
+		}
+	}
+	free(buf);
+	if (in >= 0)
+		close(in);
+	if (o >= 0) {
+		if (ok)
+			fsync(o);
+		close(o);
+	}
+	if (!ok || done < size) {
+		say("flinitrd: Load into RAM failed (%s): staying on the stick", errno ? strerror(errno) : "short read");
+		unlink(out);
+		umount(LIVE "/ram");
+		return -1;
+	}
+	dbg("copied %llu MiB in %.1f s", done >> 20, now() - t0);
+	return 0;
+}
+
+/* Should this image of SIZE bytes be loaded into RAM? */
+static int want_toram(unsigned long long size)
+{
+	unsigned long long mem = meminfo_kb("MemTotal:") * 1024ull;
+	if (toram == 0)
+		return 0;
+	if (toram == 1) {
+		if (mem < size + (1ull << 30)) {
+			say("flinitrd: Load into RAM needs %llu MiB of RAM and this machine has %llu MiB: staying on the stick",
+			    (size + (1ull << 30)) >> 20, mem >> 20);
+			return 0;
+		}
+		return 1;
+	}
+	if (persist_present)
+		return 0;
+	return mem >= size + (4ull << 30);
+}
+
 /* DIR is a mounted ISO 9660 (or any file system) with live/root.sfs:
- * loop-mount the squashfs at LIVE/rom. */
+ * loop-mount the squashfs at LIVE/rom, from a copy in RAM when that is wanted (ram_loaded is set then, and
+ * the caller releases what it mounted). */
 static int use_iso(const char *dir)
 {
 	char sfs[PATH_MAX], loop[64];
+	struct stat st;
 	snprintf(sfs, sizeof sfs, "%s/live/root.sfs", dir);
 	if (!exists(sfs))
 		return -1;
+	if (stat(sfs, &st) == 0 && want_toram((unsigned long long)st.st_size)) {
+		char copy[PATH_MAX];
+		if (copy_to_ram(sfs, (unsigned long long)st.st_size, copy, sizeof copy) == 0) {
+			if (loop_attach(copy, loop, sizeof loop) == 0) {
+				mkdir(LIVE "/rom", 0755);
+				if (mount(loop, LIVE "/rom", "squashfs", MS_RDONLY, NULL) == 0) {
+					ram_loaded = 1;
+					int mk = open(LIVE "/toram", O_WRONLY | O_CREAT | O_CLOEXEC, 0644); /* for flreport and tests */
+					if (mk >= 0)
+						close(mk);
+					return 0;
+				}
+				loop_detach(loop);
+			}
+			unlink(copy);
+			umount(LIVE "/ram");
+			say("flinitrd: Load into RAM failed: staying on the stick");
+		}
+	}
 	if (loop_attach(sfs, loop, sizeof loop))
 		return -1;
 	mkdir(LIVE "/rom", 0755);
@@ -339,7 +488,13 @@ static int try_device_iso(const struct dev *d)
 	if (try_mount(d->path, LIVE "/iso", "iso9660"))
 		return -1;
 	if (use_iso(LIVE "/iso") == 0) {
-		say("flinitrd: live system on the device %s", d->path);
+		if (ram_loaded) {
+			/* nothing of the device is needed any more: let it go completely */
+			umount(LIVE "/iso");
+			clear_readonly();
+			say("flinitrd: the live system is in RAM; %s is free", d->path);
+		} else
+			say("flinitrd: live system on the device %s", d->path);
 		return 0;
 	}
 	umount(LIVE "/iso");
@@ -410,21 +565,36 @@ static int try_device_files(const struct dev *d)
 			char loop[64];
 			if (loop_attach(s.iso, loop, sizeof loop) == 0 &&
 			    try_mount(loop, LIVE "/iso", "iso9660") == 0) {
+				/* Live persistence: freelfs-persist.img at the top of the stick, or beside the ISO */
+				char beside[PATH_MAX];
+				persist_img[0] = 0;
+				snprintf(beside, sizeof beside, "%s", s.iso);
+				char *sl = strrchr(beside, '/');
+				if (sl) {
+					snprintf(sl + 1, sizeof beside - (size_t)(sl + 1 - beside), "freelfs-persist.img");
+					if (exists(beside))
+						snprintf(persist_img, sizeof persist_img, "%s", beside);
+				}
+				if (!persist_img[0] && exists(LIVE "/src/freelfs-persist.img"))
+					snprintf(persist_img, sizeof persist_img, "%s", LIVE "/src/freelfs-persist.img");
+				persist_present = persist_img[0] && !no_persist;
 				if (use_iso(LIVE "/iso") == 0) {
-					/* Live persistence: freelfs-persist.img at the top of the stick, or beside the ISO */
-					char beside[PATH_MAX];
-					snprintf(beside, sizeof beside, "%s", s.iso);
-					char *sl = strrchr(beside, '/');
-					if (sl) {
-						snprintf(sl + 1, sizeof beside - (size_t)(sl + 1 - beside), "freelfs-persist.img");
-						if (exists(beside))
-							snprintf(persist_img, sizeof persist_img, "%s", beside);
-					}
-					if (!persist_img[0] && exists(LIVE "/src/freelfs-persist.img"))
-						snprintf(persist_img, sizeof persist_img, "%s", LIVE "/src/freelfs-persist.img");
 					snprintf(persist_dev, sizeof persist_dev, "%s", d->path);
-					say("flinitrd: live system in %s on %s (%s)", s.iso + strlen(LIVE "/src"),
-					    d->path, types[i]);
+					if (ram_loaded) {
+						/* the image is in RAM: release the stick completely, it is an ordinary drive now */
+						umount(LIVE "/iso");
+						loop_detach(loop);
+						if (umount(LIVE "/src"))
+							say("flinitrd: cannot release %s: %s", d->path, strerror(errno));
+						clear_readonly();
+						if (persist_present)
+							say("flinitrd: Load into RAM was asked for: the persistent home is not used");
+						persist_img[0] = 0;
+						say("flinitrd: live system loaded into RAM from %s on %s; the stick is free",
+						    s.iso + strlen(LIVE "/src"), d->path);
+					} else
+						say("flinitrd: live system in %s on %s (%s)", s.iso + strlen(LIVE "/src"),
+						    d->path, types[i]);
 					return 0;
 				}
 				umount(LIVE "/iso");

@@ -97,5 +97,19 @@ if [ -n "$shots" ]; then
 	done
 	ls "$shots"/snap-boot-*.png
 fi
+# firmware setup and other drives (entries other.c adds on a real firmware; here stand-ins)
+export FLBOOT_FAKE_OTHER=1
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 e)
+check "other: the menu offers Firmware setup (BIOS) and Other drives and systems" 'grep -q "Firmware setup (BIOS)" <<< "$out" && grep -q "Other drives and systems" <<< "$out"'
+check "other: the USB option is not in the main list" '! grep -q "UEFI USB stick" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u e)
+check "other: Up from the top opens Other drives and systems and lists the USB option and the drive" 'grep -q "Firmware option: UEFI USB stick" <<< "$out" && grep -q "Other drive: EFI boot program" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u e e)
+check "other: Enter on the first row chooses a BootNext entry (kind 2)" 'grep -q "kind: 2" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u e d e)
+check "other: the second row is the chain entry (kind 3)" 'grep -q "kind: 3" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u u u e)
+check "other: Firmware setup is two rows above Other drives (earlier-state row between) (kind 1)" 'grep -q "kind: 1" <<< "$out"'
+unset FLBOOT_FAKE_OTHER
 if [ "$fails" -ne 0 ]; then echo "$fails flboot menu test(s) failed"; exit 1; fi
 echo "flboot menu tests passed"

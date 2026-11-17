@@ -105,7 +105,9 @@ What flinitrd does, in order:
 5. If persistence exists (`freelfs-persist.img` next to the ISO on the stick, made by `flpersist`), it mounts that image as `/home`. Without it, everything stays in RAM. See [12](12-filesystem-layout.md).
 6. If nothing is found it says so and offers a small prompt: `r` retry, `l` list disks, `p` power off, `b` reboot.
 
-Options on the kernel command line for flinitrd: `flive.timeout=SECONDS`, `flive.iso=PATTERN` (default `freelfs-live*.iso`), `flive.debug`.
+Options on the kernel command line for flinitrd: `flive.timeout=SECONDS`, `flive.iso=PATTERN` (default `freelfs-live*.iso`), `flive.debug`, `flive.toram=0|1`.
+
+Round 21: an exFAT or FAT partition that holds the ISO (a Ventoy stick) is mounted with `uid=1000,gid=98,fmask=0133,dmask=0022` (the live user `tester`, group `seat`): those file systems keep no owner on disk, the owner is fixed at the first mount, and flmount's later remount-writable would otherwise leave every file root's. **Load into RAM** (`flive.toram=1`, the boot menu entry, or automatic when MemTotal is at least the image size plus 4 GiB and the stick has no persistence image): `root.sfs` is copied into a tmpfs at `/run/live/ram` (progress lines on the console), the system runs from the copy, then the ISO mount, its loop device and the stick's mount are released and the BLKROSET flags cleared; `/run/live/toram` marks it. The copy needs the image plus 1 GiB when forced; otherwise flinitrd says so and stays on the stick.
 
 ## 11.6 Stage 5 to 8: init, rc.sysinit, services, login
 
@@ -220,7 +222,7 @@ Kernel options that FreeLFS reads:
 | `initrd=\ucode.img` | when microcode is installed | early microcode loading |
 | `initrd=\initrd.img` | live ISO | the flinitrd initramfs |
 | `rootflags=subvol=@snapshots/N` | snapshot entries | start snapshot N read-only (see 11.9) |
-| `flive.timeout=N`, `flive.iso=PATTERN`, `flive.debug` | live ISO | flinitrd options (see 11.5) |
+| `flive.timeout=N`, `flive.iso=PATTERN`, `flive.debug`, `flive.toram=0\|1` | live ISO | flinitrd options (see 11.5) |
 
 ## 11.9 Earlier states (snapshots)
 

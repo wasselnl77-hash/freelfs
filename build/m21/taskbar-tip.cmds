@@ -1,0 +1,17 @@
+# Hovering a taskbar entry (icon-only, the default) shows the window's title after the last entry.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@mouse 640 400
+@wait 1
+@shot @OUT@/tt-1-nohover.ppm
+@mouse 80 778
+@wait 1.5
+@shot @OUT@/tt-2-hover.ppm
+@shotdiff @OUT@/tt-1-nohover.ppm @OUT@/tt-2-hover.ppm 600 52 745 900 800
+@mouse 640 400
+@wait 1.5
+@shot @OUT@/tt-3-away.ppm
+@shotsame @OUT@/tt-1-nohover.ppm @OUT@/tt-3-away.ppm 50 52 745 900 800

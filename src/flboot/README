@@ -51,3 +51,11 @@ stand-in firmware (tests/hostmenu.c) with scripted keys and writes screenshots:
 Safe graphics (round 20): every menu gets an entry "FreeLFS (Safe graphics, kernel X)", the newest kernel with the command line
 plus "nomodeset nouveau.modeset=0": no GPU driver takes the screen, the firmware framebuffer (simpledrm) shows the desktop. It is
 left out when an entry of flboot.conf already has nomodeset. Test: tests/menu-test.sh.
+
+Firmware setup and other drives (round 21, other.c): when the firmware says it can (OsIndicationsSupported has
+EFI_OS_INDICATIONS_BOOT_TO_FW_UI) the menu has "Firmware setup (BIOS)": it sets OsIndications and resets, so the computer
+opens its BIOS screen although fast boot hides F2/F12. "Other drives and systems" lists (1) the firmware's boot options from
+BootOrder (not the one flboot was started from): choosing one sets BootNext and resets; (2) other FAT volumes that hold
+\EFI\BOOT\BOOTX64.EFI or Windows' \EFI\Microsoft\Boot\bootmgfw.efi: flboot loads that program itself (with its device
+path) and starts it; when it returns the menu is back. A hidden menu (timeout 0) opens when a key is pressed in the first
+second. Test: tests/menu-test.sh (menu logic with stand-in entries), build/m21/flboot-fw.sh (real OVMF).

@@ -6,6 +6,8 @@
 EFI_STATUS boot_entry(const struct entry *e)
 {
 	static const EFI_GUID li_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+	if (e->kind != K_KERNEL)
+		return boot_other(e);
 	char *data;
 	UINTN size;
 	EFI_STATUS st = fs_read(e->kernel, &data, &size);

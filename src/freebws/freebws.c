@@ -79,6 +79,8 @@ struct sbuf {
 };
 
 struct tab {
+	int nframes, ndropped;
+	int dbg_frames;	/* FREEBWS_DEBUG: frames still to log after the tab was shown or its backend changed */
 	WebKitWebView *view;		/* NULL while the tab is discarded */
 	struct wpe_view_backend_exportable_fdo *exp;
 	unsigned exp_id;	/* never reused: a freed exportable's address may be (see live_exp) */
@@ -315,6 +317,10 @@ static void show_pixels(const uint8_t *p, int w, int h, int stride)
 static void export_shm(void *data, struct wpe_fdo_shm_exported_buffer *eb)
 {
 	struct tab *t = data;
+	if (B.debug && t->dbg_frames > 0) {
+		t->dbg_frames--;
+		flog(1, "frame (shm) from \"%s\", %s", t->title, t == B.cur ? "shown" : "dropped");
+	}
 	struct wl_shm_buffer *src = wpe_fdo_shm_exported_buffer_get_shm_buffer(eb);
 	if (t == B.cur) {	/* a background tab's frames are dropped */
 		int w, h, stride;
@@ -343,6 +349,13 @@ static const struct wl_buffer_listener dmb_l = { dmb_buffer_release };
 static void export_dmabuf(void *data, struct wpe_view_backend_exportable_fdo_dmabuf_resource *r)
 {
 	struct tab *t = data;
+	t->nframes++;
+	if (t != B.cur)
+		t->ndropped++;
+	if (B.debug && t->dbg_frames > 0) {
+		t->dbg_frames--;
+		flog(1, "frame (dmabuf) from \"%s\", %s, %ux%u", t->title, t == B.cur ? "shown" : "dropped", r->width, r->height);
+	}
 	if (t != B.cur) {	/* a background tab: give the buffer straight back */
 		wpe_view_backend_exportable_fdo_dispatch_release_buffer(t->exp, r->buffer_resource);
 		wpe_view_backend_exportable_fdo_dispatch_frame_complete(t->exp);
@@ -655,6 +668,8 @@ static void tab_activate(struct tab *t)
 		webkit_web_view_reload(t->view);
 	}
 	struct wpe_view_backend *vb = tab_vb(t);
+	t->dbg_frames = 6;
+	flog(1, "tab \"%s\" is shown (visible); frames so far %d, dropped while hidden %d", t->title, t->nframes, t->ndropped);
 	wpe_view_backend_add_activity_state(vb, wpe_view_activity_state_visible | wpe_view_activity_state_in_window);
 	if (B.page_focus)
 		wpe_view_backend_add_activity_state(vb, wpe_view_activity_state_focused);
@@ -2152,11 +2167,15 @@ static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *na, st
 	guint btn = webkit_navigation_action_get_mouse_button(na);
 	guint mods = webkit_navigation_action_get_modifiers(na);
 	int bg = btn == 2 || (mods & wpe_input_keyboard_modifier_control);
-	/* Tabs that share one web process are all related already. Relating the popup to its opener on top
-	 * (an OAuth window) hung the page on the laptop, so then it joins another tab's process, not the
-	 * opener's (FREEBWS_POPUP_RELATE=1 restores the old way). */
+	/* The popup is related to its opener (window.opener, postMessage and window.close() of an OAuth window need
+	 * that). Round 20 stopped relating it when tabs share a web process, because the opener froze when the popup
+	 * closed. That was not the relation: wpebackend-fdo 1.16.1 answered zwp_linux_dmabuf_v1.get_surface_feedback
+	 * with nothing, the web process's later feedback.destroy named an object the server never made ("invalid
+	 * object"), and the server ended the web process's whole Wayland connection: every view in that process, the
+	 * opener's too, stopped painting (its JavaScript kept running). Closing any tab that shares a process did the
+	 * same. Fixed in wpebackend-fdo release 2 (patch); FREEBWS_POPUP_UNRELATE=1 gives the r20 behaviour back. */
 	WebKitWebView *rel = v;
-	if (B.share_process && !getenv("FREEBWS_POPUP_RELATE"))
+	if (B.share_process && getenv("FREEBWS_POPUP_UNRELATE"))
 		rel = NULL;
 	B.popup_skip = v;
 	struct tab *n = tab_create(rel, NULL, 0);

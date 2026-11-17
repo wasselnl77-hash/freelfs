@@ -45,7 +45,13 @@ struct entry {
 	char *cmdline;   /* kernel command line */
 	char *version;   /* kernel version, for sorting */
 	bool snapshot;   /* an earlier state (btrfs snapshot), listed under "Start an earlier state" */
+	int kind;        /* K_KERNEL ..., see below */
+	EFI_HANDLE volume; /* K_CHAIN: the volume that holds the EFI program (path in .kernel) */
+	UINT16 bootnum;  /* K_BOOTNEXT: the firmware's Boot#### number */
 };
+
+/* what an entry does. K_BOOTNEXT and K_CHAIN are listed under "Other drives and systems". */
+enum { K_KERNEL, K_FIRMWARE, K_BOOTNEXT, K_CHAIN };
 
 struct config {
 	int timeout;     /* seconds; 0 boots the default at once, -1 waits */
@@ -66,10 +72,14 @@ int gfx_height(void);
 int gfx_text_width(const char *s, int scale);
 extern const int font_width, font_height;
 
+/* other.c: firmware setup, the firmware's other boot options, other drives with an EFI program */
+void conf_add_other(struct config *c);
+
 /* menu.c */
 int menu_run(struct config *c); /* index of the entry to boot */
 
 /* boot.c */
 EFI_STATUS boot_entry(const struct entry *e);
+EFI_STATUS boot_other(const struct entry *e); /* other.c */
 
 #endif

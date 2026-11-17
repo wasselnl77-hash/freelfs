@@ -1,0 +1,24 @@
+--- a/src/linux-dmabuf/linux-dmabuf.cpp	2026-11-17 14:37:11.439024537 +0100
++++ b/src/linux-dmabuf/linux-dmabuf.cpp	2026-11-17 14:37:11.459372595 +0100
+@@ -396,12 +396,17 @@
+ }
+ 
+ static void
+-linux_dmabuf_get_surface_feedback(struct wl_client*,
+-                                  struct wl_resource*,
+-                                  uint32_t /* dmabuf_feedback_id */,
++linux_dmabuf_get_surface_feedback(struct wl_client* client,
++                                  struct wl_resource* dmabuf_resource,
++                                  uint32_t dmabuf_feedback_id,
+                                   struct wl_resource*)
+ {
+-    // We don't support per surface feedback, but since we claim to support version 4 we need to provide an implementation.
++    // Per surface feedback is not supported, but the new id still has to become an object: this function used to
++    // do nothing, so the client's later zwp_linux_dmabuf_feedback_v1.destroy (when a view is closed) named an
++    // object the server did not know, the server answered "invalid object N" and ended the whole connection of the
++    // web process: every other view in that process stopped painting (FreeLFS round 21). Answer like the default
++    // feedback.
++    linux_dmabuf_get_default_feedback(client, dmabuf_resource, dmabuf_feedback_id);
+ }
+ 
+ static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_implementation = {

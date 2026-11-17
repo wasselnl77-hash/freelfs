@@ -18,3 +18,11 @@ Read-only by construction: each device is set read-only in the kernel
 (BLKROSET) before it is mounted, mounts are MS_RDONLY (ext4 with noload), and
 loop devices are read-only. Boot options: flive.timeout=N, flive.iso=PATTERN,
 flive.debug.
+
+exFAT and FAT sticks are mounted for the live user (uid 1000, group seat 98, fmask 0133, dmask 0022): those
+file systems have no owners on disk, so flmount's later remount-writable gives the user write access.
+
+Load into RAM (flive.toram=1 forces, =0 forbids, automatic when MemTotal >= image + 4 GiB and the stick has no
+persistence image): root.sfs is copied into a tmpfs (progress on the console), the system runs from the copy and
+the stick is released completely (unmounted, loop devices detached, BLKROSET cleared). /run/live/toram exists then.
+Forced loading needs image + 1 GiB of RAM, else it stays on the stick.

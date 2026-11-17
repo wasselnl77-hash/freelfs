@@ -64,6 +64,14 @@ static void window_configure(struct window *w, int cw, int ch)
 		STATE(XDG_TOPLEVEL_STATE_RESIZING);
 	if (C.focused == w)
 		STATE(XDG_TOPLEVEL_STATE_ACTIVATED);
+	/* a half of the screen (Super+Left/Right, drag to an edge): GTK and Firefox draw such a window without shadow
+	 * and with square corners when they know it is tiled (xdg_toplevel version 2) */
+	if ((w->snap == -1 || w->snap == 1) && !w->maximized && !w->fullscreen &&
+	    wl_resource_get_version(w->res) >= XDG_TOPLEVEL_STATE_TILED_LEFT_SINCE_VERSION) {
+		STATE(w->snap < 0 ? XDG_TOPLEVEL_STATE_TILED_LEFT : XDG_TOPLEVEL_STATE_TILED_RIGHT);
+		STATE(XDG_TOPLEVEL_STATE_TILED_TOP);
+		STATE(XDG_TOPLEVEL_STATE_TILED_BOTTOM);
+	}
 #undef STATE
 	xdg_toplevel_send_configure(w->res, cw, ch, &st);
 	w->xs->serial = wl_display_next_serial(C.dpy);

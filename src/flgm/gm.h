@@ -157,6 +157,8 @@ struct proc {
 	int app; /* the app it belongs to (own or an ancestor's), or -1 */
 	int root_pid; /* the app process this one belongs to, or 0 */
 	int seen;
+	char fp_id[96]; /* Flatpak application id (from the sandbox's /.flatpak-info), or empty */
+	int fp_tries;   /* scans spent looking for it: a sandbox shows it a moment after the process starts */
 };
 
 struct procs {
@@ -170,7 +172,7 @@ struct procs {
 };
 
 struct appinfo {
-	char exec[64], name[64], icon[32];
+	char exec[128], name[64], icon[32];
 };
 
 void apps_load(void);

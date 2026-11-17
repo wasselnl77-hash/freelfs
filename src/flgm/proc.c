@@ -101,6 +101,75 @@ static int flatpak_id(const char *s, char *out, size_t cap)
 	}
 }
 
+static int slurp(const char *path, char *buf, size_t cap);
+static void app_add(const char *exec, const char *name, const char *icon);
+
+/* ---- Flatpak apps -----------------------------------------------------------------------
+ * A Flatpak app is not found by its command line: flatpak execs bwrap, and the program runs as
+ * /app/lib/firefox/firefox in the sandbox. What does not lie is the sandbox's own root: every process in it
+ * sees /.flatpak-info, and /proc/PID/root/.flatpak-info (readable for the same user, the way the portals
+ * identify a caller) has "[Application]" and "name=org.mozilla.firefox". A cgroup name app-flatpak-ID-N.scope
+ * (flatpak with systemd) is the second source. Host /proc shows the processes of the pid namespace anyway. */
+static void read_flatpak_id(struct proc *p)
+{
+	char path[96], buf[2048];
+	p->fp_id[0] = 0;
+	snprintf(path, sizeof path, PROC_DIR "/%d/root/.flatpak-info", p->pid);
+	if (slurp(path, buf, sizeof buf) > 0) {
+		char *s = strstr(buf, "[Application]");
+		while (s && *s) {
+			char *nl = strchr(s, '\n');
+			if (nl)
+				*nl = 0;
+			if (s != buf && !strncmp(s, "name=", 5)) {
+				snprintf(p->fp_id, sizeof p->fp_id, "%s", s + 5);
+				break;
+			}
+			if (s[0] == '[' && strncmp(s, "[Application]", 13) && s != strstr(buf, "[Application]"))
+				break;
+			s = nl ? nl + 1 : NULL;
+		}
+	}
+	if (!p->fp_id[0]) {
+		snprintf(path, sizeof path, PROC_DIR "/%d/cgroup", p->pid);
+		if (slurp(path, buf, sizeof buf) > 0) {
+			char *a = strstr(buf, "app-flatpak-");
+			char *e = a ? strstr(a, ".scope") : NULL;
+			if (a && e) {
+				a += 12;
+				char *dash = e;
+				while (dash > a && dash[-1] != '-')
+					dash--;
+				if (dash > a + 1)
+					snprintf(p->fp_id, sizeof p->fp_id, "%.*s", (int)(dash - 1 - a), a);
+			}
+		}
+	}
+	for (char *c = p->fp_id; *c; c++)
+		if (!(isalnum((unsigned char)*c) || *c == '.' || *c == '_' || *c == '-')) {
+			p->fp_id[0] = 0; /* not an application id */
+			break;
+		}
+	if (p->fp_id[0] && !strchr(p->fp_id, '.'))
+		p->fp_id[0] = 0;
+}
+
+/* The app of an application id: its exported .desktop file, else an entry of its own (id as the name). */
+static int fp_app_index(const char *id)
+{
+	char key[160];
+	snprintf(key, sizeof key, "flatpak:%s", id);
+	for (int i = 0; i < napps; i++)
+		if (!strcmp(apps[i].exec, key))
+			return i;
+	const char *last = strrchr(id, '.');
+	app_add(key, last && last[1] ? last + 1 : id, "");
+	for (int i = 0; i < napps; i++)
+		if (!strcmp(apps[i].exec, key))
+			return i;
+	return -1;
+}
+
 /* The program a .desktop Exec= line starts: skips env and VAR=value, quotes and the path. */
 static int exec_program(const char *line, char *out, size_t cap)
 {
@@ -126,7 +195,7 @@ static int exec_program(const char *line, char *out, size_t cap)
 			return -1;
 		if (!strcmp(tok, "env") || (strchr(tok, '=') && tok[0] != '/' && tok[0] != '%'))
 			continue;
-		if (!strcmp(tok, "flatpak")) {
+		if (!strcmp(base_of(tok), "flatpak")) {
 			char id[96];
 			if (flatpak_id(p, id, sizeof id) == 0) {
 				snprintf(out, cap, "flatpak:%s", id);
@@ -172,7 +241,7 @@ static void apps_scan_dir(const char *dir)
 		FILE *f = fopen(path, "re");
 		if (!f)
 			continue;
-		char line[512], name[64] = "", exec[64] = "", icon[32] = "";
+		char line[512], name[64] = "", exec[128] = "", icon[32] = "", xfp[128] = "";
 		int in = 0, hide = 0, app = 1;
 		while (fgets(line, sizeof line, f)) {
 			line[strcspn(line, "\n")] = 0;
@@ -188,6 +257,8 @@ static void apps_scan_dir(const char *dir)
 				exec_program(line + 5, exec, sizeof exec);
 			else if (!strncmp(line, "Icon=", 5))
 				snprintf(icon, sizeof icon, "%s", line + 5);
+			else if (!strncmp(line, "X-Flatpak=", 10))
+				snprintf(xfp, sizeof xfp, "%s", line + 10);
 			else if (!strcmp(line, "NoDisplay=true") || !strcmp(line, "Hidden=true"))
 				hide = 1;
 			else if (!strncmp(line, "Type=", 5) && strcmp(line + 5, "Application"))
@@ -195,6 +266,8 @@ static void apps_scan_dir(const char *dir)
 		}
 		fclose(f);
 		gm_clean_utf8(name);
+		if (xfp[0] && strchr(xfp, '.') && !strchr(xfp, ' ') && strlen(xfp) < sizeof exec - 9)
+			snprintf(exec, sizeof exec, "flatpak:%s", xfp); /* exported by Flatpak: the id says it all */
 		gm_clean_utf8(exec);
 		gm_clean_utf8(icon);
 		if (app && !hide && name[0] && exec[0] && !generic_exec(exec))
@@ -217,6 +290,12 @@ void apps_load(void)
 		p[0] = 0;
 	if (p[0])
 		apps_scan_dir(p);
+	/* Flatpak's exports, whether or not the session has them in XDG_DATA_DIRS */
+	if (home && *home) {
+		snprintf(p, sizeof p, "%s/.local/share/flatpak/exports/share/applications", home);
+		apps_scan_dir(p);
+	}
+	apps_scan_dir("/var/lib/flatpak/exports/share/applications");
 	const char *xd = getenv("XDG_DATA_DIRS");
 	if (!xd || !*xd)
 		xd = "/usr/local/share:/usr/share";
@@ -240,6 +319,8 @@ const struct appinfo *apps_get(int i) { return i >= 0 && i < napps ? &apps[i] : 
  * command line ("flatpak run org.mozilla.firefox"; the sandboxed program itself is a child). */
 static int app_match(const struct proc *p)
 {
+	if (p->fp_id[0])
+		return fp_app_index(p->fp_id);
 	for (int i = 0; i < napps; i++) {
 		const char *x = apps[i].exec;
 		if (!strncmp(x, "flatpak:", 8)) {
@@ -587,6 +668,8 @@ void procs_scan(struct procs *ps)
 			continue;
 		}
 		if (fresh) {
+			p->fp_id[0] = 0; /* a new process, or a reused pid */
+			p->fp_tries = 0;
 			/* until the command line comes back from the reader (rdr.c): the comm in brackets */
 			char none[1] = "";
 			apply_cmd(p, none, 0);
@@ -603,11 +686,28 @@ void procs_scan(struct procs *ps)
 	ps->cap = np + 1;
 	resolve(ps, t);
 
+	/* a process that has not shown its Flatpak sandbox yet (bwrap sets it up in the first milliseconds) is looked
+	 * at again for its first scans */
+	for (int i = 0; i < ps->n; i++) {
+		struct proc *p = &ps->p[i];
+		if (!p->fp_id[0] && p->fp_tries < 3 && !p->kernel) {
+			p->fp_tries++;
+			read_flatpak_id(p);
+			if (p->fp_id[0])
+				p->own_app = app_match(p);
+		}
+	}
+
 	/* which app each process belongs to: the nearest ancestor (or itself) that is one */
 	for (int i = 0; i < ps->n; i++) {
 		struct proc *p = &ps->p[i];
 		p->root_pid = 0;
 		p->app = -1;
+		if (p->fp_id[0] && p->own_app >= 0) { /* inside a sandbox: that app, whatever the ancestors say */
+			p->app = p->own_app;
+			p->root_pid = p->pid;
+			continue;
+		}
 		struct proc *q = p;
 		for (int depth = 0; q && depth < 40; depth++) {
 			if (q->own_app >= 0) {
@@ -615,6 +715,24 @@ void procs_scan(struct procs *ps)
 				p->app = q->own_app;
 				break;
 			}
+			if (q->ppid <= 1)
+				break;
+			q = procs_find(ps, q->ppid);
+		}
+	}
+	/* the bwrap that watches a sandbox (and flatpak itself, xdg-dbus-proxy) is outside it: it joins the app of
+	 * its sandboxed child */
+	for (int i = 0; i < ps->n; i++) {
+		struct proc *p = &ps->p[i];
+		if (!p->fp_id[0] || p->app < 0)
+			continue;
+		struct proc *q = procs_find(ps, p->ppid);
+		for (int depth = 0; q && q->app < 0 && !q->fp_id[0] && depth < 6; depth++) {
+			if (strcmp(q->comm, "bwrap") && strcmp(q->comm, "flatpak") && strcmp(q->comm, "xdg-dbus-proxy") &&
+			    strcmp(q->comm, "flatpak-portal"))
+				break;
+			q->app = p->app;
+			q->root_pid = p->root_pid;
 			if (q->ppid <= 1)
 				break;
 			q = procs_find(ps, q->ppid);

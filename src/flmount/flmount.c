@@ -10,12 +10,15 @@
  *   flmount mount DEV                mounts at /drives/LABEL (the label made safe), prints the mount point on
  *                                    stdout, exit 0. vfat, exfat and ntfs get the caller's uid and gid; on ext4
  *                                    and btrfs the top directory is given to the caller when root owns it.
- *                                    The live boot stick is made writable and bound to /drives/LABEL.
- *   flmount unmount DEV              unmounts what is under /drives (the boot stick stays mounted for the system)
+ *                                    The live boot stick is made writable and bound to /drives/LABEL (flinitrd
+ *                                    mounted it for the live user, so the files are theirs); `list` calls it
+ *                                    "FreeLFS boot stick".
+ *   flmount unmount DEV              unmounts what is under /drives (the boot stick is refused: the system runs from it)
  *   flmount remount DEV              unmounts (lazily) and mounts again, prints the mount point (Files, after an
  *                                    input/output error)
  *   flmount eject DEV                unmounts every partition of the disk and powers the device off (not the
- *                                    boot stick: the live system runs from it)
+ *                                    boot stick: the live system runs from it, unless it was loaded into RAM, when
+ *                                    the stick is an ordinary removable drive)
  *   --internal                       (list, mount, unmount, eject) also internal disks; Files does not use it
  *
  * Root only (udev, rc.sysinit):
@@ -204,6 +207,9 @@ static void blkid_props(const char *dev, char *fs, size_t fscap, char *label, si
 	}
 	close(p[0]);
 }
+
+#define STICK_MSG "FreeLFS is running from this stick. Shut down first, or boot with 'Load into RAM'."
+#define STICK_LABEL "FreeLFS boot stick"
 
 /* the device the live system runs from (mounted at /run/live/src or /run/live/iso), "" when this is no live system */
 static void boot_device(char *out, size_t cap)
@@ -403,7 +409,7 @@ static int cmd_list(void)
 		char dev[80], mp[PATH_MAX];
 		snprintf(dev, sizeof dev, "/dev/%s", v[i].name);
 		const char *mpp = mountpoint_of(m, nm, dev, mp, sizeof mp);
-		const char *label = v[i].label[0] ? v[i].label : "-";
+		const char *label = v[i].cls == C_BOOT ? STICK_LABEL : v[i].label[0] ? v[i].label : "-";
 		/* no TAB or newline can sit in a label */
 		char lab[160];
 		snprintf(lab, sizeof lab, "%s", label);
@@ -702,7 +708,9 @@ static int cmd_unmount(const char *dev)
 	int n = v ? enumerate(v, MAXP) : 0;
 	struct part *p = v ? find_part(v, n, dev) : NULL;
 	int rc = 1, cnt = 0;
-	if (p) {
+	if (p && (p->cls == C_BOOT || p->held)) {
+		err("%s", STICK_MSG);
+	} else if (p) {
 		sync();
 		rc = unmount_dev(dev, 0, &cnt);
 		if (!rc && !cnt)
@@ -733,7 +741,7 @@ static int cmd_remount(const char *dev)
 			rc = 0;
 		}
 	} else if (p) {
-		err("%s is the stick the live system runs from", dev);
+		err("%s", STICK_MSG);
 	}
 	free(v);
 	return rc;
@@ -773,12 +781,11 @@ static int cmd_eject(const char *dev)
 	if (!p)
 		goto out;
 	if (p->cls == C_BOOT) {
-		err("%s is the stick the live system runs from; shut down instead", dev);
+		err("%s", STICK_MSG);
 		goto out;
 	}
 	if (p->held || disk_held(p->disk)) {
-		err("%s: the running system reads from this stick (a Ventoy boot); ejecting it would freeze the desktop. "
-		    "Shut down instead", dev);
+		err("%s (a Ventoy boot: the running system reads through this stick).", STICK_MSG);
 		goto out;
 	}
 	char disk[PATH_MAX];
@@ -789,7 +796,7 @@ static int cmd_eject(const char *dev)
 		if (strcmp(v[i].disk, p->disk))
 			continue;
 		if (v[i].cls == C_BOOT) {
-			err("the live system runs from this disk");
+			err("%s", STICK_MSG);
 			goto out;
 		}
 		char d[80];

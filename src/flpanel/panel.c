@@ -914,6 +914,8 @@ static void draw_panel(fl_ui *ui, void *ud)
 
 	/* windows */
 	int wx = 52 + 6;
+	const char *tip = NULL;	/* the title of the hovered entry, drawn after the last one (icon-only entries show no text) */
+	int tip_full = 0;
 	for (int i = 0; i < p->nwins; i++) {
 		struct win *w = &p->wins[i];
 		int focused = w->focused && !w->minimized && !p->menu_open;
@@ -928,6 +930,10 @@ static void draw_panel(fl_ui *ui, void *ud)
 			break;
 		fl_rect r = fl_r(wx, 1, ew, PANEL_H - 1);
 		int res = fl_widget(ui, ID_WIN + (uint32_t)i, r, FL_FOCUSABLE);
+		if (res & FL_HOVER) {
+			tip = name;
+			tip_full = labels && 12 + ICON_PX + 8 + fl_text_width(ui->f_reg, name, -1) + 12 <= ew;	/* the whole title shows already */
+		}
 		fl_color fg = focused ? fl_th.text : ((res & FL_HOVER) ? fl_th.text : fl_th.dim);
 		if (focused)
 			fl_fill_rect(cv, r, fl_th.raised);
@@ -973,6 +979,18 @@ static void draw_panel(fl_ui *ui, void *ud)
 			}
 		}
 		wx += ew + 2;
+	}
+	/* the tooltip: a flat box with the window's title right after the last entry (the panel is one strip, so it is
+	 * drawn in it instead of in a surface of its own that would take the click away from the entry) */
+	if (tip && tip[0] && !tip_full && limit - wx > 60) {
+		char fit[200];
+		int avail = limit - wx - 8 - 24;
+		fl_text_fit(ui->f_reg, tip, avail, fit, sizeof fit);
+		int tw2 = fl_text_width(ui->f_reg, fit, -1) + 24;
+		fl_rect tb = fl_r(wx + 8, 5, tw2, PANEL_H - 10);
+		fl_fill_rect(cv, tb, fl_th.raised);
+		fl_stroke_rect(cv, tb, 1, fl_th.line);
+		fl_text_in(cv, ui->f_reg, tb, FL_CENTER, 0, fl_th.text, fit);
 	}
 }
 

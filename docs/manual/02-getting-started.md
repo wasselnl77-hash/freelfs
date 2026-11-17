@@ -100,6 +100,37 @@ FreeLFS), then:
 Only Ventoy's normal mode has been tested. Its GPT mode and the other boot
 modes have not.
 
+The system runs from the ISO file on the stick. Since round 21 the stick's
+exFAT or FAT partition is mounted for the live user (user `tester`, group
+`seat`), so you can save files on it from the first minute (before, every file
+on it belonged to root and writing gave "permission denied" until you replugged
+the stick). The live system reads its programs from the stick, so the stick
+**cannot be ejected or unplugged** while the system runs from it. Files answers
+"FreeLFS is running from this stick. Shut down first, or boot with 'Load into
+RAM'." To use the stick like any other drive, load the system into RAM, see the
+next section.
+
+### Load into RAM
+
+With **Load into RAM** the system copies its image (`root.sfs`, about 0.9 GB)
+into memory at boot and lets go of the stick completely. Then the stick is an
+ordinary removable drive: you can eject it, take it out, plug it in again.
+
+| How | When |
+|---|---|
+| Automatic | The computer has at least 4 GB of RAM more than the image is big (about 5 GB or more). A progress line (`flinitrd: Load into RAM: 45% ...`) shows while it copies, 10 to 40 seconds depending on the stick |
+| Boot menu entry **FreeLFS live (Load into RAM)** | Forces it. Needs the image plus 1 GB of RAM (2 GB computers and up); with less it says so and stays on the stick |
+| Kernel option `flive.toram=1` or `flive.toram=0` | Forces it or forbids it (also for the automatic rule) |
+
+The cost is the size of the image in RAM, about 0.9 GB. On a computer with 1 GB
+nothing changes: the automatic rule never loads there. A stick with a
+persistence image (`freelfs-persist.img`, see below) is not loaded
+automatically, because the image is your home folder on the stick;
+`flive.toram=1` or the menu entry still loads the system and then does not use
+the persistent home.
+
+`/run/live/toram` exists when the system was loaded into RAM.
+
 ## Start the computer from the stick
 
 1. Plug in the stick and turn the computer on.
@@ -116,7 +147,11 @@ FreeLFS's boot loader is called **flboot**. It shows a short menu:
 | Entry | When you see it |
 |---|---|
 | **FreeLFS live** | Always on the live stick. It starts after a 3 second countdown |
+| **FreeLFS live (Load into RAM)** | The live stick only. Copies the system into RAM and frees the stick (see above) |
 | **FreeLFS live (verbose: flive.debug)** | The same, with the boot messages printed on screen. Use it when something goes wrong |
+| **FreeLFS (Safe graphics, kernel ...)** | Starts with `nomodeset` (no GPU driver) |
+| **Firmware setup (BIOS)** | Round 21. Restarts into the firmware's setup screen. Shown when the firmware supports it (OsIndicationsSupported). For computers whose fast boot hides the F2/F12 keys |
+| **Other drives and systems** | Round 21. The firmware's own boot options (a USB stick, Windows, ...): pick one and the computer restarts into it (BootNext). Also other drives with an EFI program (`\EFI\BOOT\BOOTX64.EFI`, Windows' boot manager), which flboot starts directly |
 | Kernel entries | On an installed system: the newest kernel first, then the LTS kernel as "FreeLFS (LTS kernel ...)" |
 | **Start an earlier state** | Only when snapshots exist (installed systems) |
 
@@ -128,6 +163,11 @@ Keys:
 | Enter | Start the chosen entry |
 | Esc | Leave the earlier-states list |
 | Any key | Stops the countdown, so the menu waits for you |
+
+On an **installed** system the menu is shown for 5 seconds at every start (`timeout 5` in `flboot.conf`); press any key (Space is
+harmless) to keep it open, then choose **Firmware setup (BIOS)** or **Other drives and systems** to get to the BIOS or to a USB stick when
+the computer's fast boot swallows F2 and F12. A menu configured with `timeout 0` still opens when a key is pressed in its first second.
+From the running system, `efibootmgr` (package efibootmgr, round 21) shows and changes the firmware's boot entries.
 
 Starting an earlier state is explained in [09-troubleshooting.md](09-troubleshooting.md).
 

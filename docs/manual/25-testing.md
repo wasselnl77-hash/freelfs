@@ -304,3 +304,19 @@ fails when MORE than MAX pixels differ (leftovers, stale frames).
 | `wifi-modules` | the Wi-Fi modules (with the QCA9377 PCI id) and firmware files are in the image, lspci/lsusb/ip work for an ordinary user, flreport lists controllers. **Real Wi-Fi is not testable in QEMU** | yes |
 | `splash-style` | flat and legacy splash renders (corner colour #0d1110), `flsplash-set`, no "rc: step failed" in the boot log | yes |
 | `nomodeset` | the second twin: simpledrm card, flcomp says "firmware framebuffer", desktop, Files, software night light. **Not real NVIDIA hardware** | yes |
+
+## Round 21 suite: build/m21-*.sh
+
+All of them can fail; a run on the old (r20) ISO is the negative control.
+
+| Script | What it does | Can it fail? |
+|---|---|---|
+| `build/m21-features.sh TWIN.iso [OLD-TWIN.iso]` | boots FROM a virtual Ventoy stick (`build/m21/mkstick.py`: exFAT partition holding the ISO + FAT boot partition, written without root or a mount; `fsck.exfat` checks it). `stick-boot` (1 GB): the stick belongs to the live user, a file is written from the shell and through Files, eject in Files (real click) and `flmount eject/unmount` are refused with "FreeLFS is running from this stick...", apps open. `toram` (6 GB, automatic copy into RAM): stick released, eject works, apps open, replugged stick writable. `toram-off` (`flive.toram=0`). `toram-menu` (the boot menu entry, keys sent to flboot). `taskbar-tip`. `control`: the stick-boot checks on the old ISO | yes: 11 checks fail on the r20 ISO |
+| `build/m21-flboot.sh STICK.img` | flboot in real OVMF, text mode over serial (`build/m21/flboot-fw.py`): "Firmware setup (BIOS)" lands in OVMF's setup screen, "Other drives and systems" lists the firmware's boot options and a second disk, the chain entry starts the EFI program on that disk, a firmware option (BootNext) works | yes |
+| `build/m21-freebws.sh TWIN.iso [N]` | the "laptop clone" VM (4 GB, 1920x1080, virgl GPU via the host's Radeon, user networking) and a local identity provider (`build/m21/oidc-testsite.py`): N sign-in flows through the real window on dmabuf and on shm buffers, tabs shared and not, plus open+close of a tab; every flow must end with a page that paints | yes: 3 of 3 flows (GPU, tabs not shared) and the tab test fail on the r20 ISO |
+| `src/flcomp/tests/csd.sh` (`make check-csd`) | a GTK-like client (shadow margin, set_window_geometry): maximize, fullscreen, tiled states, move, resize | yes (tiled states were missing) |
+| `make -C src/flgm check` | adds a fake `/proc` with Flatpak sandboxes (`.flatpak-info`, cgroup scope, exported .desktop with `X-Flatpak=`) | yes |
+| `build/m21-all.sh REAL TWIN NOMODESET-TWIN OLD-TWIN` | every suite in a row with a PASS / FAIL / NOT RUN table | |
+
+The live-run driver got `--stick IMG` (boot from a USB stick image), `--bootkeys` (keys for the boot menu) and prints the monitor's error
+text for `@mon`. `build/51-qemu.sh --stick IMG` boots a stick image from an xHCI controller (the stick is `id=stickdev`).

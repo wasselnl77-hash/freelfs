@@ -218,13 +218,33 @@ static int earlier_state(const struct config *c)
 	}
 }
 
+/* "Other drives and systems": the firmware's boot options and the other drives. Returns the entry or -1. */
+static int other_page(const struct config *c)
+{
+	struct page list = {"Other drives and systems", "Start something else on this computer",
+	                    "Up/Down: choose   Enter: start   Esc: back", NULL, {0}, 0};
+	int map[MAX_ENTRIES];
+	for (int i = 0; i < c->n; i++)
+		if (c->entries[i].kind >= K_BOOTNEXT && list.n < MAX_ENTRIES) {
+			map[list.n] = i;
+			list.rows[list.n++] = c->entries[i].title;
+		}
+	list.rows[list.n++] = "Back";
+	int sel = page_run(&list, 0, true);
+	return sel < 0 ? -1 : map[sel];
+}
+
 int menu_run(struct config *c)
 {
 	struct page main = {"FreeLFS", "Choose what to start", "", NULL, {0}, 0};
-	int map[MAX_ENTRIES + 1], nsnap = 0;
+	int map[MAX_ENTRIES + 2], nsnap = 0, nother = 0;
 	for (int i = 0; i < c->n; i++) {
 		if (c->entries[i].snapshot) {
 			nsnap++;
+			continue;
+		}
+		if (c->entries[i].kind >= K_BOOTNEXT) {
+			nother++;
 			continue;
 		}
 		map[main.n] = i;
@@ -234,9 +254,24 @@ int menu_run(struct config *c)
 		map[main.n] = -1;
 		main.rows[main.n++] = "Start an earlier state";
 	}
+	if (nother) {
+		map[main.n] = -2;
+		main.rows[main.n++] = "Other drives and systems";
+	}
 	int sel = find_default(c, map, main.n), left = c->timeout;
-	if (left == 0 && map[sel] >= 0)
-		return map[sel];
+	if (left == 0 && map[sel] >= 0) {
+		/* a hidden menu: a key held down or pressed in the first second still opens it */
+		EFI_INPUT_KEY k;
+		bool key = false;
+		for (int i = 0; i < 10 && !key; i++) {
+			key = !EFI_ERROR(ST->ConIn->ReadKeyStroke(ST->ConIn, &k));
+			if (!key)
+				BS->Stall(100000);
+		}
+		if (!key)
+			return map[sel];
+		left = -1;
+	}
 	graphics = gfx_init();
 	scale = !graphics ? 1 : gfx_height() >= 1400 ? 3 : gfx_height() >= 900 ? 2 : 1;
 	ST->ConOut->EnableCursor(ST->ConOut, false);
@@ -268,7 +303,7 @@ int menu_run(struct config *c)
 		if (move(key, &sel, main.n))
 			continue;
 		if (key.UnicodeChar == '\r' || key.UnicodeChar == '\n')
-			result = map[sel] >= 0 ? map[sel] : earlier_state(c);
+			result = map[sel] >= 0 ? map[sel] : map[sel] == -1 ? earlier_state(c) : other_page(c);
 	}
 	BS->SetTimer(timer, TimerCancel, 0);
 	BS->CloseEvent(timer);

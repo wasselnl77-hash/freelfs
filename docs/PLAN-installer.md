@@ -72,3 +72,19 @@ The user chose these on 2026-11-14. The installer is `src/flinstall`; today it h
   3. 🧠 Let your laptop from 2012 breathe for the first time in years
   4. 🐧 Brag on the internet that your whole desktop uses less than one Chrome tab
   5. 💤 Absolutely nothing. Free RAM is happy RAM (don't listen to those pirates who say differently!)
+
+## Taskbar previews (requested 2026-11-17)
+Hovering a taskbar entry shows a small window above the taskbar with:
+- a live thumbnail of the window (flcomp already holds a CPU copy of every window; add an fl_shell request so flpanel can get a scaled thumbnail)
+- the window title, and a small × in the corner to close that window
+- one row per window when an app has several
+- for apps playing media (MPRIS over D-Bus: Firefox, VLC, Spotify, flmusic, flvideo): ⏮ ⏯ ⏭ buttons plus the track title
+
+Round 21 only adds a plain title tooltip; the previews come in round 22.
+
+## Camera (requested 2026-11-17, round 22)
+- Kernel: UVC (uvcvideo) plus V4L2 for laptop front cameras, as modules in both kernels. For newer Intel laptops, IPU6/IPU7 MIPI cameras need libcamera (harder; check later).
+- PipeWire camera support (libcamera/v4l2 SPA plugin) and the xdg-desktop-portal Camera interface in flportal, so Firefox, Flatpak apps and video calls (Discord or Meet in the browser) can use it with a permission prompt.
+- A small FreeLFS camera app, "flcam": live view, take a photo, record video (GStreamer, already used by flmusic), saved to ~/Pictures and ~/Videos.
+- Privacy: a tray indicator while the camera is in use, and an off switch in Settings > Privacy.
+- Tests: QEMU with an emulated USB webcam if available (otherwise v4l2loopback as a fake camera).

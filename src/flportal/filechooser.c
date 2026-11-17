@@ -887,6 +887,16 @@ static void run_action(struct fc *f)
 
 /* ---- drawing ---------------------------------------------------------------------------------- */
 
+/* Give the keyboard to the list from inside a draw function. libflui drops a focus that no focusable widget claimed in the
+ * pass (the list registered itself earlier in the pass, and a press that took no focusable widget drops the focus too):
+ * say so the way widgets do (ui.c). Without this the keys died after a click in the sidebar or on a row. */
+static void focus_list(fl_ui *ui)
+{
+	ui->focus = ID_LIST;
+	ui->_focus_seen = 1;
+	ui->_press_taken = 1;
+}
+
 static void draw_toolbar(fl_ui *ui, struct fc *f, fl_rect tb)
 {
 	fl_canvas *cv = &ui->cv;
@@ -937,7 +947,7 @@ static void draw_toolbar(fl_ui *ui, struct fc *f, fl_rect tb)
 			snprintf(f->act_path, sizeof f->act_path, "%s", p);
 			f->act = A_NAV;
 		}
-		ui->focus = ID_LIST;
+		focus_list(ui);
 	}
 	if (can_new && fl_icon_button(ui, ID_NEW, fl_r(tb.x + tb.w - 8 - 32, y, 32, 32), FL_ICON_PLUS, 14, fl_th.text))
 		f->act = A_NEWDIR;
@@ -971,7 +981,7 @@ static void draw_sidebar(fl_ui *ui, struct fc *f, fl_rect sb)
 			if (res & FL_CLICK) {
 				snprintf(f->act_path, sizeof f->act_path, "%s", p->path);
 				f->act = A_NAV;
-				ui->focus = ID_LIST;
+				focus_list(ui);
 			}
 			y += 30;
 		}
@@ -1030,7 +1040,14 @@ static void draw_list(fl_ui *ui, struct fc *f, fl_rect g)
 	if (date_x < g.x + g.w)
 		fl_text_ex(cv, f->head, date_x, head.y + 7, fl_th.dim, "MODIFIED", -1, 40);
 
+	/* The list widget is the first one (it takes the keyboard focus, also when a press lands on a row: libflui drops
+	 * the focus of a press that no focusable widget took). A press makes it the active widget, and libflui gives no hover
+	 * to any other widget while one is active: the rows never saw a click, so a folder could neither be selected nor
+	 * opened, with the mouse (round 21: "I cannot open any folder"). The rows sit on top of the list: it lets go of
+	 * the press at once. */
 	int res = fl_widget(ui, ID_LIST, g, FL_FOCUSABLE | FL_NO_FOCUS_RING);
+	if (ui->active == ID_LIST)
+		ui->active = 0;
 	int content = f->n * ROW_H;
 	int mods = fl_app_mods(portal_app_get());
 	if ((res & FL_HOVER) && ui->wheel) {
@@ -1113,7 +1130,7 @@ static void draw_list(fl_ui *ui, struct fc *f, fl_rect g)
 			hit = i;
 			if (ui->press & FL_BTN_L) {
 				click_select(f, i, mods);
-				ui->focus = ID_LIST;
+				focus_list(ui);
 				if (ui->clicks >= 2 && !(mods & (FL_MOD_CTRL | FL_MOD_SHIFT))) {
 					f->act_idx = i;
 					f->act = A_ENTER_ROW;
@@ -1269,6 +1286,11 @@ static void draw(fl_ui *ui, void *ud)
 	fl_canvas *cv = &ui->cv;
 	if (!f->d.req)
 		return; /* answered; the window goes in a moment */
+	/* An input event can change what the window shows after the part that shows it was drawn (an action runs at the
+	 * end of the pass; the path bar and the list react in the pass itself). Without one more pass the window kept
+	 * the old picture until the next event: a double click on a folder "did nothing" and the folder opened one
+	 * click later (round 21: the Firefox upload dialog that could not open any folder). */
+	int had_input = ui->press || ui->release || ui->key || ui->text[0] || ui->wheel;
 	fl_rect c = fl_win_content(ui->win);
 	if (!f->inited) {
 		ui->focus = f->kind == FC_SAVE ? ID_NAME : ID_LIST;
@@ -1322,9 +1344,11 @@ static void draw(fl_ui *ui, void *ud)
 		ui->text[0] = 0;
 		ui->press = ui->release = 0;
 	}
-	if (f->act && f->d.req)
+	if (f->act && f->d.req) {
 		run_action(f);
-	if (f->d.req && (((f->ov != OV_NONE) != modal) || f->msg[0]))
+		had_input = 1;
+	}
+	if (f->d.req && (had_input || ((f->ov != OV_NONE) != modal) || f->msg[0]))
 		fl_win_redraw(ui->win);
 }
 

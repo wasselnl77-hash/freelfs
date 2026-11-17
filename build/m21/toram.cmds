@@ -1,0 +1,53 @@
+# Round 21, "Load into RAM": the system is booted from a Ventoy-style stick and copies root.sfs into RAM first
+# (automatic with 6 GB: image + 4 GB; or the boot menu entry / flive.toram=1 with less). Then the stick is a normal
+# removable drive: eject works, apps still open, and a stick plugged in again is an ordinary writable drive.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@ok the system was loaded into RAM (flinitrd marks it) :: test -e /run/live/toram
+@ok flinitrd let the stick go: nothing of it is mounted by the live system :: ! grep -q ' /run/live/\(src\|iso\)' /proc/mounts
+@ok no loop device is backed by a file on the stick; the system runs from the RAM copy :: ! grep -l freelfs-live /sys/block/loop*/loop/backing_file | grep -q . && grep -q '^/run/live/ram/root.sfs' /sys/block/loop*/loop/backing_file
+@ok the RAM copy is a tmpfs :: grep -q '^tmpfs /run/live/ram tmpfs' /proc/mounts
+@waitok 40 flmount mounted the stick as an ordinary drive :: grep -q '^/dev/sda1 /drives/Ventoy exfat' /proc/mounts
+@ok it is a removable drive now, not "boot" :: su -s /bin/sh tester -c 'flmount list' | awk -F'\t' '$1=="/dev/sda1" && $2=="Ventoy" && $6=="removable"' | grep -q .
+@ok the disk is not read-only :: test "$(cat /sys/block/sda/ro)" = 0 && test "$(cat /sys/block/sda/sda1/ro)" = 0
+@ok tester writes a file to it :: su -s /bin/sh tester -c 'echo ram-ok > /drives/Ventoy/ram.txt' && grep -q ram-ok /drives/Ventoy/ram.txt
+su -s /bin/sh tester -c 'cd /drives/Ventoy; set -a; . /tmp/sessenv; setsid flfiles /drives/Ventoy </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@shot @OUT@/tr-1-files.ppm
+@mouse 321 490
+@click
+@waitok 40 eject worked: the stick is gone, nothing mounted :: ! grep -q ' /drives/Ventoy ' /proc/mounts && ! test -e /sys/block/sda
+@wait 3
+@shot @OUT@/tr-2-after-eject.ppm
+@shotdiff @OUT@/tr-1-files.ppm @OUT@/tr-2-after-eject.ppm 3000 150 40 1010 600
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/tr-3-gm.ppm
+@shotdiff @OUT@/tr-2-after-eject.ppm @OUT@/tr-3-gm.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/tr-3-gm.ppm 150
+@ok General Manager runs after the eject :: pgrep -u tester -x general-manager
+@ok close it :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager
+@key meta_l
+@wait 2
+@type settings
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/tr-4-settings.ppm
+@shotcolors @OUT@/tr-4-settings.ppm 100
+@ok the system still reads its programs (a cold one) :: su -s /bin/sh tester -c 'flview --help' > /dev/null 2>&1; ls /usr/share/doc > /dev/null && cat /usr/share/zoneinfo/Europe/Berlin > /dev/null
+@mon device_del stickdev
+@wait 3
+@mon drive_add 0 if=none,id=stick2,file=@OUT@/new-stick.img,format=raw
+@mon device_add usb-storage,drive=stick2,id=stick2dev,bus=xstick.0
+@wait 5
+@waitok 60 the stick is plugged in again and mounted as an ordinary drive :: grep -q '^/dev/sd[a-z]1 /drives/Ventoy exfat' /proc/mounts
+@ok what was written before is there :: grep -q ram-ok /drives/Ventoy/ram.txt
+@ok and it is writable for tester again :: su -s /bin/sh tester -c 'echo again > /drives/Ventoy/again.txt' && grep -q again /drives/Ventoy/again.txt
+@ok the mount is flmount's, with the live user as owner :: grep '^/dev/sd[a-z]1 /drives/Ventoy' /proc/mounts | grep -q 'uid=1000'
+grep drives /proc/mounts; dmesg | tail -n 12 | cut -c1-140

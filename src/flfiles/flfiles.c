@@ -71,7 +71,7 @@ struct drive {
 	char dev[64], label[64], fstype[24], path[PATH_MAX];
 	unsigned long long size;
 	int mounted, removable, system;
-	int boot;	/* the live system runs from this stick: no eject button */
+	int boot;	/* the live system runs from this stick: Eject answers with the reason */
 };
 
 /* a file job's item: paths are heap strings; action is set by the clash dialog */
@@ -2049,6 +2049,8 @@ static void hlp_free(struct hlp *h)
 
 static void show_msg(struct F *f, const char *title, const char *text)
 {
+	if (!strncmp(text, "flmount: ", 9))
+		text += 9;	/* the helper's own name is no use to the person reading the message */
 	snprintf(f->dlg_title, sizeof f->dlg_title, "%s", title);
 	snprintf(f->dlg_text, sizeof f->dlg_text, "%s", text);
 	f->ov = OV_MSG;
@@ -3149,7 +3151,9 @@ static void draw_props(fl_ui *ui, struct F *f)
 		f->ov = OV_NONE;
 }
 
-/* a message: a title and up to four lines */
+static int fit_prefix(fl_font *fnt, const char *s, int w);
+
+/* a message: a title and up to five lines; a long line is wrapped at spaces, not cut (the boot stick's refusal is a sentence) */
 static void draw_msg(fl_ui *ui, struct F *f)
 {
 	fl_canvas *cv = &ui->cv;
@@ -3162,13 +3166,29 @@ static void draw_msg(fl_ui *ui, struct F *f)
 	y += 32;
 	snprintf(buf, sizeof buf, "%s", f->dlg_text);
 	char *s = buf;
-	for (int ln = 0; ln < 4 && s && *s; ln++) {
+	for (int ln = 0; ln < 5 && s && *s; ) {
 		char *e = strchr(s, '\n');
 		if (e)
 			*e = 0;
-		fl_text_fit(ui->f_reg, s, w, fit, sizeof fit);
-		fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, fit);
-		y += 22;
+		while (*s && ln < 5) {	/* wrap this paragraph */
+			int n = fit_prefix(ui->f_reg, s, w), len = (int)strlen(s);
+			if (n < len) {
+				int k = n;
+				while (k > 0 && s[k] != ' ')
+					k--;
+				if (k > 0)
+					n = k;
+			}
+			char piece[sizeof f->dlg_text];
+			snprintf(piece, sizeof piece, "%.*s", n, s);
+			fl_text_fit(ui->f_reg, piece, w, fit, sizeof fit);
+			fl_text_in(cv, ui->f_reg, fl_r(x, y, w, 20), FL_LEFT, 0, fl_th.text, fit);
+			y += 22;
+			ln++;
+			s += n;
+			while (*s == ' ')
+				s++;
+		}
 		s = e ? e + 1 : NULL;
 	}
 	int by = box.y + box.h - 24 - 34;
@@ -3469,7 +3489,7 @@ static void draw_sidebar(fl_ui *ui, struct F *f, fl_rect sb)
 	y += fl_font_height(f->head) + 8;
 	for (int i = 0; i < f->ndrv; i++) {
 		struct drive *d = &f->drv[i];
-		int eject = d->removable && d->dev[0] && !d->boot;
+		int eject = d->removable && d->dev[0]; /* the boot stick too: flmount refuses with the reason */
 		fl_rect r = fl_r(sb.x, y, sb.w - 1 - (eject ? 30 : 0), 40);
 		int res = fl_widget(ui, ID_DRIVE + (uint32_t)i, r, 0);
 		int active = d->mounted && !strcmp(d->path, f->cwd);

@@ -351,3 +351,10 @@ Outputs and night light (round 17, output.c, nightlight.c, drm.c)
   nightlight_ prefix). Fades in 2 s; auto is checked every 30 s. Colour factors go to the CRTC
   gamma table; outputs whose CRTC has none (virtio-gpu) get a per-pixel table in the copy to the
   screen. The log says "night light on (3000K, ...)".
+
+Client-side decorations (round 21): a half-screen window (Super+Left/Right, drag to an edge) is configured with the tiled-left/right
+and tiled-top/bottom states (xdg_toplevel version 2), so GTK programs such as Firefox draw it without shadow and with square corners.
+tests/csdclient.c is a GTK-like test client (shadow margin, set_window_geometry, set_maximized, fullscreen, move and resize with a
+pointer serial); tests/csd.sh (`make check-csd`) checks the configure sizes and states and where the geometry (not the shadow) ends
+up on the screen. A Firefox that "cannot maximize" on the laptop was NOT reproduced with it: maximize, unmaximize, fullscreen, move
+and resize all work for the test client; the cause on the laptop is not known (a WAYLAND_DEBUG=1 log of Firefox would show it).

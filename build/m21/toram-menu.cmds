@@ -1,0 +1,9 @@
+# The boot menu entry "FreeLFS live (Load into RAM)" (flive.toram=1) at 3 GB, where the automatic rule says no
+# (3 GB < image + 4 GB). Keys are sent to flboot with --bootkeys; the entry is the second row.
+@desktop
+@ok the entry's option is on the kernel command line :: grep -q 'flive.toram=1' /proc/cmdline
+@ok the system was loaded into RAM :: test -e /run/live/toram
+@ok the stick is free :: ! grep -q ' /run/live/\(src\|iso\)' /proc/mounts
+@waitok 40 the stick is an ordinary drive under /drives :: grep -q '^/dev/sda1 /drives/Ventoy exfat' /proc/mounts
+@ok tester can write to it :: su -s /bin/sh tester -c 'echo menu-ok > /drives/Ventoy/menu.txt' && grep -q menu-ok /drives/Ventoy/menu.txt
+@ok the stick can be ejected :: su -s /bin/sh tester -c 'flmount eject /dev/sda1' && ! test -e /sys/block/sda

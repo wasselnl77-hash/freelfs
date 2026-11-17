@@ -392,3 +392,37 @@ The r19 laptop test showed a white page or a frozen window after a Google sign-i
 - CAPTCHAs are not bypassed: Cloudflare's challenge stays allowed by the ad blocker (as before) and nothing more.
 - Test hook: `watchdog_test=1` in the config (or `FREEBWS_WATCHDOG_TEST=1`) stops counting frames 6 s after the start; tests in
   `build/m20-features.sh freebws-watchdog` use it with a local server that stalls for ever.
+
+## 18. Round 21: the real cause of the login freeze
+
+**Reproduced in a "laptop clone" VM and fixed.** The VM (`build/m21-freebws.sh`) has 4 GB (so tabs do not share a web process, as on the
+7 GB laptop), 1920x1080 and a virgl GPU through the host's Radeon (virtio-vga-gl with egl-headless), so FreeBWS runs on **dmabuf**
+buffers like on the laptop (the log's first line says `dmabuf buffers, share_process=0`; flcomp says `dmabuf through the GPU`). claude.ai
+and accounts.google.com loaded fine there, so the bug is not in loading. A login flow written for the test (no Google account: a
+tiny Python identity provider and client site, popup with `window.open`, cross-host redirects, `postMessage` to `window.opener`,
+`window.close()`, then more redirects to a heavy page) froze **every time** on the GPU path with separate web processes, never on the
+shm path:
+
+- the popup opened, the chooser was shown, the code went to the opener, the opener navigated through the redirect chain and the last
+  page **loaded** (every stage reached the test server), the popup closed, FreeBWS selected the opener again -- and the page never
+  painted: its JavaScript timers ran, `requestAnimationFrame` stood still at frame 2, `document.visibilityState` said "visible", and no
+  frame ever reached `export_dmabuf` again. The window showed the popup's last frame ("Signed in, closing...") under the opener's address.
+- **The cause is in wpebackend-fdo 1.16.1**, not in FreeBWS's tab handling. Its `zwp_linux_dmabuf_v1.get_surface_feedback` handler was an
+  empty function ("we don't support per surface feedback"), so the new object id of the request never became an object. Every web view
+  asks for one per surface. When a view is closed the web process sends `zwp_linux_dmabuf_feedback_v1.destroy` for it; the server did not
+  know that object and answered `wl_display.error "invalid object 25"` (`WAYLAND_DEBUG=server` shows it right after `wl_surface#20.destroy()`),
+  which ends the web process's **whole Wayland connection**. Every other view in that process stops painting (JavaScript goes on).
+  A popup related to its opener shares the opener's web process, so closing the popup killed the opener's rendering. The same happens
+  when a tab closes while another tab shares its web process (the 1 GB mode, where all tabs share one), and it never happens with shm
+  buffers, which use no dmabuf feedback.
+- Not the cause: tab selection order, activity states (the page said visible), destroying the popup's view late or detaching its last
+  buffer first (tried: the stall only moved to the moment the view was destroyed).
+- **The fix** is recipe wpebackend-fdo release 2 with `wpebackend-fdo-1.16.1-surface-feedback.patch`: `get_surface_feedback` creates the
+  feedback object like `get_default_feedback`. FreeBWS 20 relates popups to their opener again in every mode (the r20 exception for shared
+  web processes was a workaround for this bug; `FREEBWS_POPUP_UNRELATE=1` restores it) and logs, with `FREEBWS_DEBUG=1`, the first frames
+  after a tab is shown and how many frames each tab dropped while hidden.
+- Also seen: a FreeBWS killed with SIGTERM leaves its web and network processes behind (they keep running and heartbeating); a normal
+  quit ends them.
+- Test: `build/m21-freebws.sh TWIN.iso [N]` (see the header of the script). On the r20 ISO it fails in the GPU mode (3 of 3 flows, and open+close
+  of a tab); with release 2 the table must show all flows ok. **Not verified on the real laptop** (a real Radeon, DCC buffers, a real
+  Google): the reproduction is a faithful copy of the mechanism (same buffers path, same popup chain, same wayland error), not of the machine.

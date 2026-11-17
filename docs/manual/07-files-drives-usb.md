@@ -94,8 +94,12 @@ an ejected stick cannot leave them with a folder that is gone. A save dialog who
 If you pull a stick without ejecting it, the system cleans up the mount and forgets
 it. Files you were writing may be lost. Always eject first.
 
-The live system's own boot stick is special. Eject does not power it off, because
-the live system runs from it.
+The live system's own boot stick is special. It shows as **FreeLFS boot stick** in Files. You can
+save files on it (it is mounted for the live user), but Eject and unmount are **refused** with
+"FreeLFS is running from this stick. Shut down first, or boot with 'Load into RAM'.", because the live
+system reads its programs from it. Files shows that sentence in the message box. If you boot with **Load into RAM**
+(boot menu entry, automatic with about 5 GB of RAM or more, see [02-getting-started.md](02-getting-started.md)) the stick is
+an ordinary drive: eject works, and a stick plugged in again is mounted like any other.
 
 ### Mounting by hand
 
@@ -232,14 +236,17 @@ you shut down.
   it. Videos decodes in software by default since round 18.
 - **Shutdown** also failed on the laptop in round 17. See [09-troubleshooting.md](09-troubleshooting.md).
 - No NTFS drives.
-- **A stick you booted from (Ventoy).** A Ventoy boot maps the ISO with device-mapper over the stick, and the running system
-  reads its programs through that mapping. Ejecting the stick then takes the system's own files away: apps that were not open yet
-  fail ("input/output error"), Files shows errors, and only replugging helps. Since round 20 `flmount` sees the device-mapper
-  holder, lists that stick as "boot" (Files shows no eject button) and refuses to eject it; shut down instead. This is the most
-  likely cause of the r19 laptop bug; it is inferred from the code and not proven on the laptop.
+- **A stick you booted from (Ventoy), round 21.** The live system runs from the ISO file on the stick (`root.sfs` is
+  loop-mounted from it), so ejecting or unplugging breaks every file that is not cached yet: apps do not open, Files shows
+  input/output errors. This was the r19 and r20 laptop bug, reproduced in QEMU with a virtual Ventoy stick (exFAT partition with
+  the ISO, booted from it): the stick's files all belonged to root ("permission denied" for the user, since exFAT and FAT fix
+  the owner at the first mount, and flinitrd mounted without one), and Eject was offered. Now flinitrd mounts exFAT and FAT
+  with `uid=1000,gid=98,fmask=0133,dmask=0022` (the live user, group seat), flmount lists the stick as "FreeLFS boot stick" and
+  refuses eject, unmount and remount with the message above, and Files shows the message. **Load into RAM** frees the stick.
+  Not verified on the laptop. A Ventoy stick whose data partition is ext4 keeps its on-disk owners (root's files stay root's).
 - A drive that answers "input/output error" right after plugging in is mounted again (up to three times); a folder that gives
   that error in Files makes Files ask `flmount remount` for the drive.
-- No drag and drop from Files onto other programs, and none from the desktop.
+- No drag and drop from Files onto other programs, and none from the desktop (round 21 did not get to it, see [28-roadmap.md](28-roadmap.md)).
 - Trash on a stick is not verified.
 - Desktop icons do not have "Open with" or "Properties" yet.
 
