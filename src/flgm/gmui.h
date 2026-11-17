@@ -60,7 +60,8 @@ struct perf_entry {
 struct gm {
 	fl_app *app;
 	fl_win *win;
-	fl_timer *tick, *quick;
+	fl_timer *tick, *quick, *boot;
+	int ready;             /* the machine data is loaded; the window says so until then */
 	struct fonts f;
 	struct sys sys;
 	struct procs ps;

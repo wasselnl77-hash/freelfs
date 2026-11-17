@@ -1,6 +1,6 @@
 # /etc/profile -- login shell setup for every user
 
-PATH=/usr/local/bin:/usr/bin
+PATH=/usr/local/bin:/usr/bin:/usr/sbin
 [ "$(id -u)" -eq 0 ] && PATH=/usr/local/sbin:/usr/sbin:$PATH
 export PATH
 

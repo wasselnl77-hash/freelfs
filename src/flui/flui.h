@@ -188,6 +188,8 @@ enum { FL_MOD_SHIFT = 1, FL_MOD_CTRL = 2, FL_MOD_ALT = 4, FL_MOD_SUPER = 8 };
 enum { FL_BTN_L = 1, FL_BTN_R = 2, FL_BTN_M = 4 };
 enum { FL_CURSOR_ARROW, FL_CURSOR_IBEAM };
 
+#define FL_SB_MAX 16
+
 typedef struct fl_ui {
 	fl_canvas cv;
 	fl_win *win;
@@ -207,6 +209,12 @@ typedef struct fl_ui {
 	uint32_t _first_focus, _last_focus, _prev_focus, _edit_id;
 	int _focus_next, _focus_prev, _repass, _cur, _sel, _scroll, _focus_seen, _press_taken;
 	uint32_t _wheel_taken;
+	/* scrollbars: the tracks drawn in this frame and in the last one. A press on a track is the
+	 * bar's even when a list or text area around it took the same area (see fl_scrollbar) */
+	fl_rect _sb_now[FL_SB_MAX], _sb_last[FL_SB_MAX];
+	int _nsb_now, _nsb_last;
+	uint32_t _sb_id;          /* the bar being dragged, while _sb_on */
+	int _sb_on, _sb_grab;     /* _sb_grab: px from the thumb's top to the pointer, -1 for a page press */
 } fl_ui;
 
 typedef struct {

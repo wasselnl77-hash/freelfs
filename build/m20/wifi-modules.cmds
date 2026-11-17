@@ -1,0 +1,17 @@
+# Wi-Fi support is in the image: the kernel modules and the firmware files (round 20: an Acer's QCA9377 had no driver).
+# REAL WI-FI IS NOT TESTED HERE: QEMU has no such card. This proves the files are in the image and that the tools exist
+# for a bug report (lspci, lsusb, ip as an ordinary user); whether a card works needs the laptop.
+@desktop
+@ok the Atheros modules exist :: for m in ath10k_core ath10k_pci ath10k_sdio ath10k_usb ath9k ath9k_htc ath11k_pci ath12k; do modinfo -n $m > /dev/null || { echo missing $m; exit 1; }; done
+@ok the Realtek, Intel, MediaTek and Broadcom modules exist :: for m in rtw88_pci rtw89_pci rtl8xxxu rtl8192ce rtl8723be iwlwifi iwlmvm mt7921e mt76x2e brcmfmac; do modinfo -n $m > /dev/null || { echo missing $m; exit 1; }; done
+@ok ath10k_pci claims the QCA9377 PCI id (168c:0042) and the QCA6174 :: modinfo -F alias ath10k_pci | grep -qi 'v0000168Cd00000042' && modinfo -F alias ath10k_pci | grep -qi 'v0000168Cd0000003E'
+@ok the firmware for QCA9377 and QCA6174 is there :: test -s /usr/lib/firmware/ath10k/QCA9377/hw1.0/firmware-6.bin && test -s /usr/lib/firmware/ath10k/QCA6174/hw3.0/firmware-6.bin && test -s /usr/lib/firmware/ath10k/QCA6174/hw3.0/board-2.bin
+@ok ath9k_htc, ath11k, ath12k, brcm, rtlwifi, rtw88, rtw89, mediatek and iwlwifi firmware is there :: test -s /usr/lib/firmware/ath9k_htc/htc_9271-1.4.0.fw && ls /usr/lib/firmware/ath11k/WCN6855 > /dev/null && ls /usr/lib/firmware/ath12k/WCN7850 > /dev/null && ls /usr/lib/firmware/brcm | grep -q brcmfmac && ls /usr/lib/firmware/rtlwifi | grep -q rtl && ls /usr/lib/firmware/rtw88 | grep -q fw && ls /usr/lib/firmware/rtw89 | grep -q fw && ls /usr/lib/firmware/mediatek | grep -q mt79 && ls /usr/lib/firmware/intel/iwlwifi | grep -q ucode
+@ok the phone-only firmware was pruned (size) :: ! test -e /usr/lib/firmware/ath10k/WCN3990 && ! test -e /usr/lib/firmware/ath11k/IPQ8074
+@ok the firmware tree size is printed :: du -sm /usr/lib/firmware | cat
+@ok an ordinary user has lspci :: su -s /bin/sh tester -c 'lspci -nn' | grep -q .
+@ok an ordinary user has lsusb :: su -s /bin/sh tester -c 'lsusb' | grep -q .
+@ok an ordinary user has ip, in the PATH of a login shell :: su - tester -c 'ip -br link' | grep -q lo
+@ok lspci knows names (pci.ids) :: su -s /bin/sh tester -c 'lspci' | grep -qi -E 'vga|bridge|ethernet|host'
+@ok flreport's network part lists the controllers and the interfaces :: su -s /bin/sh tester -c 'export XDG_RUNTIME_DIR=/run/user/1000 HOME=/home/tester; flreport -q -o /tmp > /tmp/fr.out 2>&1; tar xzOf "$(tail -n 1 /tmp/fr.out)" --wildcards "*/net.txt"' | grep -q 'network controllers (PCI class' 
+@ok ... with the QEMU NIC and its driver :: su -s /bin/sh tester -c 'tar xzOf "$(tail -n 1 /tmp/fr.out)" --wildcards "*/net.txt"' | grep -E '^0000:.*class=0x0200' | grep -q 'driver='

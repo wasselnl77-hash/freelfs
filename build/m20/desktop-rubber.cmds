@@ -1,0 +1,27 @@
+# The r19/Acer bug: the rubber-band selection on the desktop left its green outline behind, frame after frame,
+# from bottom-left towards top-right. Cause found in flpanel/deskicons.c (the buffer was "cleared" by blending a
+# colour of alpha 1 over the old picture). Test: drag rectangles across the desktop through the real pointer; while the
+# button is down the band must be visible (pixels), and after the release and a click on an empty spot the screen
+# must be what it was before (the clock and the panel are left out). The old build shows the nest of outlines mid-drag
+# (picture docs/m7/m20-rubber-r19-middrag.png): the @shotsame inside the band fails there.
+@desktop
+@wait 4
+@shot @OUT@/rb-0-clean.ppm
+@drag 80 720 1100 150 @OUT@/rb-1-band.ppm
+@wait 2
+@shotdiff @OUT@/rb-0-clean.ppm @OUT@/rb-1-band.ppm 400
+# the inside of the band, near where the drag started (the old build drew a nest of outlines there): as the clean desktop
+@shotsame @OUT@/rb-0-clean.ppm @OUT@/rb-1-band.ppm 60 100 460 400 700
+@drag 1150 120 150 650 @OUT@/rb-2-band.ppm
+@wait 2
+@shotdiff @OUT@/rb-0-clean.ppm @OUT@/rb-2-band.ppm 400
+@shotsame @OUT@/rb-0-clean.ppm @OUT@/rb-2-band.ppm 60 850 150 1100 330
+@drag 300 300 900 600 @OUT@/rb-3-band.ppm
+@wait 2
+@mouse 700 450
+@click
+@wait 3
+@mouse 700 300
+@wait 2
+@shot @OUT@/rb-4-after.ppm
+@shotsame @OUT@/rb-0-clean.ppm @OUT@/rb-4-after.ppm 300 0 0 1280 700

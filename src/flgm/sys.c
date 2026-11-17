@@ -464,6 +464,7 @@ void sys_init(struct sys *s)
 	s->ncpu = cpus > 0 ? (cpus > MAXCPU ? MAXCPU : cpus) : 1;
 	cpu_static(s);
 	gpu_scan(s);
+	s->live = access(LIVE_MARK, F_OK) == 0;
 }
 
 static int skip_disk(const char *n)
@@ -616,7 +617,9 @@ static void sample_mem(struct sys *s)
 		{"MemTotal:", offsetof(struct sys, mem_total)}, {"MemFree:", offsetof(struct sys, mem_free)},
 		{"MemAvailable:", offsetof(struct sys, mem_avail)}, {"Buffers:", offsetof(struct sys, mem_buffers)},
 		{"Cached:", offsetof(struct sys, mem_cached)}, {"Slab:", offsetof(struct sys, mem_slab)},
-		{"Shmem:", offsetof(struct sys, mem_shmem)}, {"SwapTotal:", offsetof(struct sys, swap_total)},
+		{"Shmem:", offsetof(struct sys, mem_shmem)}, {"SUnreclaim:", offsetof(struct sys, mem_unrec)},
+		{"PageTables:", offsetof(struct sys, mem_pt)}, {"KernelStack:", offsetof(struct sys, mem_kstack)},
+		{"SwapTotal:", offsetof(struct sys, swap_total)},
 		{"SwapFree:", offsetof(struct sys, swap_free)}, {"Committed_AS:", offsetof(struct sys, commit)},
 		{"CommitLimit:", offsetof(struct sys, commit_limit)},
 	};
@@ -756,7 +759,7 @@ void sys_sample(struct sys *s)
 	if (slurp(PROC_DIR "/uptime", b, sizeof b) > 0)
 		s->uptime = atof(b);
 	int np = 0;
-	DIR *d = opendir("/proc");
+	DIR *d = opendir(PROC_DIR);
 	if (d) {
 		struct dirent *e;
 		while ((e = readdir(d)))
@@ -766,4 +769,36 @@ void sys_sample(struct sys *s)
 	}
 	s->nproc = np;
 	s->primed = 1;
+}
+
+/* ---- memory in use, split ---------------------------------------------------------------- */
+
+/* "In use" is MemTotal minus MemAvailable. Its parts: the programs' own memory (the anonymous
+ * PSS summed over the processes, apps_anon_kb), shared memory and tmpfs (Shmem: a live system's
+ * files and what is installed onto it), GPU memory kept in system RAM (GTT, when the driver
+ * reports it; taken out of Shmem so it is not counted twice), unreclaimable kernel memory (slab,
+ * page tables, kernel stacks). Other is what is left, so the parts always add up to used. Each
+ * part is capped by what is still left, so a number read a moment apart cannot push the sum past
+ * used. */
+void mem_split(struct memsplit *m, const struct sys *s, u64 apps_anon_kb)
+{
+	u64 used = s->mem_total > s->mem_avail ? s->mem_total - s->mem_avail : 0;
+	u64 gfx = 0;
+	for (int i = 0; i < s->ngpu; i++)
+		gfx += s->gpu[i].gtt_used / 1024;
+	u64 gfx_in_shm = gfx < s->mem_shmem ? gfx : s->mem_shmem;
+	u64 left = used;
+
+	m->used = used;
+	m->apps = apps_anon_kb < left ? apps_anon_kb : left;
+	left -= m->apps;
+	u64 kern = s->mem_unrec + s->mem_pt + s->mem_kstack;
+	m->system = kern < left ? kern : left;
+	left -= m->system;
+	u64 files = s->mem_shmem - gfx_in_shm;
+	m->files = files < left ? files : left;
+	left -= m->files;
+	m->graphics = gfx < left ? gfx : left;
+	left -= m->graphics;
+	m->other = left;
 }

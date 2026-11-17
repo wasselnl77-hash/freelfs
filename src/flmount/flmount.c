@@ -12,6 +12,8 @@
  *                                    and btrfs the top directory is given to the caller when root owns it.
  *                                    The live boot stick is made writable and bound to /drives/LABEL.
  *   flmount unmount DEV              unmounts what is under /drives (the boot stick stays mounted for the system)
+ *   flmount remount DEV              unmounts (lazily) and mounts again, prints the mount point (Files, after an
+ *                                    input/output error)
  *   flmount eject DEV                unmounts every partition of the disk and powers the device off (not the
  *                                    boot stick: the live system runs from it)
  *   --internal                       (list, mount, unmount, eject) also internal disks; Files does not use it
@@ -66,6 +68,7 @@ struct part {
 	unsigned long long size;
 	int cls;
 	int usb;
+	int held;		/* the running system reads through this disk (a Ventoy boot: device-mapper over the stick) */
 };
 
 static int allow_internal;
@@ -243,6 +246,8 @@ static int name_ok(const char *n)
 	return 1;
 }
 
+static int disk_held(const char *disk);
+
 /* Fill P for the block device NAME; 0 when it is not something to offer (no partition, loop, ram ...). */
 static int describe(const char *name, struct part *p, const char *boot_dev)
 {
@@ -290,9 +295,52 @@ static int describe(const char *name, struct part *p, const char *boot_dev)
 	if (boot_dev && boot_dev[0] && !strcmp(dp, boot_dev))
 		p->cls = C_BOOT;
 	/* the boot stick's helper partitions (Ventoy's VTOYEFI, the ISO's FLLIVE) are not drives to browse */
+	if (p->cls == C_REMOVABLE && disk_held(p->disk))
+		p->held = 1;
 	if (p->cls == C_REMOVABLE && (!strcmp(p->label, "VTOYEFI") || !strcmp(p->label, "FLLIVE")))
 		p->cls = C_INTERNAL;
 	return 1;
+}
+
+/* Is anything (device-mapper, md, LUKS) stacked on this disk or one of its partitions? /sys/class/block/X/holders
+ * lists them. A Ventoy boot maps the ISO with device-mapper over the stick's own sectors, and the running
+ * system reads its programs through that mapping: taking the stick away freezes the desktop (apps that are not in
+ * memory yet fail with "input/output error"). The stick's data partition looks like any other removable drive. */
+static int has_holders(const char *name)
+{
+	char path[PATH_MAX];
+	snprintf(path, sizeof path, "/sys/class/block/%s/holders", name);
+	DIR *d = opendir(path);
+	struct dirent *e;
+	int r = 0;
+	while (d && (e = readdir(d)))
+		if (e->d_name[0] != '.')
+			r = 1;
+	if (d)
+		closedir(d);
+	return r;
+}
+
+static int disk_held(const char *disk)
+{
+	if (has_holders(disk))
+		return 1;
+	char path[PATH_MAX];
+	snprintf(path, sizeof path, "/sys/class/block/%s", disk);
+	DIR *d = opendir(path);
+	struct dirent *e;
+	int r = 0;
+	while (d && !r && (e = readdir(d))) {
+		char q[PATH_MAX];
+		if (e->d_name[0] == '.' || strncmp(e->d_name, disk, strlen(disk)))
+			continue;
+		snprintf(q, sizeof q, "/sys/class/block/%s/%s/partition", disk, e->d_name);
+		if (!access(q, F_OK) && has_holders(e->d_name))
+			r = 1;
+	}
+	if (d)
+		closedir(d);
+	return r;
 }
 
 static int enumerate(struct part *out, int max)
@@ -363,7 +411,7 @@ static int cmd_list(void)
 			if (*s == '\t' || *s == '\n' || *s == '\r')
 				*s = ' ';
 		printf("%s\t%s\t%s\t%llu\t%s\t%s\n", dev, lab, v[i].fs[0] ? v[i].fs : "-", v[i].size, mpp ? mpp : "-",
-		       class_name[v[i].cls]);
+		       v[i].held ? "boot" : class_name[v[i].cls]);	/* "boot": no eject button */
 	}
 	free(m);
 	free(v);
@@ -475,8 +523,19 @@ static void lock_mounts(void)
 		(void)!flock(lockfd, LOCK_EX);
 }
 
+/* the lock goes when the mounting is done: the hotplug process goes on to wait up to 70 s for a click on the notification,
+ * and with the lock held that long a stick plugged in again (or a mount asked for by Files) waited behind it: the r19
+ * laptop's "replug a second time and it works" */
+static void unlock_mounts(void)
+{
+	if (lockfd >= 0) {
+		close(lockfd);	/* closing releases the flock */
+		lockfd = -1;
+	}
+}
+
 /* 0: mounted now, 2: it was mounted already (MP says where), -1: failed */
-static int do_mount(const struct part *p, char *mp, size_t mpcap)
+static int do_mount_locked(const struct part *p, char *mp, size_t mpcap)
 {
 	lock_mounts();
 	char dev[80], cur[PATH_MAX];
@@ -541,12 +600,38 @@ static int do_mount(const struct part *p, char *mp, size_t mpcap)
 		flags |= MS_RDONLY;
 		snprintf(opts, sizeof opts, "uid=%u,gid=%u", (unsigned)owner_uid, (unsigned)owner_gid);
 	}
-	int rc = mount(dev, mp, p->fs, flags, opts);
-	if (rc < 0 && errno == EROFS) {	/* a write-protected medium: read only then */
-		rc = mount(dev, mp, p->fs, flags | MS_RDONLY, opts);
+	int rc = -1;
+	/* A stick that has only just been plugged in may mount and then answer the first reads with "input/output
+	 * error" (the r19 laptop: Files showed it until the stick was plugged in a second time). After the mount
+	 * the top directory is read; on EIO the mount is dropped and made again, up to three times. */
+	for (int attempt = 0; attempt < 3; attempt++) {
+		rc = mount(dev, mp, p->fs, flags, opts);
+		if (rc < 0 && errno == EROFS) {	/* a write-protected medium: read only then */
+			rc = mount(dev, mp, p->fs, flags | MS_RDONLY, opts);
+		}
+		if (rc < 0 && !strcmp(p->fs, "vfat") && errno == EINVAL)
+			rc = mount(dev, mp, p->fs, flags, "uid=0,quiet") == 0 ? 0 : -1;
+		if (rc < 0)
+			break;
+		DIR *pd = opendir(mp);
+		int bad = 0;
+		if (!pd) {
+			bad = errno == EIO;
+		} else {
+			errno = 0;
+			while (readdir(pd))
+				;
+			bad = errno == EIO;
+			closedir(pd);
+		}
+		if (!bad)
+			break;
+		err("%s: input/output error right after mounting (try %d of 3), mounting again", dev, attempt + 1);
+		umount2(mp, MNT_DETACH);
+		usleep(1000 * 1000);
+		rc = -1;
+		errno = EIO;
 	}
-	if (rc < 0 && !strcmp(p->fs, "vfat") && errno == EINVAL)
-		rc = mount(dev, mp, p->fs, flags, "uid=0,quiet") == 0 ? 0 : -1;
 	if (rc < 0) {
 		err("cannot mount %s on %s: %s", dev, mp, strerror(errno));
 		rmdir(mp);
@@ -558,6 +643,13 @@ static int do_mount(const struct part *p, char *mp, size_t mpcap)
 			(void)!chown(mp, owner_uid, owner_gid);	/* else the drive stays root's, readable */
 	}
 	return 0;
+}
+
+static int do_mount(const struct part *p, char *mp, size_t mpcap)
+{
+	int r = do_mount_locked(p, mp, mpcap);
+	unlock_mounts();
+	return r;
 }
 
 static int cmd_mount(const char *dev)
@@ -622,6 +714,31 @@ static int cmd_unmount(const char *dev)
 	return rc;
 }
 
+/* mount DEV again from scratch: what is left of its mount goes (lazily), then a fresh mount; prints the mount point */
+static void sweep_drives(void);
+
+static int cmd_remount(const char *dev)
+{
+	struct part *v = calloc(MAXP, sizeof *v);
+	int n = v ? enumerate(v, MAXP) : 0;
+	struct part *p = v ? find_part(v, n, dev) : NULL;
+	int rc = 1;
+	if (p && p->cls != C_BOOT) {
+		sync();
+		unmount_dev(dev, 1, NULL);
+		sweep_drives();
+		char mp[PATH_MAX];
+		if (do_mount(p, mp, sizeof mp) >= 0) {
+			printf("%s\n", mp);
+			rc = 0;
+		}
+	} else if (p) {
+		err("%s is the stick the live system runs from", dev);
+	}
+	free(v);
+	return rc;
+}
+
 static void write_file(const char *path, const char *val)
 {
 	int fd = open(path, O_WRONLY | O_CLOEXEC);
@@ -657,6 +774,11 @@ static int cmd_eject(const char *dev)
 		goto out;
 	if (p->cls == C_BOOT) {
 		err("%s is the stick the live system runs from; shut down instead", dev);
+		goto out;
+	}
+	if (p->held || disk_held(p->disk)) {
+		err("%s: the running system reads from this stick (a Ventoy boot); ejecting it would freeze the desktop. "
+		    "Shut down instead", dev);
 		goto out;
 	}
 	char disk[PATH_MAX];
@@ -943,7 +1065,7 @@ int main(int argc, char **argv)
 			verb = NULL, a = argc;
 	}
 	if (!verb) {
-		fputs("usage: flmount list | mount DEV | unmount DEV | eject DEV   (--internal: also internal disks)\n", stderr);
+		fputs("usage: flmount list | mount DEV | unmount DEV | remount DEV | eject DEV   (--internal: also internal disks)\n", stderr);
 		return 2;
 	}
 	int root_caller = getuid() == 0;
@@ -953,6 +1075,8 @@ int main(int argc, char **argv)
 		return cmd_mount(dev);
 	if (!strcmp(verb, "unmount") && dev)
 		return cmd_unmount(dev);
+	if (!strcmp(verb, "remount") && dev)
+		return cmd_remount(dev);
 	if (!strcmp(verb, "eject") && dev)
 		return cmd_eject(dev);
 	if (root_caller && !strcmp(verb, "--hotplug") && dev)
@@ -961,6 +1085,6 @@ int main(int argc, char **argv)
 		return cmd_auto();
 	if (root_caller && !strcmp(verb, "--gone") && dev)
 		return cmd_gone(dev);
-	fputs("usage: flmount list | mount DEV | unmount DEV | eject DEV   (--internal: also internal disks)\n", stderr);
+	fputs("usage: flmount list | mount DEV | unmount DEV | remount DEV | eject DEV   (--internal: also internal disks)\n", stderr);
 	return 2;
 }

@@ -27,14 +27,19 @@ fltheme: $(OBJS)
 	$(CC) $(CFLAGS) $(UI_CFLAGS) -c -o $@ $<
 
 # Contrast of every colour pair (WCAG), the keys of the presets, the file formats; no compositor needed
-check: fltheme tests/contrast
+check: fltheme tests/contrast tests/accent
 	./tests/contrast
+	rm -rf tests/.scratch && mkdir -p tests/.scratch && ./tests/accent tests/.scratch && rm -rf tests/.scratch
 	./tests/presets.sh
 
 # dark -> light -> dark, panel at the top, compact title bar, buttons at the left, in a headless
 # flcomp with the real panel; needs flcomp, flpanel and Xwayland (run it in the build chroot)
 check-switch: fltheme
 	python3 -I tests/switch.py
+
+# the custom accent field and user presets, with stubs for desktop.conf (no display needed)
+tests/accent: tests/accent.c presets.c fltheme.h
+	$(CC) $(CFLAGS) -I$(or $(FLUI),../flui) -o $@ $<
 
 tests/contrast: tests/contrast.c
 	$(CC) $(CFLAGS) -I$(or $(FLUI),../flui) -o $@ $< -lm
@@ -45,6 +50,6 @@ install: fltheme
 	install -Dm644 README $(DESTDIR)$(PREFIX)/share/doc/fltheme/README
 
 clean:
-	rm -f fltheme $(OBJS) tests/contrast
+	rm -f fltheme $(OBJS) tests/contrast tests/accent
 
 .PHONY: all check check-switch install clean

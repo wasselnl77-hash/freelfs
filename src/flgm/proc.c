@@ -73,6 +73,34 @@ static int generic_exec(const char *e)
 	return 0;
 }
 
+/* flatpak run [options] APPID [args]: the application id (org.mozilla.firefox). Flatpak programs
+ * are started by "flatpak", which is no program of its own, so the id is the key. */
+static int flatpak_id(const char *s, char *out, size_t cap)
+{
+	char tok[256];
+	int seen_run = 0;
+	for (;;) {
+		while (*s == ' ' || *s == '\t')
+			s++;
+		size_t n = 0;
+		while (*s && *s != ' ' && *s != '\t' && n + 1 < sizeof tok)
+			tok[n++] = *s++;
+		tok[n] = 0;
+		if (!n)
+			return -1;
+		if (!seen_run) {
+			seen_run = !strcmp(tok, "run");
+			continue;
+		}
+		if (tok[0] == '-' || tok[0] == '%' || tok[0] == '@')
+			continue;
+		if (!strchr(tok, '.'))
+			return -1;
+		snprintf(out, cap, "%s", tok);
+		return 0;
+	}
+}
+
 /* The program a .desktop Exec= line starts: skips env and VAR=value, quotes and the path. */
 static int exec_program(const char *line, char *out, size_t cap)
 {
@@ -98,6 +126,13 @@ static int exec_program(const char *line, char *out, size_t cap)
 			return -1;
 		if (!strcmp(tok, "env") || (strchr(tok, '=') && tok[0] != '/' && tok[0] != '%'))
 			continue;
+		if (!strcmp(tok, "flatpak")) {
+			char id[96];
+			if (flatpak_id(p, id, sizeof id) == 0) {
+				snprintf(out, cap, "flatpak:%s", id);
+				return 0;
+			}
+		}
 		snprintf(out, cap, "%s", base_of(tok));
 		return out[0] ? 0 : -1;
 	}
@@ -201,13 +236,22 @@ void apps_load(void)
 int apps_count(void) { return napps; }
 const struct appinfo *apps_get(int i) { return i >= 0 && i < napps ? &apps[i] : NULL; }
 
-static int app_match(const char *name, const char *comm)
+/* The app a process is: a program by its name, or a flatpak app by the application id in its
+ * command line ("flatpak run org.mozilla.firefox"; the sandboxed program itself is a child). */
+static int app_match(const struct proc *p)
 {
 	for (int i = 0; i < napps; i++) {
 		const char *x = apps[i].exec;
-		if (!strcmp(x, name) || !strcmp(x, comm))
+		if (!strncmp(x, "flatpak:", 8)) {
+			const char *id = x + 8, *at = p->cmd ? strstr(p->cmd, id) : NULL;
+			size_t l = strlen(id);
+			if (at && (at == p->cmd || at[-1] == ' ') && (at[l] == 0 || at[l] == ' '))
+				return i;
+			continue;
+		}
+		if (!strcmp(x, p->name) || !strcmp(x, p->comm))
 			return i;
-		if (strlen(comm) == 15 && !strncmp(x, comm, 15))
+		if (strlen(p->comm) == 15 && !strncmp(x, p->comm, 15))
 			return i;
 	}
 	return -1;
@@ -373,6 +417,7 @@ static int read_one(struct procs *ps, struct proc *p, int *fresh, double dt)
 		if (sscanf(buf, "%llu %llu %llu", &size, &res, &shr) == 3) {
 			long pg = sysconf(_SC_PAGESIZE) / 1024;
 			p->priv_kb = (res > shr ? res - shr : 0) * (u64)pg;
+			p->rss_kb = res * (u64)pg;
 		}
 	}
 	if (p->io_ok || *fresh) {
@@ -399,9 +444,83 @@ static int read_one(struct procs *ps, struct proc *p, int *fresh, double dt)
 	return 0;
 }
 
+/* Sets the command line of a process (n bytes of cb; 0: none, the kernel or an unreadable one)
+ * and what follows from it: the name, and the app it is. */
+static void apply_cmd(struct proc *p, char *cb, int n)
+{
+	for (int k = 0; k < n; k++)
+		if (!cb[k])
+			cb[k] = ' ';
+	while (n > 0 && cb[n - 1] == ' ')
+		cb[--n] = 0;
+	if (n > 0)
+		gm_clean_utf8(cb);
+	p->kernel = n <= 0 && (p->ppid == 2 || p->pid == 2);
+	free(p->cmd);
+	p->cmd = NULL;
+	if (n > 0)
+		p->cmd = strdup(cb);
+	else {
+		char br[40];
+		snprintf(br, sizeof br, p->kernel ? "[%s]" : "(%s)", p->comm);
+		p->cmd = strdup(br);
+	}
+	derive_name(p);
+	p->own_app = app_match(p);
+}
+
+/* The reads that wait on the reader (rdr.c): the command lines of new processes, and the memory
+ * of every process from smaps_rollup. PSS is asked for at most every 2 s, and a process's again
+ * only when its resident size moved by 1 MB or 10 s have passed: most scans read nothing. */
+static void resolve(struct procs *ps, double t)
+{
+	int round = t - ps->pss_round_t >= 2.0;
+	if (round)
+		ps->pss_round_t = t;
+	for (int i = 0; i < ps->n; i++) {
+		struct proc *p = &ps->p[i];
+		if (p->cmd_state == 1 && rdr_submit(RDR_CMDLINE, p->pid, p->start) == 0)
+			p->cmd_state = 2;
+		if (p->cmd_state == 2) {
+			char cb[1024] = "";
+			u64 n = 0, unused = 0;
+			int r = rdr_take(RDR_CMDLINE, p->pid, p->start, cb, sizeof cb, &n, &unused);
+			if (r != 0) { /* answered, or failed (the placeholder stays) */
+				p->cmd_state = 0;
+				if (r > 0)
+					apply_cmd(p, cb, (int)n);
+			}
+		}
+
+		u64 diff = p->rss_kb > p->pss_rss ? p->rss_kb - p->pss_rss : p->pss_rss - p->rss_kb;
+		int due = t - p->pss_t >= 10.0 || (round && diff >= 1024);
+		if (!p->pss_busy && due && rdr_submit(RDR_PSS, p->pid, p->start) == 0)
+			p->pss_busy = 1;
+		if (p->pss_busy) {
+			u64 pss = 0, anon = 0;
+			int r = rdr_take(RDR_PSS, p->pid, p->start, NULL, 0, &pss, &anon);
+			if (r != 0) { /* answered, or failed: the RSS numbers stand until the next try */
+				p->pss_busy = 0;
+				p->pss_t = t;
+				p->pss_rss = p->rss_kb;
+				if (r > 0) {
+					p->mem_kb = pss;
+					p->anon_kb = anon;
+					p->pss_ok = 1;
+				}
+			}
+		}
+		if (!p->pss_ok) { /* no smaps_rollup: the resident size, and its private part */
+			p->mem_kb = p->rss_kb;
+			p->anon_kb = p->priv_kb;
+		}
+	}
+}
+
 void procs_scan(struct procs *ps)
 {
 	double t = now_s();
+	rdr_pump();
 	double dt = ps->t_prev > 0 && t - ps->t_prev < 6 ? t - ps->t_prev : 0;
 	ps->t_prev = t;
 
@@ -468,28 +587,10 @@ void procs_scan(struct procs *ps)
 			continue;
 		}
 		if (fresh) {
-			char path[96], cb[1024];
-			snprintf(path, sizeof path, PROC_DIR "/%d/cmdline", p->pid);
-			int n = slurp(path, cb, sizeof cb);
-			if (n > 0) {
-				for (int k = 0; k < n; k++)
-					if (!cb[k])
-						cb[k] = ' ';
-				while (n > 0 && cb[n - 1] == ' ')
-					cb[--n] = 0;
-				gm_clean_utf8(cb);
-			}
-			p->kernel = n <= 0 && (p->ppid == 2 || p->pid == 2);
-			free(p->cmd);
-			if (n > 0)
-				p->cmd = strdup(cb);
-			else {
-				char br[40];
-				snprintf(br, sizeof br, p->kernel ? "[%s]" : "(%s)", p->comm);
-				p->cmd = strdup(br);
-			}
-			derive_name(p);
-			p->own_app = app_match(p->name, p->comm);
+			/* until the command line comes back from the reader (rdr.c): the comm in brackets */
+			char none[1] = "";
+			apply_cmd(p, none, 0);
+			p->cmd_state = 1;
 		}
 		nn++;
 	}
@@ -500,6 +601,7 @@ void procs_scan(struct procs *ps)
 	ps->p = nw;
 	ps->n = nn;
 	ps->cap = np + 1;
+	resolve(ps, t);
 
 	/* which app each process belongs to: the nearest ancestor (or itself) that is one */
 	for (int i = 0; i < ps->n; i++) {
@@ -518,4 +620,28 @@ void procs_scan(struct procs *ps)
 			q = procs_find(ps, q->ppid);
 		}
 	}
+}
+
+/* Sums for the memory view: the anonymous part of every process (what the programs use
+ * themselves), and the PSS of the processes of one app. */
+void procs_mem(const struct procs *ps, u64 *anon_kb, u64 *pss_kb)
+{
+	u64 a = 0, s = 0;
+	for (int i = 0; i < ps->n; i++) {
+		a += ps->p[i].anon_kb;
+		s += ps->p[i].mem_kb;
+	}
+	if (anon_kb)
+		*anon_kb = a;
+	if (pss_kb)
+		*pss_kb = s;
+}
+
+u64 procs_app_mem(const struct procs *ps, int app)
+{
+	u64 s = 0;
+	for (int i = 0; i < ps->n; i++)
+		if (ps->p[i].app == app)
+			s += ps->p[i].mem_kb;
+	return s;
 }

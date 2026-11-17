@@ -1,11 +1,20 @@
 flsplash -- the FreeLFS boot screen
 
-The one glossy thing in FreeLFS, on purpose: the logo of docs/logo.svg (three
-bars tilted 6 degrees) as beveled, glossy green slabs with an extruded side
-and a gel highlight, a soft glow behind, a faded mirror image on a dark floor,
-a light band that sweeps across, and "FreeLFS" (IBM Plex Sans, spaced, one
-size) fading in under it. About 3.8 s; it always plays to the end (at least 3 s from the
-first picture), then fades out to the background in 300 ms and lets go.
+Two styles, chosen system-wide in /etc/freelfs/splash.conf (splash=flat or
+splash=legacy; a missing or unreadable file, or anything else, means flat):
+
+  flat (default)  the logo of docs/logo.svg as a flat F in the accent green on
+                  the background #0d1110, a thin spinning arc under it (a 110
+                  degree arc, one turn per 1.2 s, antialiased, constant speed),
+                  and "FreeLFS" small at the bottom in the light text colour.
+                  Fades in from black in 500 ms, keeps spinning until the
+                  handover, then fades to the background (300 ms) and lets go.
+  legacy (3D)     the glossy logo: beveled green slabs, a soft glow, a faded
+                  mirror image, a light band that sweeps across, and "FreeLFS"
+                  under it. About 3.8 s, then fades out and lets go.
+
+Both start on the same clock. The minimum on screen is 3 s from the first picture
+(flat: it is never ended before that; legacy: its animation is 3.8 s).
 
 How: nothing is drawn at boot, only composited. genart.c renders the layers
 once at build time (bevel normals, diffuse and specular light, a fake studio
@@ -28,18 +37,24 @@ into the buffer on screen, paced at 60 Hz.
   flsplash             started by rc.sysinit as root; forks, exits 0 always
   flsplash --handover  asks the splash to end: it plays the animation to its end,
                        fades out (300 ms), drops DRM master and returns (waits up
-                       to 6 s); flgreet and the first-boot step of rc.sysinit run
+                       to 12 s); flgreet and the first-boot step of rc.sysinit run
                        it before flcomp. flsplash exits 6 s after the release.
-  flsplash --text      the boot text now (also puts the console back to text)
+  flsplash --text      the boot text now (also puts the console back to text;
+                       sends HUP)
   flsplash --render MS W H FILE.ppm
                        the picture at MS ms on a W x H screen, written to a
                        PPM; needs no screen (how to look at it while tuning
                        genart.c)
 
-Signals: USR1 hands the screen over, USR2 or TERM show the text. Esc shows
-the text too (tty0 is read in raw mode); a failed `step` sends USR2. Kernel
-option `nosplash` turns it off. With KD_GRAPHICS set on tty0, the status lines
-of rc go to the console buffer only (the serial console still gets them).
+Signals: USR1 is the handover: the splash lets go when its animation is over
+(flat: it fades to the background first, so the login screen starts from that
+colour). HUP or TERM show the text at once; `flsplash --text` sends HUP. USR2,
+which a failed rc `step` sends, is only logged: the splash goes on (round 20: a
+boot step never ends or changes the splash). Esc shows the text at once (tty0 is
+read in raw mode). The animation clock runs only while a screen is up, so a card
+that is gone for a moment does not use the animation up. Kernel option
+`nosplash` turns it off. With KD_GRAPHICS set on tty0, the status lines of rc go
+to the console buffer only (the serial console still gets them).
 
 When the DRM device goes away (simpledrm giving way to the real driver) the
 card is opened again and drawing continues at the right point: /dev and
@@ -49,11 +64,28 @@ within 4 s it exits and the boot stays text. Nobody taking over within 3
 minutes also means text.
 
 Files in /run: flsplash.pid, .done (animation over), .released (handed over),
+.style (flat or legacy: the login screen reads it, see flgreet's README),
 .log (what happened, in ms).
+
+flsplash-set (src/flsplash/flsplash-set.c): the Themes app's helper, installed
+setuid root, group seat (mode 4750, recipe owner= line). `flsplash-set flat|legacy`
+writes /etc/freelfs/splash.conf after the person's password (flauth, the same way
+flpkg-seat does). It checks its single argument, that the caller passes flauth
+(or is root), that /etc/freelfs is a root-owned directory not writable by others
+(created 0755 when missing), and it writes a new file with O_EXCL and no symlink
+followed, then renames it over splash.conf. Anything else at that place is refused.
+
+Tests: `make check` (tests/check.sh): both styles render, the config picks the
+style, the helper's arguments, the write and the refusals. No screen, no root.
+
+Planned, not built: custom boot screens. A user image (a PNG or the logo colour
+scheme) with the same spinner, chosen in Themes > Boot screen and kept in
+/etc/freelfs/ next to splash.conf; the flat style is the template for it. Until
+then the two styles above are the only choices.
 
 Build: make (genart needs FreeType and the IBM Plex Sans font, flsplash needs
 zlib); make install (PREFIX, DESTDIR). The art file is generated, not kept in
-the tree.
+the tree. The helper is built with it; the recipe gives it its owner and mode.
 
 Wallpaper colours: `genart -W -a RRGGBB -w FILE` renders only the wallpaper (the 3D F without the
 word) with the hue of the green material replaced (HSV: saturation and brightness stay, white

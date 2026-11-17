@@ -243,6 +243,23 @@ void conf_load(struct config *c)
 		struct snap_ctx s = {c, k.version[0]};
 		each_line(text, snapshot_line, &s);
 	}
+	/* "Safe graphics": the newest kernel with nomodeset, so no GPU driver (nouveau on an NVIDIA card that hangs,
+	 * amdgpu, i915) takes the screen and the firmware framebuffer (simpledrm) shows the desktop. Unless an entry
+	 * of the file already does that. */
+	bool have_safe = false;
+	for (int i = 0; i < c->n; i++)
+		for (const char *t = c->entries[i].cmdline; t && *t; t++)
+			if (t[0] == 'n' && !memcmp(t, "nomodeset", 9))
+				have_safe = true;
+	if (k.n && !have_safe) {
+		struct entry *e = add(c);
+		if (e) {
+			e->title = join("FreeLFS (Safe graphics, kernel ", k.version[0], ")");
+			e->kernel = ascii_to16(join("\\vmlinuz-", k.version[0], ""));
+			e->version = k.version[0];
+			e->cmdline = join(c->cmdline ? c->cmdline : "", " nomodeset nouveau.modeset=0", "");
+		}
+	}
 	for (int i = 0; i < c->n; i++)
 		if (!c->entries[i].cmdline)
 			c->entries[i].cmdline = c->cmdline ? c->cmdline : "";

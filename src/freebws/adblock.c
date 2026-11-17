@@ -76,6 +76,27 @@ static struct A {
 } A;
 #define SKIP(w) (A.skip && strstr(A.skip, w))
 
+/* The finished sheet and scriptlet source per host: a Google login is a chain of redirects over many
+ * hosts, and collecting the selectors (tens of thousands) at every hop stalled the browser process.
+ * Dropped whenever the cosmetic tables are reloaded. */
+#define HCACHE_N 12
+static struct hcache {
+	char host[256];
+	char *css, *js;
+	int nofilter;
+	unsigned stamp;
+} hcache[HCACHE_N];
+static unsigned hcache_clock;
+
+static void hcache_drop(void)
+{
+	for (int i = 0; i < HCACHE_N; i++) {
+		g_free(hcache[i].css);
+		g_free(hcache[i].js);
+		memset(&hcache[i], 0, sizeof hcache[i]);
+	}
+}
+
 static void logf_(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
 static void logf_(const char *fmt, ...)
 {
@@ -473,6 +494,7 @@ static void tables_free(void)
 	A.generic = NULL;
 	g_free(A.generic_css);
 	A.generic_css = NULL;
+	hcache_drop();
 }
 
 #define GROUP 16
@@ -967,20 +989,18 @@ static void tab_clear_content(struct adb_tab *s, WebKitUserContentManager *ucm)
 	}
 }
 
+static void filters_set(struct adb_tab *s, WebKitUserContentManager *ucm, int on);
+
 void adb_tab_refilter(struct adb_tab *s, WebKitUserContentManager *ucm)
 {
 	if (!ucm)
 		return;
 	int want = A.enabled && !s->off && A.filters && A.filters->len && !SKIP("net");
-	if (s->filters_on) {
+	if (s->filters_on) {	/* the lists may be new ones: out, then in again */
 		webkit_user_content_manager_remove_all_filters(ucm);
 		s->filters_on = 0;
 	}
-	if (want) {
-		for (guint i = 0; i < A.filters->len; i++)
-			webkit_user_content_manager_add_filter(ucm, g_ptr_array_index(A.filters, i));
-		s->filters_on = 1;
-	}
+	filters_set(s, ucm, want);
 	int yt = A.enabled && !s->off && A.yt_js && !SKIP("yt");
 	if (yt && !s->yt) {
 		s->yt = webkit_user_script_new(A.yt_js, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES,
@@ -1018,23 +1038,55 @@ void adb_tab_free(struct adb_tab *s, WebKitUserContentManager *ucm)
 	memset(s, 0, sizeof *s);
 }
 
-/* the style sheet and the scriptlet script for a host */
+/* put the filters in (or take them out), only when the state differs: adding a filter twice or removing
+ * none are errors waiting to happen in a redirect chain */
+static void filters_set(struct adb_tab *s, WebKitUserContentManager *ucm, int on)
+{
+	if (on && !s->filters_on && A.filters && A.filters->len && !SKIP("net")) {
+		for (guint i = 0; i < A.filters->len; i++)
+			webkit_user_content_manager_add_filter(ucm, g_ptr_array_index(A.filters, i));
+		s->filters_on = 1;
+	} else if (!on && s->filters_on) {
+		webkit_user_content_manager_remove_all_filters(ucm);
+		s->filters_on = 0;
+	}
+}
+
+static void install_content(struct adb_tab *s, WebKitUserContentManager *ucm, const char *css, const char *js)
+{
+	if (css && *css) {
+		s->sheet = webkit_user_style_sheet_new(css, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
+						       WEBKIT_USER_STYLE_LEVEL_USER, NULL, NULL);
+		webkit_user_content_manager_add_style_sheet(ucm, s->sheet);
+	}
+	if (js && *js) {
+		s->script = webkit_user_script_new(js, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
+						   WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+		webkit_user_content_manager_add_script(ucm, s->script);
+	}
+}
+
+/* the style sheet and the scriptlet script for a host. The tab already has them: nothing. */
 static void make_page_content(struct adb_tab *s, WebKitUserContentManager *ucm, const char *host)
 {
+	if (s->host[0] && !strcmp(s->host, host) && (s->sheet || s->script))
+		return;
+	for (int i = 0; i < HCACHE_N; i++)
+		if (hcache[i].host[0] && !strcmp(hcache[i].host, host)) {
+			hcache[i].stamp = ++hcache_clock;
+			filters_set(s, ucm, !hcache[i].nofilter);
+			install_content(s, ucm, hcache[i].css, hcache[i].js);
+			if (A.verbose)
+				logf_("%s: from the cache", host);
+			return;
+		}
 	struct host_info hi = { 0 };
 	hi.hide = g_ptr_array_new_with_free_func(g_free);
 	hi.unhide = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 	hi.css = g_ptr_array_new_with_free_func(g_free);
 	hi.js = g_ptr_array_new_with_free_func(g_free);
 	host_collect(host, &hi);
-	if (hi.nofilter) {	/* the lists whitelist this site as a whole */
-		webkit_user_content_manager_remove_all_filters(ucm);
-		s->filters_on = 0;
-	} else if (!s->filters_on && A.filters && A.filters->len && !SKIP("net")) {
-		for (guint i = 0; i < A.filters->len; i++)
-			webkit_user_content_manager_add_filter(ucm, g_ptr_array_index(A.filters, i));
-		s->filters_on = 1;
-	}
+	filters_set(s, ucm, !hi.nofilter);	/* the lists whitelist this site as a whole: no network filters */
 	GString *css = g_string_new(NULL);
 	if (!hi.nofilter && !hi.elemhide && !SKIP("css")) {
 		if (!hi.generichide && A.generic) {
@@ -1049,11 +1101,7 @@ static void make_page_content(struct adb_tab *s, WebKitUserContentManager *ucm, 
 				g_string_append_printf(css, "%s\n", (char *)g_ptr_array_index(hi.css, i));
 		}
 	}
-	if (css->len) {
-		s->sheet = webkit_user_style_sheet_new(css->str, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
-						       WEBKIT_USER_STYLE_LEVEL_USER, NULL, NULL);
-		webkit_user_content_manager_add_style_sheet(ucm, s->sheet);
-	}
+	char *src = NULL;
 	if (!hi.nofilter && !hi.nojs && hi.js->len && A.scriptlets_lib && !SKIP("js")) {
 		GString *calls = g_string_new("[");
 		for (guint i = 0; i < hi.js->len; i++) {
@@ -1068,13 +1116,24 @@ static void make_page_content(struct adb_tab *s, WebKitUserContentManager *ucm, 
 			g_strfreev(f);
 		}
 		g_string_append_c(calls, ']');
-		char *src = g_strdup_printf("(%s)(%s);", A.scriptlets_lib, calls->str);
-		s->script = webkit_user_script_new(src, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
-						   WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
-		webkit_user_content_manager_add_script(ucm, s->script);
-		g_free(src);
+		src = g_strdup_printf("(%s)(%s);", A.scriptlets_lib, calls->str);
 		g_string_free(calls, TRUE);
 	}
+	install_content(s, ucm, css->str, src);
+	struct hcache *e = &hcache[0];	/* remember it; the least recently used entry goes */
+	for (int i = 0; i < HCACHE_N; i++)
+		if (!hcache[i].host[0] || hcache[i].stamp < e->stamp) {
+			e = &hcache[i];
+			if (!e->host[0])
+				break;
+		}
+	g_free(e->css);
+	g_free(e->js);
+	g_strlcpy(e->host, host, sizeof e->host);
+	e->css = g_strdup(css->str);
+	e->js = src;
+	e->nofilter = hi.nofilter;
+	e->stamp = ++hcache_clock;
 	if (A.verbose)
 		logf_("%s: %zu bytes of CSS (%u own, %u unhide), %u scriptlet(s)%s%s%s%s", host, css->len, hi.hide->len,
 		      g_hash_table_size(hi.unhide), hi.js->len, hi.nofilter ? ", nofilter" : "", hi.elemhide ? ", elemhide" : "",

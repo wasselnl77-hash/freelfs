@@ -419,6 +419,37 @@ static void page_cpu(fl_ui *ui, struct gm *g, fl_rect r)
 	stats_draw(ui, g, x, y + 8, w, big, 2, mid, 3, kv, nkv, stacked);
 }
 
+/* The "?" beside the breakdown: why the programs' numbers do not add up to In use. */
+static const char *const why_lines[] = {
+	"Why the programs do not add up to In use",
+	"",
+	"Each program's number counts the libraries and program files",
+	"it shares with other programs. Linux keeps those in Cached,",
+	"which is not In use, so the programs' numbers add up to more",
+	"than their own memory.",
+	"",
+	"The breakdown below counts only each app's own memory, so its",
+	"parts add up to In use.",
+	NULL,
+};
+
+static void why_tip(fl_ui *ui, struct gm *g, int rx, int ty)
+{
+	fl_canvas *cv = &ui->cv;
+	int n = 0, wmax = 0;
+	for (; why_lines[n]; n++) {
+		int tw = fl_text_width(g->f.sm, why_lines[n], -1);
+		if (tw > wmax)
+			wmax = tw;
+	}
+	fl_rect b = fl_r(rx - wmax - 24, ty, wmax + 24, n * 16 + 16);
+	fl_fill_rect(cv, b, fl_th.raised);
+	fl_stroke_rect(cv, b, 1, fl_th.line);
+	for (int i = 0; i < n; i++)
+		gm_text(ui, g->f.sm, fl_r(b.x + 12, b.y + 8 + i * 16, wmax + 4, 16), FL_LEFT, i ? fl_th.dim : fl_th.strong,
+		        why_lines[i]);
+}
+
 static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 {
 	const struct sys *s = &g->sys;
@@ -430,20 +461,31 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 	double used = (double)(s->mem_total - s->mem_avail) * 1024;
 	double cached = (double)(s->mem_cached + s->mem_buffers) * 1024;
 	double avail = (double)s->mem_avail * 1024;
-	struct kv big[2], mid[2], kv[7];
+	u64 apps_anon = 0;
+	procs_mem(&g->ps, &apps_anon, NULL);
+	struct memsplit sp;
+	mem_split(&sp, s, apps_anon);
+	struct kv big[2], mid[2], kv[9];
 	kvset(&big[0], "In use", "%s", fmt_bytes(used));
 	kvset(&big[1], "Available", "%s", fmt_bytes(avail));
 	kvset(&mid[0], "Cached", "%s", fmt_bytes(cached));
 	kvset(&mid[1], "Swap in use", "%s of %s", fmt_bytes((double)(s->swap_total - s->swap_free) * 1024), fmt_bytes((double)s->swap_total * 1024));
+	/* what "in use" is made of; the parts add up to it */
 	int nkv = 0;
+	kvset(&kv[nkv++], "Apps (own memory)", "%s", fmt_bytes((double)sp.apps * 1024));
+	kvset(&kv[nkv++], s->live ? "Live system and tmpfs" : "Shared memory and tmpfs", "%s", fmt_bytes((double)sp.files * 1024));
+	if (sp.graphics)
+		kvset(&kv[nkv++], "Graphics buffers", "%s", fmt_bytes((double)sp.graphics * 1024));
+	kvset(&kv[nkv++], "System (kernel)", "%s", fmt_bytes((double)sp.system * 1024));
+	kvset(&kv[nkv++], "Drivers and other", "%s", fmt_bytes((double)sp.other * 1024));
+	kvset(&kv[nkv++], "Total in use", "%s", fmt_bytes((double)sp.used * 1024));
 	kvset(&kv[nkv++], "Committed", "%s of %s", fmt_bytes((double)s->commit * 1024), fmt_bytes((double)s->commit_limit * 1024));
 	kvset(&kv[nkv++], "Free", "%s", fmt_bytes((double)s->mem_free * 1024));
 	kvset(&kv[nkv++], "Buffers", "%s", fmt_bytes((double)s->mem_buffers * 1024));
-	kvset(&kv[nkv++], "Shared", "%s", fmt_bytes((double)s->mem_shmem * 1024));
-	kvset(&kv[nkv++], "Kernel slab", "%s", fmt_bytes((double)s->mem_slab * 1024));
 	int sh = stats_height(2, 2, nkv, stacked);
 	int comp_h = 22 + 26 + 26;
-	int gh = r.y + r.h - y - 22 - 22 - comp_h - 18 - sh - 8;
+	int cap_h = 24; /* the "What is in use" caption row */
+	int gh = r.y + r.h - y - 22 - 22 - comp_h - 18 - cap_h - sh - 8;
 	if (gh < 100)
 		gh = 100;
 	char cap[64];
@@ -475,7 +517,17 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 		lx += tw + 44;
 	}
 	y += comp_h + 10;
-	stats_draw(ui, g, x, y, w, big, 2, mid, 2, kv, nkv, stacked);
+
+	/* the breakdown caption, with the "?" that explains the gap between the programs and In use */
+	const char *capt = "What is in use";
+	gm_text(ui, g->f.sm, fl_r(x, y, w / 2, 18), FL_LEFT, fl_th.dim, capt);
+	fl_rect qb = fl_r(x + fl_text_width(g->f.sm, capt, -1) + 10, y, 16, 16);
+	int qres = fl_widget(ui, ID_PERF + 95, qb, 0);
+	fl_stroke_rect(cv, qb, 1, (qres & FL_HOVER) ? fl_th.accent : fl_th.line);
+	gm_text(ui, g->f.tiny, qb, FL_CENTER, (qres & FL_HOVER) ? fl_th.strong : fl_th.dim, "?");
+	stats_draw(ui, g, x, y + cap_h, w, big, 2, mid, 2, kv, nkv, stacked);
+	if (qres & FL_HOVER) /* drawn last, over the numbers */
+		why_tip(ui, g, qb.x + qb.w, qb.y + qb.h + 4);
 }
 
 static void page_disk(fl_ui *ui, struct gm *g, fl_rect r, int di)

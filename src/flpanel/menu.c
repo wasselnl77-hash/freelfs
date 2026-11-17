@@ -228,6 +228,29 @@ static int xml_attr(const char *line, const char *name, char *out, size_t cap)
 	return 1;
 }
 
+/* A recent file on a removable drive: is its mount still there? access() on a path of a stick that was pulled
+ * can wait for the USB layer's timeout, and the whole panel (the start menu, every launcher) with it. So the
+ * file is not touched: the entry stays when /proc/mounts still lists the drive, and goes when it does not. */
+static int on_gone_drive(const char *file)
+{
+	const char *root = !strncmp(file, "/drives/", 8) ? "/drives/" : !strncmp(file, "/run/media/", 11) ? "/run/media/" : NULL;
+	if (!root)
+		return -1;	/* an ordinary path: look at it */
+	FILE *m = fopen("/proc/mounts", "r");
+	char line[1024];
+	int found = 0;
+	while (m && !found && fgets(line, sizeof line, m)) {
+		char dev[256], mp[512];
+		if (sscanf(line, "%255s %511s", dev, mp) != 2)
+			continue;
+		size_t n = strlen(mp);
+		found = !strncmp(file, mp, n) && (file[n] == '/' || !file[n]) && !strncmp(mp, root, strlen(root));
+	}
+	if (m)
+		fclose(m);
+	return !found;
+}
+
 static void add_recent(struct panel *p, int *cap)
 {
 	const char *xd = getenv("XDG_DATA_HOME"), *h = getenv("HOME");
@@ -254,7 +277,10 @@ static void add_recent(struct panel *p, int *cap)
 			when[0] = 0;
 		snprintf(file, sizeof file, "%s", href + 7);
 		percent_decode(file);
-		if (file[0] != '/' || access(file, F_OK) != 0)
+		if (file[0] != '/')
+			continue;
+		int gone = on_gone_drive(file);
+		if (gone == 1 || (gone < 0 && access(file, F_OK) != 0))
 			continue;
 		/* newest first: where it goes in the list of the best RECENT_N so far */
 		int at = 0;

@@ -3,9 +3,11 @@
 # (Realtek, Intel, MediaTek), Realtek Ethernet, AMD microcode, Cirrus amplifiers.
 # Intel's audio (SOF) firmware is the package sof-firmware, Intel microcode intel-ucode.
 # Release 2: Intel and MediaTek added, iwlwifi pruned to the newest files.
+# Release 3: NVIDIA (nouveau; Tegra and the old GSP version pruned).
+# Release 4: Atheros (ath9k_htc, ath10k, ath11k, ath12k), Broadcom (brcm), rtlwifi and their Bluetooth firmware.
 pkgname=linux-firmware
 version=20261019
-release=2
+release=4
 summary="Firmware for GPUs, Wi-Fi, Bluetooth and Ethernet chips"
 url=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
 license=(custom)
@@ -21,7 +23,7 @@ package() {
 	# GPUs (AMD amdgpu and radeon; Intel i915 GuC/HuC/DMC and xe), Wi-Fi and Bluetooth (Realtek,
 	# Intel, MediaTek), Realtek Ethernet, Cirrus Logic amplifier firmware (laptop speakers on
 	# HDA and SOF), AMD microcode (amd-ucode)
-	for d in amdgpu radeon i915 xe rtw88 rtw89 rtl_nic rtl_bt intel mediatek cirrus amd-ucode; do
+	for d in amdgpu radeon i915 xe nvidia ath9k_htc ath10k ath11k ath12k ar3k qca brcm rtlwifi rtw88 rtw89 rtl_nic rtl_bt intel mediatek cirrus amd-ucode; do
 		[ -d "$d" ] && cp -a "$d" "$fw/"
 	done
 	# Intel Wi-Fi is in intel/iwlwifi now; older releases had it at the top
@@ -45,6 +47,19 @@ package() {
 	# mediatek/: keep Wi-Fi and Bluetooth of the MT79xx PCIe/USB chips (mt7921, mt7922, mt7925,
 	# mt7927) and the old USB sticks; drop router SoCs (mt798x, mt7996) and Chromebook SoCs (mt8*)
 	(cd "$fw/mediatek" && rm -rf mt8* mt7996 mt798* mt7988* 2> /dev/null; true)
+	# nvidia/ (nouveau): Tegra SoC firmware is not for PCs; of the GSP firmware (Turing and newer, 25 to 60 MB each)
+	# only the newest version stays (kernel 6.16 and later, so both FreeLFS kernels, ask for 570.144)
+	(cd "$fw/nvidia" && rm -rf tegra* gk20a gm20b gp10b
+		for g in */gsp; do
+			[ -e "$g/gsp-570.144.bin" ] && rm -f "$g"/*535.113.01.bin
+		done; true)
+	# Atheros/Qualcomm Wi-Fi (round 20; an Acer with a QCA9377 had no Wi-Fi): ath10k keeps the PC chips (QCA6174, QCA9377,
+	# QCA988x, QCA99x0, QCA9984/88/87, QCA4019), not WCN3990 (phones); ath11k the laptop chips (QCA6390, WCN6855, QCA2066,
+	# QCA6698AQ), not the router/server/phone ones; ath12k the laptop chip WCN7850. brcm: Broadcom brcmfmac, rtlwifi:
+	# the old Realtek PCIe family, qca and ar3k: the Bluetooth firmware that comes with those cards.
+	(cd "$fw/ath10k" && rm -rf WCN3990)
+	(cd "$fw/ath11k" && rm -rf IPQ* WCN6750 QCN9074)
+	(cd "$fw/ath12k" && rm -rf IPQ* QCN9274; true)
 	# AMD microcode: signature files are not needed
 	rm -f "$fw"/amd-ucode/*.asc
 

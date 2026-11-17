@@ -14,7 +14,24 @@
 
 /* ---- the primitive ---------------------------------------------------------------- */
 
-int fl_widget(fl_ui *ui, uint32_t id, fl_rect r, int flags)
+/* A press that lands on a scrollbar track belongs to the bar. A list or a text area around the
+ * bar has the same area and is drawn first, so it would take the press and the bar would never
+ * see it: the tracks drawn in the last frame are checked before a widget claims the press. */
+static int on_bar(const fl_ui *ui)
+{
+	for (int i = 0; i < ui->_nsb_last; i++)
+		if (fl_in(ui->_sb_last[i], ui->mx, ui->my))
+			return 1;
+	return 0;
+}
+
+static int press_on_bar(const fl_ui *ui)
+{
+	return (ui->press & FL_BTN_L) && on_bar(ui);
+}
+
+/* claim: whether a press here may make the widget active (the bar itself: 1) */
+static int widget(fl_ui *ui, uint32_t id, fl_rect r, int flags, int claim)
 {
 	int res = 0;
 	fl_rect vis = fl_intersect(r, ui->cv.clip);
@@ -49,7 +66,7 @@ int fl_widget(fl_ui *ui, uint32_t id, fl_rect r, int flags)
 	}
 	if (hover)
 		res |= FL_HOVER;
-	if (hover && (ui->press & FL_BTN_L)) {
+	if (hover && (ui->press & FL_BTN_L) && claim) {
 		ui->active = id;
 		if (flags & FL_FOCUSABLE) {
 			ui->focus = id;
@@ -70,6 +87,35 @@ int fl_widget(fl_ui *ui, uint32_t id, fl_rect r, int flags)
 		}
 	}
 	return res;
+}
+
+int fl_widget(fl_ui *ui, uint32_t id, fl_rect r, int flags)
+{
+	return widget(ui, id, r, flags, !press_on_bar(ui));
+}
+
+/* run_pass: at the start of a frame (first) the bars of the last frame become the known ones */
+void fl_ui_pass_begin(fl_ui *ui, int first)
+{
+	if (first) {
+		memcpy(ui->_sb_last, ui->_sb_now, sizeof ui->_sb_now);
+		ui->_nsb_last = ui->_nsb_now;
+	}
+	ui->_nsb_now = 0;
+}
+
+/* run_pass: the end of a pass. A release frees the active widget and any scrollbar drag. */
+void fl_ui_pass_end(fl_ui *ui)
+{
+	if (ui->release & FL_BTN_L) {
+		ui->active = 0;
+		ui->_sb_on = 0;
+	}
+	ui->press = ui->release = 0;
+	ui->wheel = 0;
+	ui->key = 0;
+	ui->text[0] = 0;
+	ui->_wheel_taken = 0;
 }
 
 static int key_activate(fl_ui *ui, int res)
@@ -409,33 +455,58 @@ int fl_switch(fl_ui *ui, uint32_t id, fl_rect r, int *on)
 	return toggled;
 }
 
+/* a bar takes presses this far beside its drawn track: 4 px is hard to hit with a touchpad */
+#define SB_SLOP 3
+
 int fl_scrollbar(fl_ui *ui, uint32_t id, fl_rect r, int *off, int content, int view)
 {
 	int max = content - view;
-	if (max <= 0 || view <= 0) {
+	fl_rect hit = {r.x - SB_SLOP, r.y, r.w + 2 * SB_SLOP, r.h};
+	if (max <= 0 || view <= 0) { /* nothing to scroll: no bar, so it takes no presses either */
 		*off = 0;
 		return 0;
 	}
+	if (ui->_nsb_now < FL_SB_MAX)
+		ui->_sb_now[ui->_nsb_now++] = hit;
 	int th = r.h * view / content;
 	if (th < 24)
 		th = 24;
 	if (th > r.h)
 		th = r.h;
 	int span = r.h - th;
-	fl_rect thumb = {r.x, r.y + (span ? span * *off / max : 0), r.w, th};
-	int res = fl_widget(ui, id, r, 0);
+	int res = widget(ui, id, hit, 0, 1); /* the bar claims its own presses: claim = 1 */
 	int changed = 0;
 	if (res & FL_DOWN) {
-		if (span > 0) {
-			int o = (ui->my - r.y - th / 2) * max / span;
+		int ty = r.y + (span ? span * *off / max : 0);
+		if (!ui->_sb_on || ui->_sb_id != id) { /* the press that starts this drag */
+			ui->_sb_on = 1;
+			ui->_sb_id = id;
+			if (ui->my >= ty && ui->my < ty + th) {
+				ui->_sb_grab = ui->my - ty; /* the thumb moves with the pointer, from the point held */
+			} else {                        /* the track: one page toward the pointer */
+				int o = *off + (ui->my < ty ? -view : view);
+				ui->_sb_grab = -1;
+				o = o < 0 ? 0 : o > max ? max : o;
+				if (o != *off) {
+					*off = o;
+					changed = 1;
+				}
+			}
+		}
+		if (ui->_sb_grab >= 0 && span > 0) {
+			int o = (ui->my - r.y - ui->_sb_grab) * max / span;
 			o = o < 0 ? 0 : o > max ? max : o;
 			if (o != *off) {
 				*off = o;
 				changed = 1;
 			}
 		}
-		thumb.y = r.y + (span ? span * *off / max : 0);
 	}
+	if (*off < 0)
+		*off = 0;
+	if (*off > max)
+		*off = max;
+	fl_rect thumb = {r.x, r.y + (span ? span * *off / max : 0), r.w, th};
 	fl_fill_rect(&ui->cv, thumb, (res & (FL_HOVER | FL_DOWN)) ? fl_th.dim : fl_th.line);
 	return changed;
 }
@@ -463,8 +534,8 @@ int fl_list(fl_ui *ui, uint32_t id, fl_rect r, int count, int item_h, fl_list_st
 		ui->wheel = 0;
 	}
 	int hover_i = -1;
-	if ((res & FL_HOVER) && !(ui->active && ui->active != id))
-		hover_i = (ui->my - r.y + st->scroll) / item_h;
+	if ((res & FL_HOVER) && !(ui->active && ui->active != id) && !on_bar(ui))
+		hover_i = (ui->my - r.y + st->scroll) / item_h; /* not over the bar: that drags the list */
 	if (hover_i >= count)
 		hover_i = -1;
 	if (hover_i >= 0 && (ui->mx != st->lx || ui->my != st->ly))

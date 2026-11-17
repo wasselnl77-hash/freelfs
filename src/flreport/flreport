@@ -124,6 +124,9 @@ state=${XDG_STATE_HOME:-$HOME/.local/state}
 for f in "$rt"/flcomp.log "$rt"/flcomp.log.1 "$rt"/session.log "$rt"/*.log; do
 	[ -f "$f" ] && [ ! -e "$r/logs/${f##*/}" ] && grab "$f" logs
 done
+for f in /run/flsplash.log; do
+	[ -f "$f" ] && grab "$f" logs
+done
 for f in "$state"/freelfs/log/*; do
 	[ -f "$f" ] && grab "$f" logs state-
 done
@@ -207,10 +210,36 @@ grab /proc/version hw
 	dmesg 2>/dev/null | grep -i -E 'firmware.*(fail|not found|error|direct)|failed to load' | head -n 30
 } >"$r/hw/power-backlight-rfkill.txt" 2>&1
 run hw/modules-loaded.txt lsmod
+# block devices and what is stacked on them: a stick the system runs from (a Ventoy boot maps the ISO with device-mapper
+# over it) shows as slaves/holders; with the live mounts it says what must never be ejected
+{
+	echo "# name size(512B) removable slaves= holders="
+	for d in /sys/class/block/*; do
+		n=${d##*/}
+		printf '%s size=%s removable=%s slaves=%s holders=%s\n' "$n" "$(cat "$d/size" 2>/dev/null)" "$(cat "$d/removable" 2>/dev/null)" \
+			"$(ls "$d/slaves" 2>/dev/null | tr '\n' ',')" "$(ls "$d/holders" 2>/dev/null | tr '\n' ',')"
+	done
+	echo
+	echo "# live system mounts and /drives:"
+	grep -E ' /run/live| /drives/|/run/media' /proc/self/mountinfo 2>/dev/null
+	echo
+	echo "# flmount list:"
+	flmount list 2>&1
+} >"$r/hw/block-devices.txt" 2>&1
 
 # ---- network ---------------------------------------------------------------------------
 {
 	run net.txt ip -br link
+	sh_run net.txt 'echo "-- network interfaces (/sys/class/net):"; ls /sys/class/net'
+	# the network controllers by PCI class (0280 wireless, 0200 ethernet): the id, the driver bound, and which module
+	# the kernel would load for it (an empty answer there means the image has no driver for the card)
+	sh_run net.txt 'echo "-- network controllers (PCI class 0x0280 and 0x0200):"
+		for d in /sys/bus/pci/devices/*; do
+			c=$(cat "$d/class" 2>/dev/null); case $c in 0x0280* | 0x0200*) ;; *) continue ;; esac
+			drv=$(readlink "$d/driver" 2>/dev/null)
+			echo "${d##*/} class=$c id=$(cat "$d/vendor" 2>/dev/null | sed s/0x//):$(cat "$d/device" 2>/dev/null | sed s/0x//) driver=$(if [ -n "$drv" ]; then basename "$drv"; else echo "NO DRIVER BOUND"; fi) modules-for-it=$(modprobe -R "$(cat "$d/modalias" 2>/dev/null)" 2>/dev/null | tr "\n" " ")"
+		done'
+	sh_run net.txt 'echo "-- dmesg lines about firmware:"; dmesg 2>/dev/null | grep -i firmware | head -n 60'
 	run net.txt ip -br addr
 	run net.txt ip route
 	run net.txt ip -6 route

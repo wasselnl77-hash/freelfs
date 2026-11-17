@@ -71,6 +71,7 @@ struct drive {
 	char dev[64], label[64], fstype[24], path[PATH_MAX];
 	unsigned long long size;
 	int mounted, removable, system;
+	int boot;	/* the live system runs from this stick: no eject button */
 };
 
 /* a file job's item: paths are heap strings; action is set by the clash dialog */
@@ -767,13 +768,16 @@ static void set_title(struct F *f)
 }
 
 static void places_load(struct F *f);
+static void io_error_remount(struct F *f, const char *path, int err);
 
 /* Go to path. 0 on success; on failure the old folder stays and a message says why. */
 static int load_dir(struct F *f, const char *path, int push)
 {
 	char rp[PATH_MAX];
 	if (!realpath(path, rp)) {
-		say(f, 1, "Cannot open %s: %s", path, strerror(errno));
+		int e = errno;
+		say(f, 1, "Cannot open %s: %s", path, strerror(e));
+		io_error_remount(f, path, e);
 		return -1;
 	}
 	struct stat st;
@@ -790,6 +794,7 @@ static int load_dir(struct F *f, const char *path, int push)
 		if (old[0])
 			scan(f);
 		say(f, 1, "Cannot open %s: %s", rp, strerror(e));
+		io_error_remount(f, rp, e);
 		return -1;
 	}
 	sel_reset(f);
@@ -2119,6 +2124,7 @@ static void drives_rebuild(struct F *f, const char *list)
 				if (d->mounted)
 					snprintf(d->path, sizeof d->path, "%s", fld[4]);
 				d->removable = 1;
+				d->boot = !strcmp(fld[5], "boot");
 			}
 			p = next;
 		}
@@ -2305,6 +2311,24 @@ fail:
 	}
 	free(h);
 	return NULL;
+}
+
+/* A folder on a drive answers "input/output error" (a stick that was just plugged in, or whose mount went bad):
+ * flmount mounts it again from scratch. The result lands like a click on the drive: Files opens its top. */
+static void io_error_remount(struct F *f, const char *path, int err)
+{
+	if ((err != EIO && err != ENODEV && err != ESTALE && err != ENOTCONN) || f->opr)
+		return;
+	for (int i = 0; i < f->ndrv; i++) {
+		struct drive *d = &f->drv[i];
+		if (!d->mounted || !d->dev[0] || !d->path[0] || !path_in(path, d->path))
+			continue;
+		say(f, 0, "%s answered with an error, mounting it again...", d->label);
+		f->opr = hlp_spawn(f, HK_MOUNT, "remount", d->dev);
+		if (f->opr)
+			snprintf(f->opr->label, sizeof f->opr->label, "%s", d->label);
+		return;
+	}
 }
 
 /* ask flmount for the drive list, unless a list is already on its way */
@@ -3445,7 +3469,7 @@ static void draw_sidebar(fl_ui *ui, struct F *f, fl_rect sb)
 	y += fl_font_height(f->head) + 8;
 	for (int i = 0; i < f->ndrv; i++) {
 		struct drive *d = &f->drv[i];
-		int eject = d->removable && d->dev[0];
+		int eject = d->removable && d->dev[0] && !d->boot;
 		fl_rect r = fl_r(sb.x, y, sb.w - 1 - (eject ? 30 : 0), 40);
 		int res = fl_widget(ui, ID_DRIVE + (uint32_t)i, r, 0);
 		int active = d->mounted && !strcmp(d->path, f->cwd);

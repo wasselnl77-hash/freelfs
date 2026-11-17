@@ -3,7 +3,7 @@
 # the person's password against /etc/shadow with crypt(), and its flui window.
 pkgname=flauth
 version=0.1
-release=1
+release=2
 summary="Password prompt for root actions (setuid helper and dialog)"
 license=(MIT)
 arch=(x86_64)

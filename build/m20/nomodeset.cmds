@@ -1,0 +1,30 @@
+# "Safe graphics" (nomodeset): no GPU driver, the firmware framebuffer through simpledrm. QEMU -vga std stands in for a
+# machine whose GPU driver is not used; real NVIDIA hardware is NOT tested here. The desktop must come up on simpledrm,
+# flcomp must say so, windows draw, the night light must work without a gamma table (software copy loop).
+@desktop
+@ok the kernel got nomodeset :: grep -q nomodeset /proc/cmdline
+@ok no native GPU driver took the screen (bochs is not loaded) :: ! grep -q '^bochs' /proc/modules
+@ok the card belongs to simpledrm :: for c in /sys/class/drm/card[0-9]; do readlink $c/device/driver; done | grep -q -E 'simple-framebuffer|simpledrm|efi-framebuffer'
+@ok flcomp says it runs on the firmware framebuffer :: grep -q 'firmware framebuffer' /run/user/1000/flcomp.log
+@ok flcomp did not wait for a driver that never comes :: ! grep -q 'waiting for it' /run/user/1000/flcomp.log
+@ok the panel runs :: pgrep -u tester -x flpanel
+@wait 3
+@shot @OUT@/nm-1-desktop.ppm
+@shotcolors @OUT@/nm-1-desktop.ppm 40
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 4
+@shot @OUT@/nm-2-files.ppm
+@shotdiff @OUT@/nm-1-desktop.ppm @OUT@/nm-2-files.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/nm-2-files.ppm 40
+su -s /bin/sh tester -c 'fldisplay nightlight on temp=3000'
+@wait 4
+@shot @OUT@/nm-3-night.ppm
+@shotdiff @OUT@/nm-2-files.ppm @OUT@/nm-3-night.ppm 100000 0 0 1280 750
+@ok the log says the night light is done in software :: grep -q 'night light is done in software' /run/user/1000/flcomp.log
+su -s /bin/sh tester -c 'fldisplay nightlight off'
+@wait 4
+@shot @OUT@/nm-4-night-off.ppm
+@shotdiff @OUT@/nm-3-night.ppm @OUT@/nm-4-night-off.ppm 100000 0 0 1280 750
+@ok no crash screen, flcomp still runs :: pgrep -u tester -x flcomp || pgrep -x flcomp

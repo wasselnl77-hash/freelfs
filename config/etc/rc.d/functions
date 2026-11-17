@@ -5,8 +5,8 @@ COLS=$(stty size 2>/dev/null < /dev/console)
 COLS=${COLS#* }
 [ "${COLS:-0}" -gt 20 ] 2>/dev/null || COLS=80
 
-# The boot screen (flsplash). A failed step shows the text; the screen is
-# handed over before something else (flsetup) wants it.
+# The boot screen (flsplash). A failed step is only logged (/run/flsplash.log); Esc shows the
+# text. splash_text (SIGUSR2) is kept for callers that want it logged.
 splash_text() {
 	local p
 	if [ -r /run/flsplash.pid ] && read -r p < /run/flsplash.pid && [ -n "$p" ]; then
@@ -26,7 +26,7 @@ stat_busy() {
 		"$1" "$((COLS - 6))"
 }
 stat_done() { printf '\033[%dG[\033[1;32mDONE\033[0m]\n' "$((COLS - 6))"; }
-stat_fail() { splash_text; printf '\033[%dG[\033[1;31mFAIL\033[0m]\n' "$((COLS - 6))"; }
+stat_fail() { printf '\033[%dG[\033[1;31mFAIL\033[0m]\n' "$((COLS - 6))"; }
 
 # step MESSAGE CMD... -- run CMD under a status line
 step() {
@@ -36,6 +36,7 @@ step() {
 	if "$@"; then
 		stat_done
 	else
+		echo "rc: step failed: $m" >> /run/flsplash.log 2> /dev/null
 		stat_fail
 		return 1
 	fi

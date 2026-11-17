@@ -9,7 +9,7 @@
 # no package, so upgrades never drop users.
 pkgname=base-files
 version=0.1
-release=4
+release=5
 summary="FreeLFS file system layout, system accounts and basic /etc files"
 license=(MIT)
 arch=(any)

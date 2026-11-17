@@ -752,7 +752,16 @@ static void desk_draw(fl_ui *ui, void *ud)
 {
 	(void)ud;
 	fl_canvas *cv = &ui->cv;
-	fl_fill_rect(cv, fl_r(0, 0, cv->w, cv->h), INPUT_BG);
+	/* Clear the buffer: REPLACE every pixel. fl_fill_rect blends a colour that is not fully opaque (source-over), and
+	 * INPUT_BG has alpha 1, so the old picture of this buffer stayed under it: every rubber band and every dragged
+	 * icon left its picture behind, frame after frame (the green outlines on the Acer; QEMU was never tested with a
+	 * rubber band). */
+	if (cv->px)
+		for (int y = 0; y < cv->h; y++) {
+			uint32_t *row = cv->px + (size_t)y * (size_t)cv->stride;
+			for (int x = 0; x < cv->w; x++)
+				row[x] = INPUT_BG;
+		}
 	int mx = ui->mx, my = ui->my;
 	int ctrl = (ui->mods & FL_MOD_CTRL) != 0;
 

@@ -1,7 +1,7 @@
 # flcrash, from src/flcrash in the FreeLFS tree.
 pkgname=flcrash
 version=0.1
-release=3
+release=4
 summary="The FreeLFS \"Something went wrong\" screen, shown when the desktop session dies"
 license=(MIT)
 arch=(x86_64)

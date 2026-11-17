@@ -1,7 +1,7 @@
 # flsetup, from src/flsetup in the FreeLFS tree.
 pkgname=flsetup
 version=0.1
-release=2
+release=3
 summary="First boot keyboard choice for the FreeLFS desktop"
 license=(MIT)
 arch=(x86_64)

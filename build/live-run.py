@@ -21,6 +21,7 @@ CMDFILE: one shell command per line, '#' lines skipped. Lines starting with '@':
     @waitok SECS TEXT :: CMD   like @ok, but CMD is tried every second for up to SECS seconds
     @shotok FILE          like @shot (kept for old files), or (almost) one colour
     @shotdiff BASE NEW MIN [X1 Y1 X2 Y2]  FAILS unless at least MIN pixels differ between two screendumps
+    @shotsame BASE NEW MAX [X1 Y1 X2 Y2]  FAILS when MORE than MAX pixels differ (leftovers, stale frames)
     @shotpix FILE RRGGBB MIN  FAILS unless at least MIN pixels have exactly that colour
     @shotcolors FILE MIN  FAILS unless the screendump FILE has at least MIN distinct colours
     @shot FILE            screendump; also FAILS when the file is missing or blank
@@ -237,6 +238,11 @@ with open(LOG, "w") as log:
                     print("pixels that differ, %s vs %s: %d" % (os.path.basename(w[1]), os.path.basename(w[2]), n))
                     if n < int(w[3]):
                         fail("%s differs from %s in %d pixels, expected at least %s (no window appeared?)" % (os.path.basename(w[2]), os.path.basename(w[1]), n, w[3]))
+                elif w[0] == "shotsame":	# @shotsame BASE NEW MAX [X1 Y1 X2 Y2]: FAILS when more than MAX pixels differ
+                    n = shot_diff(w[1], w[2], tuple(int(v) for v in w[4:8]) if len(w) >= 8 else None)
+                    print("pixels that differ, %s vs %s: %d (at most %s allowed)" % (os.path.basename(w[1]), os.path.basename(w[2]), n, w[3]))
+                    if n > int(w[3]):
+                        fail("%s differs from %s in %d pixels, at most %s allowed (a leftover picture?)" % (os.path.basename(w[2]), os.path.basename(w[1]), n, w[3]))
                 elif w[0] == "shotpix":	# @shotpix FILE RRGGBB MIN: FAILS unless at least MIN pixels have exactly that colour
                     d = open(w[1], "rb").read()
                     m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", d)

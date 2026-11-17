@@ -1,0 +1,38 @@
+# FreeBWS watchdogs, through the real window. A local server sends the start of a page and then stalls for ever.
+#  1. the frame watchdog: the config says watchdog_test=1 (frames stop counting 6 s after the start); the page has
+#     been loading 8 s with no new frame, 5 s later the browser must write buffers=shm, log it, and start again
+#     with the same page;
+#  2. the hang watchdog: the page keeps stalling; with tabs in one web process (1 GB: on) 30 s without load
+#     progress end the web process, the log says so, the browser is still there.
+# Looks at ~/.cache/freebws/log, the config file, processes and pictures.
+@desktop
+@put @HERE@/stall-server.py /tmp/stall-server.py
+@ok the stalling server runs :: (setsid python3 /tmp/stall-server.py 80 > /tmp/stall.log 2>&1 &) ; sleep 2; python3 -c "import socket; s=socket.create_connection(('127.0.0.1',80),3); s.close()"
+@ok FreeBWS is told to test the watchdog :: mkdir -p /home/tester/.config/freebws && printf 'watchdog_test=1\nbuffers=dmabuf\n' > /home/tester/.config/freebws/config && chown -R 1000:999 /home/tester/.config/freebws && rm -f /home/tester/.cache/freebws/log
+@key meta_l
+@wait 1
+@type web
+@key ret
+@waitok 90 FreeBWS runs :: pgrep -u tester -x freebws
+@wait 12
+@key ctrl-l
+@wait 1
+@type 127.0.0.1
+@key ret
+@wait 3
+@waitok 60 the frame watchdog fell back to shm :: grep -q 'falling back to shm buffers' /home/tester/.cache/freebws/log
+@ok the log says why :: grep -E 'no new frame for 5 s while a page was loading|no frame from the GPU path' /home/tester/.cache/freebws/log
+@ok the flag is persisted for the next start :: grep -q '^buffers=shm' /home/tester/.config/freebws/config && grep -q '^watchdog_test=0' /home/tester/.config/freebws/config
+@waitok 40 FreeBWS started again (second 'started' line in the log, a live process) :: pgrep -u tester -x freebws && test "$(grep -c ' started: ' /home/tester/.cache/freebws/log)" -ge 2
+@wait 8
+@shot @OUT@/fw-1-after-fallback.ppm
+@shotcolors @OUT@/fw-1-after-fallback.ppm 40
+@ok the second start is on shm and loads the same page :: grep ' started: ' /home/tester/.cache/freebws/log | tail -n 1 | grep -q 'shm buffers, share_process=1, hangkill=1, loading http://127.0.0.1/'
+@waitok 90 the hang watchdog ended the stalled web process :: grep -q 'ending its web process' /home/tester/.cache/freebws/log
+@ok the log has the web process end :: grep -q 'ended by the hang watchdog' /home/tester/.cache/freebws/log
+@wait 5
+@ok FreeBWS is still running :: pgrep -u tester -x freebws
+@shot @OUT@/fw-2-after-hang.ppm
+@shotcolors @OUT@/fw-2-after-hang.ppm 40
+# what the guest has to say (always printed, never fails)
+cat /home/tester/.cache/freebws/log; pgrep -a -u tester freebws; ls /home/tester/.local/state/freelfs/log 2>&1 | head; tail -n 20 /run/user/1000/flcomp.log

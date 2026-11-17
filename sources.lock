@@ -248,3 +248,5 @@ fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf  libusb-1.0.30.
 060309d7a333d38d951bc27598c677af1796934dbd98e1024e7ad8de798fedda  avahi-0.8.tar.gz  https://github.com/avahi/avahi/releases/download/v0.8/avahi-0.8.tar.gz
 fd23eb5f6f986dcc7e708307355ba3289abe03cc381fc47a80bca4a50aa6b834  libdaemon-0.14.tar.gz  http://0pointer.de/lennart/projects/libdaemon/libdaemon-0.14.tar.gz
 646f622e9e7e9e65eef9d0ab58999d4920ddb33d98e6a75232627cfe3bd508f9  papirus-icon-theme-20260801.tar.gz  https://github.com/PapirusDevelopmentTeam/papirus-icon-theme/archive/refs/tags/20260801.tar.gz
+e7713409882813991d2269d125e40dad1f54a019a52b78b3962941c1d4a6f86f  pciutils-3.14.0.tar.xz  https://mirrors.edge.kernel.org/pub/software/utils/pciutils/pciutils-3.14.0.tar.xz
+83f68b59b58547589c00266e82671864627593ab4362d8c807f50eea923cad93  usbutils-018.tar.xz  https://www.kernel.org/pub/linux/utils/usb/usbutils/usbutils-018.tar.xz

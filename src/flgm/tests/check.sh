@@ -12,11 +12,11 @@ mkdir -p "$dir/cfg/autostart" "$dir/etc/autostart"
 printf '[Desktop Entry]\nType=Application\nName=Alpha\nExec=alpha --serve\n' >"$dir/cfg/autostart/alpha.desktop"
 printf '[Desktop Entry]\nType=Application\nName=Beta\nExec=beta\nHidden=true\n' >"$dir/cfg/autostart/beta.desktop"
 printf '[Desktop Entry]\nType=Application\nName=System one\nExec=sysone\n' >"$dir/etc/autostart/sys-one.desktop"
-CFLAGS_T="-std=c17 -D_GNU_SOURCE -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation -O1"
-${CC:-cc} $CFLAGS_T -o "$dir/data-test" tests/data-test.c sys.c proc.c startup.c -lm || exit 1
+CFLAGS_T="-std=c17 -D_GNU_SOURCE -pthread -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation -O1"
+${CC:-cc} $CFLAGS_T -o "$dir/data-test" tests/data-test.c sys.c proc.c rdr.c startup.c -lm || exit 1
 "$dir/data-test" || exit 1
 # the fake tree: PROC_DIR and SYS_DIR are compile-time roots, so the test is built against scratch paths
 mkdir -p "$dir/fake/proc" "$dir/fake/sys"
-${CC:-cc} $CFLAGS_T "-DPROC_DIR=\"$dir/fake/proc\"" "-DSYS_DIR=\"$dir/fake/sys\"" -o "$dir/fake-test" \
-	tests/fake-test.c sys.c proc.c startup.c -lm || exit 1
+${CC:-cc} $CFLAGS_T "-DPROC_DIR=\"$dir/fake/proc\"" "-DSYS_DIR=\"$dir/fake/sys\"" "-DLIVE_MARK=\"$dir/fake/live\"" -o "$dir/fake-test" \
+	tests/fake-test.c sys.c proc.c rdr.c startup.c -lm -lpthread || exit 1
 "$dir/fake-test"

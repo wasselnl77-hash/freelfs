@@ -232,6 +232,13 @@ you shut down.
   it. Videos decodes in software by default since round 18.
 - **Shutdown** also failed on the laptop in round 17. See [09-troubleshooting.md](09-troubleshooting.md).
 - No NTFS drives.
+- **A stick you booted from (Ventoy).** A Ventoy boot maps the ISO with device-mapper over the stick, and the running system
+  reads its programs through that mapping. Ejecting the stick then takes the system's own files away: apps that were not open yet
+  fail ("input/output error"), Files shows errors, and only replugging helps. Since round 20 `flmount` sees the device-mapper
+  holder, lists that stick as "boot" (Files shows no eject button) and refuses to eject it; shut down instead. This is the most
+  likely cause of the r19 laptop bug; it is inferred from the code and not proven on the laptop.
+- A drive that answers "input/output error" right after plugging in is mounted again (up to three times); a folder that gives
+  that error in Files makes Files ask `flmount remount` for the drive.
 - No drag and drop from Files onto other programs, and none from the desktop.
 - Trash on a stick is not verified.
 - Desktop icons do not have "Open with" or "Properties" yet.

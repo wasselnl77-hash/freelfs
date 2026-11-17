@@ -16,7 +16,7 @@ DESTDIR ?=
 WALLS = teal:35a09b blue:4d8fd0 amber:d0a032 orange:e0793f rose:d4678c
 WALLFILES = $(foreach w,$(WALLS),wallpaper-$(word 1,$(subst :, ,$(w))).flw)
 
-all: flsplash $(WALLFILES)
+all: flsplash flsplash-set $(WALLFILES)
 
 genart: genart.c
 	$(CC) $(CFLAGS) $$(pkg-config --cflags $(PKGS)) $(LDFLAGS) -o $@ $< $$(pkg-config --libs $(PKGS)) -lz -lm
@@ -30,13 +30,25 @@ wallpaper-%.flw: genart
 flsplash: flsplash.c flsplash.dat
 	$(CC) $(CFLAGS) -DARTFILE='"flsplash.dat"' $(LDFLAGS) -o $@ flsplash.c -lz -lm
 
+# the Themes app's helper: setuid root, group seat (mode from the recipe's owner= line)
+flsplash-set: flsplash-set.c flauth-check.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ flsplash-set.c
+
+flsplash-set-test: flsplash-set.c flauth-check.h
+	$(CC) $(CFLAGS) -DFLSPLASH_SET_TEST $(LDFLAGS) -o $@ flsplash-set.c
+
+# the flat and legacy renders, the config, the helper's checks; no screen, no root
+check: flsplash flsplash-set-test
+	sh tests/check.sh
+
 install: all
 	install -Dm755 flsplash $(DESTDIR)$(PREFIX)/sbin/flsplash
+	install -Dm755 flsplash-set $(DESTDIR)$(PREFIX)/bin/flsplash-set
 	install -Dm644 wallpaper.flw $(DESTDIR)$(PREFIX)/share/flcomp/wallpaper.flw
 	for f in $(WALLFILES); do install -Dm644 $$f $(DESTDIR)$(PREFIX)/share/flcomp/$$f; done
 	install -Dm644 README $(DESTDIR)$(PREFIX)/share/doc/flsplash/README
 
 clean:
-	$(RM) flsplash genart flsplash.dat wallpaper.flw $(WALLFILES)
+	$(RM) flsplash flsplash-set flsplash-set-test genart flsplash.dat wallpaper.flw $(WALLFILES)
 
-.PHONY: all install clean
+.PHONY: all install check clean

@@ -61,6 +61,12 @@ check "Esc goes back to the main menu" 'grep -q "chosen: 0" <<< "$out"'
 out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u e u e d e)
 check "Back row of the list returns to the main menu" 'grep -q "chosen: 0" <<< "$out"'
 
+# Safe graphics: the newest kernel with nomodeset, in the main list, listed after the other kernels
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 e)
+check "the main menu offers Safe graphics" 'grep -q "Safe graphics, kernel 6.14.0" <<< "$out"'
+out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u u e)
+check "Safe graphics boots the newest kernel with nomodeset" 'grep -q "^cmdline: root=PARTUUID=1234 rootwait ro rootflags=subvol=@ quiet nomodeset nouveau.modeset=0$" <<< "$out" && grep -q "^title: FreeLFS (Safe graphics, kernel 6.14.0)$" <<< "$out"'
+
 # the command line of a snapshot: rootflags replaced, the newest kernel
 out=$(FLBOOT_TEXT=1 hm "$esp" 800x600 u e d e e)
 check "snapshot #8 boots with rootflags=subvol=@snapshots/8, not @" 'grep -q "^cmdline: root=PARTUUID=1234 rootwait ro quiet rootflags=subvol=@snapshots/8$" <<< "$out"'

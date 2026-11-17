@@ -26,15 +26,17 @@
 #include <errno.h>
 #include <flui.h>
 #include <flpalette.h>
+#include <math.h>
 #include <stdarg.h>
 #include <signal.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
 
-enum { PG_PRESETS, PG_COLOURS, PG_FONTS, PG_WINDOWS, PG_PANEL, PG_ANIM, PG_COUNT };
+enum { PG_PRESETS, PG_COLOURS, PG_FONTS, PG_WINDOWS, PG_PANEL, PG_ANIM, PG_BOOT, PG_COUNT };
 
 /* widget ids; ranges: presets 100.., user presets 200.., swatches 300.., fonts 400.., choices 500.. */
 enum {
@@ -55,14 +57,16 @@ struct app {
 	char save_name[40];
 	char msg[120];
 	int msg_err;
-	/* colours */
-	char hex[16];
+	/* colours: the custom accent field, and the accent value it was last synced with */
+	char hex[16], hex_seen[64];
 	/* sliders: the value while the mouse is down, applied on release */
 	uint32_t sl_id;
 	int sl_val;
 	/* fonts that are really installed */
 	const char *fonts[6];
 	int nfonts;
+	/* boot screen: the style in /etc/freelfs/splash.conf, read once and after each change */
+	int boot_legacy, boot_known;
 };
 
 static struct app A;
@@ -397,8 +401,11 @@ static void page_presets(fl_ui *ui, fl_rect c)
 					say(1, "%s is not a theme file", A.user[k].name);
 			}
 			if (fl_button(ui, ID_UP_DEL + (uint32_t)k, fl_r(r.x + r.w - 80, r.y + 3, 72, 26), "Delete", FL_BTN_OUTLINE)) {
-				user_delete(A.user[k].name);
-				say(0, "Deleted %s", A.user[k].name);
+				/* a failed unlink must not say "Deleted": the name would come back on the next listing */
+				if (user_delete(A.user[k].name) == 0)
+					say(0, "Deleted %s", A.user[k].name);
+				else
+					say(1, "Could not delete %s: %s", A.user[k].name, strerror(errno));
 				refresh_user();
 				break;
 			}
@@ -450,18 +457,24 @@ static void page_colours(fl_ui *ui, fl_rect c)
 			set_or_default("accent", fl_accents[i].id);
 	}
 	y += ROW + 8;
-	row_text(ui, x, y, w - 250, "Custom accent", "Six hex digits, then Enter (for example 8a5fd0)");
+	row_text(ui, x, y, w - 250, "Custom accent", "Six hex digits, then Enter. Clear the field and Reset to drop it");
 	fl_rect hf = fl_r(x + w - 230, y + 12, 130, 32);
-	if (!A.hex[0] && sel < 0)
-		snprintf(A.hex, sizeof A.hex, "%s", cur);
+	/* the field follows the configured accent only when that changes: a cleared field stays cleared */
+	accent_field_sync(fl_conf_get("accent", NULL), sel >= 0, A.hex_seen, sizeof A.hex_seen, A.hex, sizeof A.hex);
 	int e = fl_textfield(ui, ID_HEX, hf, A.hex, sizeof A.hex, "RRGGBB", ui->f_reg);
 	fl_color probe;
 	uint32_t pv;
 	int valid = flpal_parse_hex(A.hex, &pv) == 0;
 	probe = valid ? flpal_accent(A.hex, fl_th.dark) : fl_th.line;
 	fl_fill_rect(&ui->cv, fl_r(hf.x + hf.w + 8, hf.y, 32, 32), probe);
-	if (fl_button(ui, ID_HEX + 1, fl_r(hf.x + hf.w + 48, hf.y, 52, 32), "Set", valid ? FL_BTN_ACCENT : FL_BTN_OUTLINE) || (e & FL_EDIT_ENTER)) {
-		if (valid) {
+	/* an empty field while a custom accent is in use: Reset removes it (the default green) */
+	int clear = !A.hex[0] && sel < 0;
+	int hit = fl_button(ui, ID_HEX + 1, fl_r(hf.x + hf.w + 48, hf.y, 52, 32), clear ? "Reset" : "Set",
+	                    clear || valid ? FL_BTN_ACCENT : FL_BTN_OUTLINE);
+	if (hit || (e & FL_EDIT_ENTER)) {
+		if (clear) {
+			set_or_default("accent", "green"); /* the default: the key is removed from desktop.conf */
+		} else if (valid) {
 			char norm[16];
 			snprintf(norm, sizeof norm, "%06x", pv & 0xffffff);
 			set_one("accent", norm);
@@ -593,6 +606,160 @@ static void page_anim(fl_ui *ui, fl_rect c)
 
 /* ---- window ------------------------------------------------------------------------------------ */
 
+/* ---- boot screen ------------------------------------------------------------------------------
+ * /etc/freelfs/splash.conf is written by flsplash-set (setuid root, after the person's password, see
+ * flsplash's README); this app only reads it and runs the helper. The two previews are simplified
+ * drawings of the styles, the real screens come at the next boot. */
+#define SPLASH_CONF "/etc/freelfs/splash.conf"
+#define SPLASH_SET "/usr/bin/flsplash-set"
+#define BOOT_BG 0xff0d1110u
+#define BOOT_ACCENT 0xff3f9b63u
+#define BOOT_TEXT 0xffd8dce0u
+
+/* the last splash= line wins, as flsplash reads it; anything else is flat */
+static int splash_read_legacy(void)
+{
+	FILE *f = fopen(SPLASH_CONF, "r");
+	int legacy = 0;
+	if (!f)
+		return 0;
+	char line[128];
+	while (fgets(line, sizeof line, f)) {
+		size_t l = strlen(line);
+		while (l && (line[l - 1] == '\n' || line[l - 1] == '\r' || line[l - 1] == ' ' || line[l - 1] == '\t'))
+			line[--l] = 0;
+		if (!strcmp(line, "splash=legacy"))
+			legacy = 1;
+		else if (!strcmp(line, "splash=flat"))
+			legacy = 0;
+	}
+	fclose(f);
+	return legacy;
+}
+
+/* one bar of docs/logo.svg: rect (x, y, w, h) in its 20 x 20 box, rotate(6 10 10), scaled by k */
+static void boot_bar(fl_path *p, float x, float y, float w, float h, float cx, float cy, float k)
+{
+	const float c = 0.99452190f, s = 0.10452846f; /* cos and sin of 6 degrees */
+	float px[4] = {x, x + w, x + w, x}, py[4] = {y, y, y + h, y + h};
+	for (int i = 0; i < 4; i++) {
+		float dx = px[i] - 10.0f, dy = py[i] - 10.0f;
+		float X = cx + k * (dx * c - dy * s), Y = cy + k * (dx * s + dy * c);
+		if (i == 0)
+			fl_path_move(p, X, Y);
+		else
+			fl_path_line(p, X, Y);
+	}
+	fl_path_close(p);
+}
+
+static void boot_logo(fl_canvas *cv, float cx, float cy, float side, fl_color c, int dy_px)
+{
+	float k = side / 20.0f;
+	static const float bars[3][4] = {{3, 3, 14, 3.4f}, {3, 8.3f, 10, 3.4f}, {3, 13.6f, 6, 3.4f}};
+	for (int i = 0; i < 3; i++) {
+		fl_path *p = fl_path_new();
+		boot_bar(p, bars[i][0], bars[i][1], bars[i][2], bars[i][3], cx, cy + (float)dy_px, k);
+		fl_path_fill(cv, p, c);
+		fl_path_free(p);
+	}
+}
+
+static void draw_boot_preview(fl_ui *ui, fl_rect r, int legacy)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_fill_rect(cv, r, BOOT_BG);
+	fl_stroke_rect(cv, r, 1, fl_th.line);
+	float side = r.h * 0.30f;
+	float cx = (float)r.x + r.w / 2.0f, cy = (float)r.y + r.h * 0.40f;
+	if (legacy) {
+		/* the glow and the mirror image, roughly */
+		int g = (int)side;
+		fl_fill_rect(cv, fl_r((int)cx - g * 3 / 4, (int)cy - g * 3 / 4, g * 3 / 2, g * 3 / 2), 0x143f9b63u);
+		boot_logo(cv, cx, cy, side, BOOT_ACCENT, 0);
+		boot_logo(cv, cx, cy, side, 0x553f9b63u, (int)(side * 1.05f));
+	} else {
+		boot_logo(cv, cx, cy, side, BOOT_ACCENT, 0);
+	}
+	/* the spinner: a 110 degree arc */
+	float R = r.h * 0.05f;
+	float sy = cy + side * 0.55f + r.h * 0.085f;
+	fl_path *ap = fl_path_new();
+	for (int i = 0; i <= 24; i++) {
+		float a = 0.6f + 1.92f * (float)i / 24.0f;
+		float X = cx + R * cosf(a), Y = sy + R * sinf(a);
+		if (i == 0)
+			fl_path_move(ap, X, Y);
+		else
+			fl_path_line(ap, X, Y);
+	}
+	fl_path_stroke(cv, ap, 2.0f, BOOT_ACCENT);
+	fl_path_free(ap);
+	fl_text_in(cv, A.small, fl_r(r.x, r.y + r.h - 22, r.w, 16), FL_CENTER, 0, BOOT_TEXT, "FreeLFS");
+}
+
+static void set_boot_style(int legacy)
+{
+	const char *word = legacy ? "legacy" : "flat";
+	pid_t p = fork();
+	if (p < 0) {
+		say(1, "Cannot start %s: %s", SPLASH_SET, strerror(errno));
+		return;
+	}
+	if (p == 0) {
+		execl(SPLASH_SET, "flsplash-set", word, (char *)NULL);
+		_exit(127);
+	}
+	int st = 0;
+	while (waitpid(p, &st, 0) < 0 && errno == EINTR)
+		;
+	/* the helper's own codes, and flauth's, which it passes on */
+	switch (WIFEXITED(st) ? WEXITSTATUS(st) : -1) {
+	case 0:
+		A.boot_legacy = legacy;
+		A.boot_known = 1;
+		say(0, "Boot screen: %s. It applies at the next boot.", legacy ? "Legacy (3D)" : "Flat");
+		break;
+	case 1: say(1, "Not changed: the password was wrong, or the file could not be written."); break;
+	case 2: say(1, "Cancelled. Nothing was changed."); break;
+	case 3: say(1, "Locked out of the password prompt for a while. Nothing was changed."); break;
+	case 4: say(1, "No password can unlock this account. Nothing was changed."); break;
+	case 77: say(1, "Your password is needed, and flauth is not available. Nothing was changed."); break;
+	case 127: say(1, "The boot screen helper is not installed."); break;
+	default: say(1, "Not changed (helper exit %d).", WIFEXITED(st) ? WEXITSTATUS(st) : -1); break;
+	}
+}
+
+static void page_boot(fl_ui *ui, fl_rect c)
+{
+	int x = c.x + 28, w = c.w - 56, y = c.y + 20;
+	if (!A.boot_known) {
+		A.boot_legacy = splash_read_legacy();
+		A.boot_known = 1;
+	}
+	section(ui, x, y, w, "Boot screen");
+	y += 34;
+	int gap = 20, cw = (w - gap) / 2;
+	for (int i = 0; i < 2; i++) {
+		int legacy = i;
+		int cx = x + i * (cw + gap);
+		draw_boot_preview(ui, fl_r(cx, y, cw, 150), legacy);
+		int on = A.boot_legacy == legacy;
+		if (choice(ui, ID_CH + 40 + (uint32_t)i, fl_r(cx, y + 160, cw, 32), legacy ? "Legacy (3D)" : "Flat (default)", on) && !on)
+			set_boot_style(legacy);
+		fl_text(&ui->cv, A.small, cx, y + 202, fl_th.dim,
+		        legacy ? "The glossy 3D logo: glow, mirror and a light sweep." :
+		                 "A flat F with a thin spinner: calm, fades in, then the login screen.", -1);
+	}
+	y += 236;
+	if (A.msg[0])
+		fl_text(&ui->cv, A.small, x, y, A.msg_err ? fl_th.err : fl_th.dim, A.msg, -1);
+	fl_text(&ui->cv, A.small, x, y + 24, fl_th.dim,
+	        "It applies at the next boot. Esc on the boot screen always shows the text console.", -1);
+	fl_text(&ui->cv, A.small, x, y + 42, fl_th.dim,
+	        "Changing it asks for your password (flauth). Custom boot screens come later.", -1);
+}
+
 static int sidebar_item(fl_ui *ui, uint32_t id, fl_rect r, fl_icon ic, const char *label, int on)
 {
 	int res = fl_widget(ui, id, r, FL_FOCUSABLE);
@@ -622,6 +789,7 @@ static void draw(fl_ui *ui, void *ud)
 	static const struct { fl_icon icon; const char *name; } items[PG_COUNT] = {
 		{FL_ICON_SETTINGS, "Presets"}, {FL_ICON_DISPLAY, "Colours"}, {FL_ICON_DOC, "Fonts"},
 		{FL_ICON_WINDOW, "Windows"}, {FL_ICON_MENU, "Panel"}, {FL_ICON_CLOCK, "Animations"},
+		{FL_ICON_DISPLAY, "Boot screen"},
 	};
 	for (int i = 0; i < PG_COUNT; i++)
 		if (sidebar_item(ui, ID_PAGE + (uint32_t)i, fl_r(side.x, side.y + 12 + i * 40, side.w - 1, 40), items[i].icon,
@@ -635,6 +803,7 @@ static void draw(fl_ui *ui, void *ud)
 	case PG_WINDOWS: page_windows(ui, c); break;
 	case PG_PANEL: page_panel(ui, c); break;
 	case PG_ANIM: page_anim(ui, c); break;
+	case PG_BOOT: page_boot(ui, c); break;
 	default: page_presets(ui, c);
 	}
 }
@@ -643,7 +812,7 @@ static const char *const font_candidates[] = {"IBM Plex Sans", "IBM Plex Mono", 
 
 static int page_by_name(const char *n)
 {
-	static const char *const names[PG_COUNT] = {"presets", "colours", "fonts", "windows", "panel", "animations"};
+	static const char *const names[PG_COUNT] = {"presets", "colours", "fonts", "windows", "panel", "animations", "boot"};
 	for (int i = 0; i < PG_COUNT; i++)
 		if (!strcasecmp(n, names[i]))
 			return i;

@@ -195,7 +195,7 @@ static int cmp_proc_idx(const void *pa, const void *pb)
 	int c;
 	switch (s_col) {
 	case 1: c = cmp_d(x->cpu, y->cpu); break;
-	case 2: c = x->priv_kb < y->priv_kb ? -1 : x->priv_kb > y->priv_kb; break;
+	case 2: c = x->mem_kb < y->mem_kb ? -1 : x->mem_kb > y->mem_kb; break;
 	case 3: c = cmp_d(x->disk_bps, y->disk_bps); break;
 	default: c = strcasecmp(x->name, y->name); break;
 	}
@@ -214,7 +214,7 @@ static int cmp_detail(const void *pa, const void *pb)
 	case 2: c = strcmp(state_name(x->state), state_name(y->state)); break;
 	case 3: c = strcasecmp(user_name(x->uid), user_name(y->uid)); break;
 	case 4: c = cmp_d(x->cpu, y->cpu); break;
-	case 5: c = x->priv_kb < y->priv_kb ? -1 : x->priv_kb > y->priv_kb; break;
+	case 5: c = x->mem_kb < y->mem_kb ? -1 : x->mem_kb > y->mem_kb; break;
 	case 6: c = strcasecmp(x->cmd ? x->cmd : "", y->cmd ? y->cmd : ""); break;
 	default: c = strcasecmp(x->name, y->name); break;
 	}
@@ -250,7 +250,7 @@ static int proc_matches(const struct proc *p, const char *q)
 static void agg_add(struct agg *a, const struct proc *p)
 {
 	a->cpu += p->cpu;
-	a->mem += p->priv_kb;
+	a->mem += p->mem_kb;
 	a->disk += p->disk_bps;
 	a->disk_ok |= p->io_ok;
 }
@@ -258,7 +258,7 @@ static void agg_add(struct agg *a, const struct proc *p)
 static void fill_row_from_proc(struct model *m, struct row *r, const struct proc *p)
 {
 	r->cpu = p->cpu;
-	r->mem = p->priv_kb;
+	r->mem = p->mem_kb;
 	r->disk = p->disk_bps;
 	r->disk_ok = p->io_ok;
 	r->tpos = pool_add(m, p->pid);
@@ -1129,7 +1129,7 @@ static void draw_details(fl_ui *ui, struct gm *g, fl_rect r)
 		gm_text(ui, ui->f_reg, fl_r(cx[3] + PAD, rr.y, cwid[3] - PAD, rr.h), FL_LEFT, fl_th.text, fit);
 		gm_text(ui, ui->f_reg, fl_r(cx[4], rr.y, cwid[4] - 14, rr.h), FL_RIGHT, p->cpu < 0.05 ? fl_th.dim : fl_th.text,
 		        fmt_pct(p->cpu));
-		gm_text(ui, ui->f_reg, fl_r(cx[5], rr.y, cwid[5] - 14, rr.h), FL_RIGHT, fl_th.text, fmt_mem(p->priv_kb));
+		gm_text(ui, ui->f_reg, fl_r(cx[5], rr.y, cwid[5] - 14, rr.h), FL_RIGHT, fl_th.text, fmt_mem(p->mem_kb));
 		fl_text_fit(ui->f_reg, p->cmd ? p->cmd : "", cwid[6] - PAD - 28, fit, sizeof fit);
 		gm_text(ui, ui->f_reg, fl_r(cx[6] + PAD, rr.y, cwid[6] - PAD, rr.h), FL_LEFT, fl_th.dim, fit);
 		if (sel)
@@ -1264,7 +1264,7 @@ static void set_tab(struct gm *g, int tab)
 	g->tab = tab;
 	if (tab == TAB_STARTUP)
 		startup_reload(g);
-	if (wants_procs(g)) {
+	if (g->ready && wants_procs(g)) {
 		procs_scan(&g->ps);
 		rebuild(g);
 		fl_timer_arm(g->quick, 400, 0);
@@ -1370,7 +1370,9 @@ static void draw(fl_ui *ui, void *ud)
 	fl_rect page = fl_r(c.x, c.y + STRIP_H, c.w, c.h - STRIP_H - STATUS_H);
 	fl_rect save = cv->clip;
 	fl_clip(cv, page);
-	switch (g->tab) {
+	if (!g->ready) { /* the window is up before the first read of /proc and /sys */
+		gm_text(ui, g->f.h2, page, FL_CENTER, fl_th.dim, "Reading the system...");
+	} else switch (g->tab) {
 	case TAB_PROCS: draw_groups_page(ui, g, page, TAB_PROCS, "Processes"); break;
 	case TAB_USERS: draw_groups_page(ui, g, page, TAB_USERS, "Users"); break;
 	case TAB_DETAILS: draw_details(ui, g, page); break;
@@ -1383,11 +1385,19 @@ static void draw(fl_ui *ui, void *ud)
 
 /* ---- timers and main ---------------------------------------------------------------------------- */
 
+/* the Memory entry of Performance splits "in use" by process, so it reads the process table too */
+static int wants_mem_view(const struct gm *g)
+{
+	return g->tab == TAB_PERF && g->perf_sel == 1;
+}
+
 static void on_tick(void *ud)
 {
 	struct gm *g = ud;
+	if (!g->ready)
+		return;
 	sys_sample(&g->sys);
-	if (wants_procs(g)) {
+	if (wants_procs(g) || wants_mem_view(g)) {
 		procs_scan(&g->ps);
 		rebuild(g);
 	}
@@ -1397,9 +1407,60 @@ static void on_tick(void *ud)
 static void on_quick(void *ud)
 {
 	struct gm *g = ud;
-	if (wants_procs(g)) {
+	if (!g->ready)
+		return;
+	if (wants_procs(g) || wants_mem_view(g)) {
 		procs_scan(&g->ps);
 		rebuild(g);
+	}
+	fl_win_redraw(g->win);
+}
+
+/* --expand and --select, applied once the data is in */
+static const char *boot_expand, *boot_select;
+
+/* The machine data. It is read after the window is up (the first frame says "Reading the
+ * system"), so a slow or hung read in /proc or /sys delays the numbers, not the window. */
+static void on_boot(void *ud)
+{
+	struct gm *g = ud;
+	apps_load();
+	sys_init(&g->sys);
+	procs_init(&g->ps, g->sys.ncpu);
+	sys_sample(&g->sys);
+	g->ready = 1;
+	procs_scan(&g->ps);
+	if (boot_expand) {
+		/* groups opened up front: for screenshots */
+		struct procs *ps = &g->ps;
+		for (int i = 0; i < ps->n; i++) {
+			const struct appinfo *ai = apps_get(ps->p[i].app);
+			char key[96];
+			if (ai && (!strcmp(boot_expand, "all") || !strcasecmp(boot_expand, ai->exec) ||
+			           !strcasecmp(boot_expand, ai->name))) {
+				snprintf(key, sizeof key, "a:%d", ps->p[i].app);
+				if (!exp_has(g, key))
+					exp_toggle(g, key);
+			}
+		}
+	}
+	if (boot_expand && (!strcmp(boot_expand, "all") || !strcmp(boot_expand, user_name(getuid())))) {
+		char key[96];
+		snprintf(key, sizeof key, "u:%u", getuid());
+		exp_toggle(g, key);
+	}
+	rebuild(g);
+	if (boot_select && wants_procs(g)) {
+		struct model *m = g->tab == TAB_PROCS ? &g->procs_m : g->tab == TAB_USERS ? &g->users_m : &g->det_m;
+		char needle[96];
+		snprintf(needle, sizeof needle, "%s", boot_select);
+		for (char *c = needle; *c; c++)
+			*c = (char)tolower((unsigned char)*c);
+		for (int i = 0; i < m->n; i++)
+			if (m->r[i].kind != ROW_SECTION && contains_ci(m->r[i].label, needle)) {
+				snprintf(g->ts[g->tab].sel, sizeof g->ts[g->tab].sel, "%s", m->r[i].key);
+				break;
+			}
 	}
 	fl_win_redraw(g->win);
 }
@@ -1475,10 +1536,6 @@ int main(int argc, char **argv)
 	g->f.mid = fl_font_ui(500, 18);
 	g->f.mono = fl_font_mono(400, 12);
 
-	apps_load();
-	sys_init(&g->sys);
-	procs_init(&g->ps, g->sys.ncpu);
-	sys_sample(&g->sys);
 	g->sort_col[TAB_PROCS] = g->sort_col[TAB_USERS] = 0;
 	g->sort_col[TAB_DETAILS] = 4;
 	g->sort_desc[TAB_DETAILS] = 1;
@@ -1494,6 +1551,9 @@ int main(int argc, char **argv)
 	g->tab = -1;
 	g->tick = fl_timer_new(g->app, on_tick, g);
 	g->quick = fl_timer_new(g->app, on_quick, g);
+	g->boot = fl_timer_new(g->app, on_boot, g);
+	boot_expand = expand;
+	boot_select = select_text;
 
 	fl_win_opts o = {
 		.title = "General Manager", .app_id = "general-manager", .w = g->width > 0 ? g->width : 1040,
@@ -1505,38 +1565,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "general-manager: cannot open a window\n");
 		return 1;
 	}
-	if (expand) {
-		/* groups opened up front: for screenshots */
-		procs_scan(&g->ps);
-		struct procs *ps = &g->ps;
-		for (int i = 0; i < ps->n; i++) {
-			const struct appinfo *ai = apps_get(ps->p[i].app);
-			char key[96];
-			if (ai && (!strcmp(expand, "all") || !strcasecmp(expand, ai->exec) || !strcasecmp(expand, ai->name))) {
-				snprintf(key, sizeof key, "a:%d", ps->p[i].app);
-				if (!exp_has(g, key))
-					exp_toggle(g, key);
-			}
-		}
-	}
-	if (expand && (!strcmp(expand, "all") || !strcmp(expand, user_name(getuid())))) {
-		char key[96];
-		snprintf(key, sizeof key, "u:%u", getuid());
-		exp_toggle(g, key);
-	}
 	set_tab(g, tab);
-	if (select_text && wants_procs(g)) {
-		struct model *m = tab == TAB_PROCS ? &g->procs_m : tab == TAB_USERS ? &g->users_m : &g->det_m;
-		char needle[96];
-		snprintf(needle, sizeof needle, "%s", select_text);
-		for (char *c = needle; *c; c++)
-			*c = (char)tolower((unsigned char)*c);
-		for (int i = 0; i < m->n; i++)
-			if (m->r[i].kind != ROW_SECTION && contains_ci(m->r[i].label, needle)) {
-				snprintf(g->ts[tab].sel, sizeof g->ts[tab].sel, "%s", m->r[i].key);
-				break;
-			}
-	}
+	/* the window shows first; the machine data is read on the first turn of the event loop */
+	fl_timer_arm(g->boot, 1, 0);
 	fl_timer_arm(g->tick, g->interval_ms, g->interval_ms);
 	fl_app_watch_conf(g->app, NULL, NULL);
 	fl_app_run(g->app);

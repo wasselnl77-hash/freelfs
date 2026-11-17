@@ -62,3 +62,13 @@ The user chose these on 2026-11-14. The installer is `src/flinstall`; today it h
   - **Start menu and search:** the real name big ("FreeBWS"), "Web browser" small under it; search matches both.
   - **Window titles and taskbar:** the real name ("FreeBWS", "General Manager").
   - Needs `GenericName=` in every .desktop file, read by flpanel's menu and search.
+
+## Branding (2026-11-16)
+- **Tagline:** "Scratch, from scratch."
+- **Welcome app greeting:** "Hello! Your free RAM is calling for you!" Below it, "5 things to do with the RAM you just saved" (draft list in the chat, final wording TBD), plus a live counter "FreeLFS is using N MB right now".
+- **Welcome list, draft:**
+  1. 🦊 Open 47 more browser tabs and still feel nothing
+  2. 🎮 Give it to your games. They deserve it more than Windows Update does
+  3. 🧠 Let your laptop from 2012 breathe for the first time in years
+  4. 🐧 Brag on the internet that your whole desktop uses less than one Chrome tab
+  5. 💤 Absolutely nothing. Free RAM is happy RAM (don't listen to those pirates who say differently!)

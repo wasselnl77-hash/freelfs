@@ -937,7 +937,10 @@ static void draw_panel(fl_ui *ui, void *ud)
 			fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 2, r.w, 2), fl_th.accent);
 		else if (res & FL_FOCUS)
 			fl_fill_rect(cv, fl_r(r.x, r.y + r.h - 2, r.w, 2), fl_th.line);
-		int iy = r.y + (r.h - 2 - ICON_PX) / 2;
+		/* centred in the part of the entry that is drawn: the 2 px accent underline (focused, or keyboard
+		 * focus) takes the bottom of the box; the hover and pressed fill covers all of it */
+		int under = (focused || (res & FL_FOCUS)) ? 2 : 0;
+		int iy = r.y + (r.h - under - ICON_PX) / 2;
 		if (labels) {
 			if (!icon_draw_app(cv, w->app_id, r.x + 12, iy, ICON_PX))
 				fl_icon_draw(cv, fl_icon_for_app(w->app_id), r.x + 12, iy, ICON_PX, fg);

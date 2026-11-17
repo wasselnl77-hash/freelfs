@@ -3,12 +3,12 @@
 
 CC ?= cc
 CFLAGS ?= -O2 -g
-CFLAGS += -std=c17 -D_GNU_SOURCE -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation
+CFLAGS += -std=c17 -D_GNU_SOURCE -pthread -Wall -Wextra -Wno-unused-parameter -Wno-format-truncation
 PKGS = flui
 PREFIX ?= /usr
 DESTDIR ?=
 
-OBJS = gm.o perf.o sys.o proc.o startup.o
+OBJS = gm.o perf.o sys.o proc.o rdr.o startup.o
 
 all: general-manager
 

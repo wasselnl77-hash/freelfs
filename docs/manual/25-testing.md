@@ -13,7 +13,7 @@ written, and why a pass in QEMU is not a pass on real hardware.
 4. Package test suites inside the build
 5. The QEMU drivers
 6. The `.cmds` command language (`build/live-run.py`)
-7. The round suites (m8 to m18)
+7. The round suites (m8 to m20)
 8. Writing a test that can fail
 9. The audit of 2026-11-14: where the tests did not test what the person does
 10. QEMU passing is not real hardware
@@ -165,7 +165,7 @@ off), and `build/m16/persist-2-write.cmds` (checks that `/home` is the persisten
 Fixed coordinates in `@mouse` depend on the screen and the windows. The audit (section 9) noted this; the newer suites take
 screendumps and check them where they can.
 
-## 7. The round suites (m8 to m18)
+## 7. The round suites (m8 to m20)
 
 Every round of the project got a suite. The scripts are in `build/`. The `.cmds` and `.tty` files they use are in the directories
 `build/m16/`, `build/m17/` and `build/m18/`, or next to the scripts (`build/m10-features.cmds`, `build/m7-desktop.cmds`, ...). The list below is what each script's header says.
@@ -288,3 +288,19 @@ contributors too:
 - Do not wait with `while pgrep -f PATTERN`: the loop matches its own command line and never ends. Wait on a PID
   (`while kill -0 $PID 2>/dev/null; do sleep 5; done`), use `pgrep -x NAME`, or run the job in the background.
 - Do not read or search the `~/Dokumente/tokens` folder. Tests need no credentials.
+
+## Round 20 suite: build/m20-features.sh
+
+`build/m20-features.sh TWIN.iso [NOMODESET-TWIN.iso]`, steps in `build/m20/*.cmds` (the second twin is built with
+`./build/53-iso.sh --cmdline "console=ttyS0,115200 nomodeset"`). New driver command `@shotsame BASE NEW MAX [X1 Y1 X2 Y2]`
+fails when MORE than MAX pixels differ (leftovers, stale frames).
+
+| Step | What it does | Can it fail? |
+|---|---|---|
+| `ventoy-eject` | Ventoy layout stick, a device-mapper device over it (`build/m20/dmlinear.c`, built against the sysroot): `flmount list` says boot, eject refused, stick stays, General Manager opens | yes: a stick without holders ejects |
+| `ventoy-replug` | the same stick without the mapping: eject in Files, apps open (pixels), replug twice, files readable at once | yes: failed on the r19 ISO's lock (flmount held its mount lock while it waited for the notification) |
+| `freebws-watchdog` | a local server stalls a page for ever; `watchdog_test=1` freezes the frame counter: fallback to shm (config, log, restart on the same page), then the hang watchdog ends the web process | yes |
+| `desktop-rubber` | rubber-band drags across the desktop through the real pointer: inside the band the desktop must look as before | yes: fails on the r19 ISO (815 and 661 pixels differ), passes with the fix (0) |
+| `wifi-modules` | the Wi-Fi modules (with the QCA9377 PCI id) and firmware files are in the image, lspci/lsusb/ip work for an ordinary user, flreport lists controllers. **Real Wi-Fi is not testable in QEMU** | yes |
+| `splash-style` | flat and legacy splash renders (corner colour #0d1110), `flsplash-set`, no "rc: step failed" in the boot log | yes |
+| `nomodeset` | the second twin: simpledrm card, flcomp says "firmware framebuffer", desktop, Files, software night light. **Not real NVIDIA hardware** | yes |

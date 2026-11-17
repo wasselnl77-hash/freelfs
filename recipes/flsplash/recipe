@@ -1,14 +1,16 @@
 # flsplash, from src/flsplash in the FreeLFS tree.
 pkgname=flsplash
 version=0.2
-release=5
-summary="FreeLFS boot screen: a glossy 3D logo on the KMS framebuffer, no compositor"
+release=6
+summary="FreeLFS boot screen: a flat logo with a spinner (or the legacy 3D one) on the KMS framebuffer, no compositor"
 license=(MIT)
 arch=(x86_64)
 groups=(desktop)
 depends=(glibc zlib)
 # genart renders the logo and the word (IBM Plex Sans) at build time
 makedepends=(freetype zlib ibm-plex)
+# the Themes app writes /etc/freelfs/splash.conf through this helper (it asks flauth for the password)
+owner=("/usr/bin/flsplash-set 0 98 4750")
 source=()
 sha256=()
 

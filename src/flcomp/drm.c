@@ -472,33 +472,101 @@ static int drm_cb(int fd, uint32_t mask, void *data)
 	return 0;
 }
 
+/* simpledrm / efifb: the firmware framebuffer, one dumb buffer, no gamma table, no real vblank. It is what a
+ * machine shows before its GPU driver is loaded, and for good when there is none (an NVIDIA card without nouveau,
+ * "nomodeset"). A real GPU's card is preferred whenever both exist. */
+static bool card_is_firmware_fb(const char *name)
+{
+	char link[300], tgt[300];
+	snprintf(link, sizeof link, "/sys/class/drm/%s/device/driver", name);
+	ssize_t n = readlink(link, tgt, sizeof tgt - 1);
+	if (n <= 0)
+		return false;
+	tgt[n] = 0;
+	const char *b = strrchr(tgt, '/');
+	b = b ? b + 1 : tgt;
+	return !strcmp(b, "simple-framebuffer") || !strcmp(b, "simpledrm") || !strcmp(b, "efi-framebuffer") ||
+	       !strcmp(b, "vesa-framebuffer") || !strcmp(b, "platform-framebuffer");
+}
+
+/* A PCI display controller whose driver has not bound yet: its module is still loading (nouveau takes seconds when
+ * it loads GSP firmware). Starting on the firmware framebuffer now would lose the screen when the driver takes
+ * over, so wait, at most 10 s, and not at all with "nomodeset" (no driver will come). */
+static void wait_for_gpu_driver(void)
+{
+	char cl[512];
+	FILE *f = fopen("/proc/cmdline", "r");
+	if (f) {
+		bool nomodeset = fgets(cl, sizeof cl, f) && strstr(cl, "nomodeset");
+		fclose(f);
+		if (nomodeset)
+			return;
+	}
+	for (int t = 0; t < 50; t++) {
+		bool pending = false;
+		DIR *d = opendir("/sys/bus/pci/devices");
+		struct dirent *e;
+		while (d && (e = readdir(d))) {
+			if (e->d_name[0] == '.')
+				continue;
+			char p[400], buf[32];
+			snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/class", e->d_name);
+			FILE *cf = fopen(p, "r");
+			if (!cf)
+				continue;
+			unsigned cls = 0;
+			if (fgets(buf, sizeof buf, cf))
+				cls = (unsigned)strtoul(buf, NULL, 16);
+			fclose(cf);
+			if ((cls >> 16) != 0x03)
+				continue;
+			snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/driver", e->d_name);
+			if (access(p, F_OK) != 0)
+				pending = true;
+		}
+		if (d)
+			closedir(d);
+		if (!pending)
+			return;
+		if (t == 0)
+			fprintf(stderr, "flcomp: a graphics card has no driver yet, waiting for it (up to 10 s)\n");
+		usleep(200 * 1000);
+	}
+	fprintf(stderr, "flcomp: no driver took the graphics card: using the firmware framebuffer if there is one\n");
+}
+
 static int open_drm(void)
 {
+	wait_for_gpu_driver();
 	DIR *d = opendir("/dev/dri");
 	if (!d)
 		return -1;
 	struct dirent *e;
 	int ret = -1;
-	while (ret < 0 && (e = readdir(d))) {
-		if (strncmp(e->d_name, "card", 4))
-			continue;
-		char path[300];
-		snprintf(path, sizeof(path), "/dev/dri/%s", e->d_name);
-		int fd, id = open_dev(path, &fd);
-		if (id < 0)
-			continue;
-		D.fd = fd;
-		D.dev_id = id;
-		NOUT = 0;
-		probe_drm();
-		bool any = false;
-		for (int i = 0; i < NOUT; i++)
-			any |= OUT[i].connected;
-		if (any)
-			ret = 0;
-		else {
-			close_dev(fd);
-			D.fd = -1;
+	for (int pass = 0; pass < 2 && ret < 0; pass++) {	/* pass 0: real GPUs; pass 1: the firmware framebuffer */
+		rewinddir(d);
+		while (ret < 0 && (e = readdir(d))) {
+			if (strncmp(e->d_name, "card", 4) || card_is_firmware_fb(e->d_name) != (pass == 1))
+				continue;
+			char path[300];
+			snprintf(path, sizeof(path), "/dev/dri/%s", e->d_name);
+			int fd, id = open_dev(path, &fd);
+			if (id < 0)
+				continue;
+			D.fd = fd;
+			D.dev_id = id;
+			NOUT = 0;
+			probe_drm();
+			bool any = false;
+			for (int i = 0; i < NOUT; i++)
+				any |= OUT[i].connected;
+			if (any) {
+				ret = 0;
+				fprintf(stderr, "flcomp: display on %s (%s)\n", e->d_name, pass ? "firmware framebuffer" : "GPU driver");
+			} else {
+				close_dev(fd);
+				D.fd = -1;
+			}
 		}
 	}
 	closedir(d);
@@ -924,8 +992,14 @@ void backend_tint(const double rgb[3])
 			d->full = 2;
 		}
 	}
-	if (soft && (tint_on || was))
+	if (soft && (tint_on || was)) {
+		static bool said;
+		if (!said) {	/* once: simpledrm, virtio and some NVIDIA setups have no gamma table */
+			said = true;
+			fprintf(stderr, "flcomp: night light is done in software (an output has no gamma table)\n");
+		}
 		damage_all();
+	}
 }
 
 /* ---- from the shadow buffer to the screen ------------------------------------------------- */

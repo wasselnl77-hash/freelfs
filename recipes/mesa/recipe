@@ -22,7 +22,7 @@
 # Vulkan programs on the host itself use this Mesa.
 pkgname=mesa
 version=26.1.7
-release=3
+release=4
 summary="OpenGL, EGL, GBM and Vulkan drivers"
 url=https://mesa3d.org/
 license=(MIT)
@@ -35,7 +35,7 @@ sha256=(25e0a669e6638c3563e7be32a0a09f1888317e6eed0d047dc41d49dc8de26c7d)
 build_style=meson
 configure_args=(
 	-D platforms=wayland,x11
-	-D gallium-drivers=radeonsi,llvmpipe,softpipe,virgl,zink
+	-D gallium-drivers=radeonsi,nouveau,llvmpipe,softpipe,virgl,zink
 	-D vulkan-drivers=amd,swrast
 	-D gallium-va=enabled
 	-D video-codecs=all

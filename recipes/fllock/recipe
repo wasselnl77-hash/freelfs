@@ -3,7 +3,7 @@
 # locked by flcomp itself, see fl_shell lock).
 pkgname=fllock
 version=0.1
-release=2
+release=3
 summary="FreeLFS lock screen: clock, date and password; the compositor holds the lock"
 license=(MIT)
 arch=(x86_64)

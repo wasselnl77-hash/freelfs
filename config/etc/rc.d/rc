@@ -44,6 +44,7 @@ case $1 in
 				"/etc/rc.d/init.d/$s" start
 			else
 				stat_busy "Starting $s"
+				echo "rc: service failed: $s" >> /run/flsplash.log 2> /dev/null
 				stat_fail
 			fi
 		done

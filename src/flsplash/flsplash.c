@@ -1,28 +1,40 @@
 /* flsplash -- the FreeLFS boot screen. Runs as root from rc.sysinit.
  * SPDX-License-Identifier: MIT
  *
- * A glossy 3D logo (docs/logo.svg: three bars tilted 6 degrees, as beveled
- * slabs) on a dark floor with a soft glow, a mirror image and a light sweep,
- * then "FreeLFS" under it. The layers are rendered at build time by genart.c
- * (flsplash.dat, deflated, built into this binary, a few sizes); here only the
- * logo region is composited, in premultiplied integer math, by the clock
- * (CLOCK_MONOTONIC from the first picture, about 4 s). Straight into KMS dumb
- * buffers, flipped on the vertical blank when the driver can (two buffers),
- * otherwise only the region is copied; or /dev/fb0 when there is no DRM
- * device. No compositor.
+ * Two styles, chosen by /etc/freelfs/splash.conf (splash=flat or splash=legacy;
+ * a missing or unreadable file means flat, the default):
+ *
+ *   flat    (default) the logo as a flat F (docs/logo.svg) on the background
+ *           colour, a thin spinning arc in the accent green, "FreeLFS" at the
+ *           bottom. Fades in from black; keeps spinning until the handover.
+ *   legacy  the glossy 3D logo: three bars as beveled slabs on a dark floor with
+ *           a soft glow, a mirror image and a light sweep, then "FreeLFS". The
+ *           layers are rendered at build time by genart.c (flsplash.dat, deflated,
+ *           built into this binary, a few sizes); here only the logo region is
+ *           composited, in premultiplied integer math, by the clock.
+ *
+ * Both run on the clock (CLOCK_MONOTONIC while a screen is up, from the first
+ * picture). Straight into KMS dumb buffers, flipped on the vertical blank when
+ * the driver can (two buffers), otherwise the region is copied; or /dev/fb0 when
+ * there is no DRM device. No compositor.
  *
  *   flsplash             start (forks into the background; exits 0 whatever happens)
  *   flsplash --handover  wait for the animation to end, then let go of the
  *                        screen (the login screen takes it over; the last
  *                        picture stays up until the new owner has drawn)
  *   flsplash --text      switch to the boot text at once (also when flsplash
- *                        is gone: the console is put back to text mode)
- *   flsplash --render MS W H FILE.ppm
- *                        the picture at MS ms on a W x H screen, no screen needed
+ *                        is gone: the console is put back to text mode); sends
+ *                        SIGHUP, while SIGUSR2 is what a failing rc step sends
+ *   flsplash --render MS W H FILE.ppm [flat|legacy]
+ *                        the picture at MS ms on a W x H screen, no screen needed;
+ *                        the style of the config unless given (FLSPLASH_CONF
+ *                        names another config file for this; the tests use it)
  *
  * When the DRM device goes away (simpledrm handing over to the real driver)
  * the card is opened again and drawing goes on at the right point. Esc shows
- * the boot text; so does SIGUSR2, which a failing boot step sends.
+ * the boot text; SIGUSR2 (a failing boot step) is only logged. The handover
+ * fades the flat picture to the background colour (the legacy one is let go as
+ * it is). /run/flsplash.style names the style for the greeter.
  * /run/flsplash.pid, .done (animation over), .released (handover done), .log.
  * Kernel option nosplash: do nothing.
  */
@@ -54,6 +66,8 @@
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
 
+#define SPLASH_CONF "/etc/freelfs/splash.conf"
+#define STYLEF "/run/flsplash.style"
 #define PIDF "/run/flsplash.pid"
 #define DONEF "/run/flsplash.done"
 #define RELF "/run/flsplash.released"
@@ -74,10 +88,18 @@ extern const uint8_t flsplash_art[], flsplash_art_end[];
 #define T_SWEEP 1500
 #define T_TEXT0 2100    /* the word fades in */
 #define T_TEXT 1300
-#define T_END 3800
+#define T_END 3800          /* legacy: the animation's end (flat has none) */
+#define FLAT_FADE_IN_MS 500 /* flat: fade in from black */
+#define FLAT_SPIN_MS 1200   /* flat: one turn of the spinner */
+#define FLAT_BG 0x0d1110u
+#define FLAT_ACCENT 0x3f9b63u
+#define FLAT_TEXT 0xd8dce0u
+enum { ST_FLAT, ST_LEGACY };
+static int g_style = ST_FLAT;
+#define FLATSTYLE (g_style == ST_FLAT)
 #define T_MIN 3000       /* the splash holds at least this long from the first picture (the animation is longer) */
 #define FADE_US 300000   /* after the animation, or when the handover came: fade out in this time */
-#define HANDOVER_WAIT_MS 6000 /* --handover waits for the fade and the animation's rest */
+#define HANDOVER_WAIT_MS 12000 /* --handover waits for the animation's rest: it may start late (a card that comes up late) */
 _Static_assert(T_END >= T_MIN, "the splash must hold at least T_MIN");
 #define FRAME_US 16667
 #define MIN_GAP_US 8000      /* least time between two copied frames */
@@ -428,6 +450,9 @@ struct out {
 	int rs, gs, bs; /* channel shifts of a 32 bit pixel */
 	struct scene *sc;
 	int rx, ry;     /* where the region sits */
+	uint32_t *fbase; /* flat: the picture without fade and spinner, w x h */
+	int fx, fy, fl;  /* flat: the logo's box: top left and side */
+	int sx, sy, sr, sth; /* flat: the spinner's centre, radius and thickness */
 };
 struct card {
 	int fd, fbdev, nout, nopoll;
@@ -443,6 +468,8 @@ static int tty_raw, kd_graphics;
 static int64_t t0_us = -1; /* monotonic us of the first picture */
 static int anim_done, released, card_gone, want_release;
 static int64_t fade_us = -1; /* when the fade-out started, -1 none */
+static int64_t clk_us, clk_ref = -1; /* the animation clock: time with a screen up and the splash ours */
+static int64_t card_seen_us;         /* the last time a screen was up: GIVE_UP counts from it */
 static int64_t st_frames, st_us, st_gap, st_last; /* what the frames cost: for the log */
 static int64_t start_us, rescan_at = -1, retry_until = -1, release_us, done_us;
 
@@ -468,10 +495,45 @@ static void logf_(const char *fmt, ...)
 	}
 }
 
+/* the animation clock advances only while a screen is up: a card that is gone for a moment (simpledrm
+ * handing over to the real driver) must not use the animation up. Called with the time now, before
+ * any change of ncards. */
+static void clk_run(int64_t now)
+{
+	if (clk_ref >= 0 && ncards && !released)
+		clk_us += now - clk_ref;
+	clk_ref = now;
+}
+
 static int64_t clock_t_now(void)
 {
-	int64_t t = t0_us < 0 ? 0 : (now_us() - t0_us) / 1000;
-	return t > T_END ? T_END : t;
+	int64_t t = clk_us / 1000;
+	return !FLATSTYLE && t > T_END ? T_END : t;
+}
+
+/* /etc/freelfs/splash.conf: the last splash= line wins; anything else is flat */
+static int read_style(const char *path)
+{
+	char b[512] = "";
+	int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+	if (fd < 0)
+		return ST_FLAT;
+	ssize_t n = read(fd, b, sizeof b - 1);
+	close(fd);
+	if (n <= 0)
+		return ST_FLAT;
+	b[n] = 0;
+	int st = ST_FLAT;
+	for (char *t = strtok(b, "\n"); t; t = strtok(NULL, "\n")) {
+		size_t l = strlen(t);
+		while (l && (t[l - 1] == ' ' || t[l - 1] == '\r' || t[l - 1] == '\t'))
+			t[--l] = 0;
+		if (!strcmp(t, "splash=legacy"))
+			st = ST_LEGACY;
+		else if (!strcmp(t, "splash=flat"))
+			st = ST_FLAT;
+	}
+	return st;
 }
 
 static uint32_t pack(const struct out *o, uint32_t rgb)
@@ -542,9 +604,26 @@ static void dirty(struct card *c, struct out *o, int full)
 	ioctl(c->fd, DRM_IOCTL_MODE_DIRTYFB, &d); /* only drivers with a shadow buffer need it */
 }
 
+static void flat_draw(struct out *o, uint8_t *map, int64_t t);
+
+/* what one buffer shows at time t: the legacy region, or the whole flat picture */
+static void draw_map(struct out *o, uint8_t *map, int64_t t)
+{
+	if (FLATSTYLE)
+		flat_draw(o, map, t);
+	else
+		blit(o, map);
+}
+
 /* everything: room and region, into every buffer, no flipping */
 static void present_full(struct card *c, struct out *o, int64_t t)
 {
+	if (FLATSTYLE) {
+		for (int i = 0; i < o->nbuf; i++)
+			flat_draw(o, o->map[i], t);
+		dirty(c, o, 1);
+		return;
+	}
 	compose(o->sc, t);
 	for (int i = 0; i < o->nbuf; i++) {
 		bgfill(o, o->map[i]);
@@ -556,9 +635,10 @@ static void present_full(struct card *c, struct out *o, int64_t t)
 /* one frame of the region: flipped on the vertical blank if the driver can, else copied */
 static void present(struct card *c, struct out *o, int64_t t, int idx)
 {
-	compose(o->sc, t);
+	if (!FLATSTYLE)
+		compose(o->sc, t);
 	int back = o->nbuf > 1 && o->flip_ok ? 1 - o->front : o->front;
-	blit(o, o->map[back]);
+	draw_map(o, o->map[back], t);
 	if (back != o->front) {
 		struct drm_mode_crtc_page_flip pf = {.crtc_id = o->crtc, .fb_id = o->fb[back],
 		                                     .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uint64_t)idx + 1};
@@ -573,9 +653,9 @@ static void present(struct card *c, struct out *o, int64_t t, int idx)
 			return;
 		}
 		o->flip_ok = 0; /* no flips here: copy the region into what is on screen */
-		blit(o, o->map[o->front]);
+		draw_map(o, o->map[o->front], t);
 	}
-	dirty(c, o, 0);
+	dirty(c, o, FLATSTYLE);
 }
 
 static void read_events(struct card *c)
@@ -621,7 +701,7 @@ static int draw_card_full(struct card *c, int64_t t)
 		struct out *o = &c->o[i];
 		present_full(c, o, t);
 		o->pending = 0;
-		o->final_sent = t >= T_END && fade_us < 0;
+		o->final_sent = !FLATSTYLE && t >= T_END && fade_us < 0;
 		o->next_us = 0;
 	}
 	in_draw = 0;
@@ -663,7 +743,7 @@ static int draw_card(struct card *c, int64_t t, int64_t nowu, int64_t *next)
 		if (st_last && p0 - st_last > st_gap)
 			st_gap = p0 - st_last;
 		st_last = p0;
-		if (t >= T_END && fade_us < 0)
+		if (!FLATSTYLE && t >= T_END && fade_us < 0)
 			o->final_sent = 1;
 		if (o->pending) {
 			o->next_us = nowu + MIN_FLIP_GAP_US;
@@ -708,6 +788,161 @@ static void drop_card(int i)
 	cards[i] = cards[--ncards];
 }
 
+/* ---- the flat boot screen ------------------------------------------------------------------
+ * The logo is the three bars of docs/logo.svg (rotate(6 10 10) of three rects in a 20 x 20 box),
+ * drawn with 4 x 4 samples per pixel. The word is the legacy art's text layer, its alpha taken
+ * and box-filtered to a small size, in the light text colour. Both are drawn once per output
+ * into fbase; per frame come the fade (from black at the start, toward the background at the
+ * handover) and the spinner, a 110 degree arc on a ring, with round ends. */
+static int pick_size(int w, int h);
+static const float flat_bars[3][4] = {{3, 3, 14, 3.4f}, {3, 8.3f, 10, 3.4f}, {3, 13.6f, 6, 3.4f}};
+
+static uint32_t lerp_rgb(uint32_t a, uint32_t b, unsigned k) /* a toward b by k/256, per channel */
+{
+	uint32_t r = 0;
+	for (int s = 0; s <= 16; s += 8) {
+		int ca = (int)(a >> s & 255), cb = (int)(b >> s & 255);
+		r |= (uint32_t)(ca + (cb - ca) * (int)k / 256) << s;
+	}
+	return r;
+}
+
+/* the pixel as it shows now: toward the background by fout/256, then from black by fin/256 */
+static uint32_t flat_px(uint32_t c, unsigned fout, unsigned fin)
+{
+	if (fout)
+		c = lerp_rgb(c, FLAT_BG, fout);
+	if (fin < 256)
+		c = lerp_rgb(0, c, fin);
+	return c;
+}
+
+/* is the point (in the 20 x 20 box of logo.svg) on one of the three bars */
+static int in_logo(float x, float y)
+{
+	const float a = 6.0f * (float)M_PI / 180.0f;
+	float dx = x - 10.0f, dy = y - 10.0f;
+	/* the point in the bars' own frame: the inverse of SVG's rotate(6) (y down) */
+	float u = dx * cosf(a) + dy * sinf(a) + 10.0f, v = -dx * sinf(a) + dy * cosf(a) + 10.0f;
+	for (int i = 0; i < 3; i++)
+		if (u >= flat_bars[i][0] && u <= flat_bars[i][0] + flat_bars[i][2] && v >= flat_bars[i][1] &&
+		    v <= flat_bars[i][1] + flat_bars[i][3])
+			return 1;
+	return 0;
+}
+
+static int flat_layout(struct out *o)
+{
+	int W = (int)o->w, H = (int)o->h;
+	free(o->fbase);
+	o->fbase = malloc((size_t)W * (size_t)H * 4);
+	if (!o->fbase)
+		return -1;
+	for (size_t i = 0; i < (size_t)W * (size_t)H; i++)
+		o->fbase[i] = FLAT_BG;
+	/* the logo: 18 % of the height, centred a little above the middle */
+	int L = H * 18 / 100;
+	o->fl = L;
+	o->fx = W / 2 - L / 2;
+	o->fy = H * 42 / 100 - L / 2;
+	for (int y = o->fy; y < o->fy + L; y++)
+		for (int x = o->fx; x < o->fx + L; x++) {
+			if (x < 0 || y < 0 || x >= W || y >= H)
+				continue;
+			int n = 0;
+			for (int sy = 0; sy < 4; sy++)
+				for (int sx = 0; sx < 4; sx++)
+					n += in_logo(((float)(x - o->fx) + ((float)sx + 0.5f) / 4.0f) * 20.0f / (float)L,
+					             ((float)(y - o->fy) + ((float)sy + 0.5f) / 4.0f) * 20.0f / (float)L);
+			if (n)
+				o->fbase[(size_t)y * (size_t)W + (size_t)x] = lerp_rgb(FLAT_BG, FLAT_ACCENT, (unsigned)(n * 256 / 16));
+		}
+	/* the spinner sits under the logo */
+	o->sx = W / 2;
+	o->sy = o->fy + L + H * 85 / 1000;
+	o->sr = H * 24 / 1000 > 10 ? H * 24 / 1000 : 10;
+	o->sth = H / 360 > 2 ? H / 360 : 2;
+	/* the word: the legacy text layer's alpha, box-filtered to 9 % of the width, bottom centre */
+	struct scene *sc = load_scene(pick_size(W, H));
+	if (sc && sc->text.px && sc->text.w > 0 && sc->text.h > 0) {
+		const struct lay *t = &sc->text;
+		int ww = W * 9 / 100, wh = t->h * ww / t->w;
+		int wx = (W - ww) / 2, wy = H * 925 / 1000 - wh;
+		for (int y = 0; y < wh; y++)
+			for (int x = 0; x < ww; x++) {
+				int x0 = x * t->w / ww, x1 = (x + 1) * t->w / ww, y0 = y * t->h / wh, y1 = (y + 1) * t->h / wh;
+				if (x0 >= t->w) x0 = t->w - 1;
+				if (y0 >= t->h) y0 = t->h - 1;
+				if (x1 > t->w) x1 = t->w;
+				if (y1 > t->h) y1 = t->h;
+				if (x1 <= x0) x1 = x0 + 1;
+				if (y1 <= y0) y1 = y0 + 1;
+				unsigned sum = 0, n = 0;
+				for (int sy = y0; sy < y1; sy++)
+					for (int sx = x0; sx < x1; sx++, n++)
+						sum += t->px[(size_t)sy * (size_t)t->w + (size_t)sx] >> 24;
+				unsigned a = n ? sum / n : 0;
+				int px = wx + x, py = wy + y;
+				if (a && px >= 0 && py >= 0 && px < W && py < H) {
+					uint32_t *d = &o->fbase[(size_t)py * (size_t)W + (size_t)px];
+					*d = lerp_rgb(*d, FLAT_TEXT, a);
+				}
+			}
+	}
+	return 0;
+}
+
+/* a point on the spinner: the ring of radius R, the arc from a0 for len radians, round ends */
+static int in_arc(double px, double py, double cx, double cy, double R, double th, double a0, double len)
+{
+	double dx = px - cx, dy = py - cy, d = sqrt(dx * dx + dy * dy);
+	if (fabs(d - R) <= th / 2) {
+		double a = atan2(dy, dx) - a0;
+		while (a < 0)
+			a += 2 * M_PI;
+		while (a >= 2 * M_PI)
+			a -= 2 * M_PI;
+		if (a <= len)
+			return 1;
+	}
+	if (hypot(px - (cx + R * cos(a0)), py - (cy + R * sin(a0))) <= th / 2)
+		return 1;
+	return hypot(px - (cx + R * cos(a0 + len)), py - (cy + R * sin(a0 + len))) <= th / 2;
+}
+
+static void flat_draw(struct out *o, uint8_t *map, int64_t t)
+{
+	int W = (int)o->w, H = (int)o->h;
+	unsigned fin = t >= FLAT_FADE_IN_MS ? 256u : (unsigned)(t * 256 / FLAT_FADE_IN_MS);
+	unsigned fout = g_fade;
+	for (int y = 0; y < H; y++) {
+		uint32_t *row = (uint32_t *)(map + (size_t)y * o->pitch);
+		const uint32_t *src = o->fbase + (size_t)y * (size_t)W;
+		for (int x = 0; x < W; x++)
+			row[x] = pack(o, flat_px(src[x], fout, fin));
+	}
+	/* the spinner: constant speed, 110 degrees, antialiased over the background */
+	double a0 = fmod((double)t * 2.0 * M_PI / FLAT_SPIN_MS, 2 * M_PI);
+	double len = 110.0 * M_PI / 180.0, R = o->sr, th = o->sth;
+	int r = (int)R + o->sth + 2;
+	for (int y = o->sy - r; y <= o->sy + r; y++) {
+		if (y < 0 || y >= H)
+			continue;
+		uint32_t *row = (uint32_t *)(map + (size_t)y * o->pitch);
+		for (int x = o->sx - r; x <= o->sx + r; x++) {
+			if (x < 0 || x >= W)
+				continue;
+			int n = 0;
+			for (int sy = 0; sy < 4; sy++)
+				for (int sx = 0; sx < 4; sx++)
+					n += in_arc(x + ((double)sx + 0.5) / 4.0, y + ((double)sy + 0.5) / 4.0, o->sx, o->sy, R, th,
+					            a0, len);
+			uint32_t base = o->fbase[(size_t)y * (size_t)W + (size_t)x];
+			row[x] = pack(o, flat_px(lerp_rgb(base, FLAT_ACCENT, (unsigned)(n * 256 / 16)), fout, fin));
+		}
+	}
+}
+
 /* the biggest size that sits well on the screen (about 40% of its height at most) */
 static int pick_size(int w, int h)
 {
@@ -720,6 +955,8 @@ static int pick_size(int w, int h)
 
 static int layout(struct out *o)
 {
+	if (FLATSTYLE)
+		return flat_layout(o);
 	o->sc = load_scene(pick_size((int)o->w, (int)o->h));
 	if (!o->sc)
 		return -1;
@@ -845,7 +1082,7 @@ static int drm_setup(struct card *c)
 			continue;
 		}
 		used |= 1u << pick;
-		logf_("%s: %ux%u on connector %u, logo %d, %s", c->path, o->w, o->h, o->conn, o->sc->S,
+		logf_("%s: %ux%u on connector %u, logo %d, %s", c->path, o->w, o->h, o->conn, FLATSTYLE ? 0 : o->sc->S,
 		      o->nbuf > 1 ? "flipping" : "copying");
 	}
 	return c->nout ? 0 : -1;
@@ -876,7 +1113,7 @@ static int fb_setup(struct card *c)
 		return -1;
 	}
 	c->nout = 1;
-	logf_("%s: %ux%u (fbdev), logo %d", c->path, o->w, o->h, o->sc->S);
+	logf_("%s: %ux%u (fbdev), logo %d", c->path, o->w, o->h, FLATSTYLE ? 0 : o->sc->S);
 	return 0;
 }
 
@@ -920,6 +1157,7 @@ static void watch(void)
 static int rescan(void)
 {
 	int again = 0, added = 0;
+	clk_run(now_us());
 	for (int i = ncards - 1; i >= 0; i--)
 		if (!card_alive(&cards[i])) {
 			logf_("%s is gone", cards[i].path);
@@ -973,6 +1211,7 @@ static int rescan(void)
 	if (added) {
 		if (t0_us < 0)
 			t0_us = now_us();
+		clk_ref = now_us();
 		set_graphics();
 		int64_t t = clock_t_now();
 		for (int i = ncards - 1; i >= 0; i--)
@@ -1025,6 +1264,7 @@ static void kd_text_now(void)
 
 static void cleanup_files(void)
 {
+	unlink(STYLEF);
 	unlink(PIDF);
 	unlink(DONEF);
 	unlink(RELF);
@@ -1066,7 +1306,7 @@ static void do_release(void)
 }
 
 /* the fade-out: the picture goes to the background colour over FADE_US, then the screen is let go */
-__attribute__((unused)) static void fade_start(int64_t now)
+static void fade_start(int64_t now)
 {
 	fade_us = now;
 	g_fade = 0;
@@ -1094,10 +1334,32 @@ static void fade_finish(void)
 	logf_("faded out, screen released");
 }
 
+/* the handover: flat fades its picture to the background first (the login screen starts from
+ * that colour), legacy is let go at once (its last picture stays in the scanout) */
+static void handover_now(void)
+{
+	if (FLATSTYLE && !released && fade_us < 0 && ncards) {
+		logf_("handover: fading to the background");
+		fade_start(now_us());
+		return;
+	}
+	do_release();
+}
+
 static void daemon_main(int ready)
 {
 	start_us = now_us();
-	logf_("start");
+	g_style = read_style(SPLASH_CONF);
+	logf_("start, style %s", FLATSTYLE ? "flat" : "legacy");
+	{
+		int sf = open(STYLEF, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+		if (sf >= 0) {
+			if (write(sf, FLATSTYLE ? "flat\n" : "legacy\n", FLATSTYLE ? 5 : 7) < 0) {
+				/* the greeter then assumes the legacy picture */
+			}
+			close(sf);
+		}
+	}
 	if (art_init() < 0) {
 		logf_("no art");
 		cleanup_files();
@@ -1113,6 +1375,7 @@ static void daemon_main(int ready)
 	sigaddset(&set, SIGHUP);
 	sigprocmask(SIG_BLOCK, &set, NULL);
 	int sfd = signalfd(-1, &set, SFD_CLOEXEC);
+	card_seen_us = start_us;
 	struct sigaction sa = {.sa_handler = on_bus, .sa_flags = SA_NODEFER};
 	sigaction(SIGBUS, &sa, NULL);
 	ifd = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
@@ -1127,7 +1390,10 @@ static void daemon_main(int ready)
 	for (;;) {
 		int64_t now = now_us(), wake = INT64_MAX;
 #define WAKE(at) do { if ((at) < wake) wake = (at); } while (0)
-		if (!released && ncards && (!anim_done || fade_us >= 0)) {
+		clk_run(now);
+		if (ncards)
+			card_seen_us = now;
+		if (!released && ncards && (!anim_done || fade_us >= 0 || FLATSTYLE)) {
 			int64_t next = INT64_MAX;
 			int lost = 0;
 			int64_t t = clock_t_now();
@@ -1146,14 +1412,16 @@ static void daemon_main(int ready)
 			card_gone = 0;
 			if (fade_us >= 0) {
 				WAKE(next);
-			} else if (ncards && all_final()) {
+			} else if (ncards && !anim_done && (FLATSTYLE ? t >= T_MIN : all_final())) {
 				anim_done = 1;
 				done_us = now;
 				touch(DONEF);
 				logf_("done: %lld frames, %lld us each, longest gap %lld ms", (long long)st_frames,
 				      (long long)(st_us / (st_frames ? st_frames : 1)), (long long)(st_gap / 1000));
 				if (want_release)
-					do_release(); /* no fade: flgreet's first frames continue from the wordmark left on screen */
+					handover_now(); /* flat: fades to the background first; legacy: no fade, the wordmark stays */
+				if (FLATSTYLE && !released)
+					WAKE(next);
 			} else {
 				WAKE(next);
 			}
@@ -1167,7 +1435,7 @@ static void daemon_main(int ready)
 		if (rescan_at >= 0)
 			WAKE(rescan_at);
 		if (!ncards && !released)
-			WAKE(start_us + (int64_t)GIVE_UP_MS * 1000);
+			WAKE(card_seen_us + (int64_t)GIVE_UP_MS * 1000);
 		if (released)
 			WAKE(release_us + (int64_t)LINGER_MS * 1000);
 		else if (anim_done)
@@ -1195,13 +1463,19 @@ static void daemon_main(int ready)
 			struct signalfd_siginfo si;
 			if (read(sfd, &si, sizeof si) == sizeof si) {
 				if (si.ssi_signo == SIGUSR1) {
-					if (anim_done || !ncards || t0_us < 0)
+					/* no screen has ever been up: nothing to keep. Otherwise the animation runs to its
+					 * end (a card that is gone for a moment comes back), then the screen is let go */
+					if (!ncards && t0_us < 0)
 						do_release();
-					else { /* the system is up: the animation runs to its end, then the screen is let go with the wordmark in place */
+					else if (anim_done)
+						handover_now();
+					else
 						want_release = 1;
-					}
+				} else if (si.ssi_signo == SIGUSR2) {
+					/* a failing rc step: logged only, the splash goes on (the rule of round 20) */
+					logf_("a boot step failed (logged only; Esc shows the boot text)");
 				} else if (released) {
-					if (si.ssi_signo == SIGUSR2) /* the login screen did not come up */
+					if (si.ssi_signo == SIGHUP) /* --text after the handover */
 						kd_text_now();
 					cleanup_files();
 					exit(0);
@@ -1249,7 +1523,7 @@ static void daemon_main(int ready)
 			else
 				retry_until = -1;
 		}
-		if (!ncards && now >= start_us + (int64_t)GIVE_UP_MS * 1000) {
+		if (!ncards && now >= card_seen_us + (int64_t)GIVE_UP_MS * 1000) {
 			logf_("no screen, boot as text");
 			tty_release(1);
 			cleanup_files();
@@ -1304,8 +1578,9 @@ static int in_cmdline(const char *word)
 }
 
 /* --render: the picture at some time, into a PPM, for looking at it without a screen */
-static int render_ppm(int ms, int w, int h, const char *file)
+static int render_ppm(int ms, int w, int h, const char *file, int style)
 {
+	g_style = style;
 	if (art_init() < 0 || w < 64 || h < 64 || w > 8192 || h > 8192)
 		return 1;
 	struct out o = {.w = (uint32_t)w, .h = (uint32_t)h, .pitch = (uint32_t)w * 4, .rs = 16, .gs = 8, .nbuf = 1};
@@ -1345,15 +1620,18 @@ int main(int argc, char **argv)
 			kd_text_now();
 			return 0;
 		}
-		kill(p, SIGUSR2);
+		kill(p, SIGHUP); /* not SIGUSR2: the animation must not wait for a failing step (see daemon_main) */
 		for (int i = 0; i < 20 && kill(p, 0) == 0; i++)
 			nanosleep(&(struct timespec){0, 50 * 1000000}, NULL);
 		return 0;
 	}
-	if (argc == 6 && !strcmp(argv[1], "--render"))
-		return render_ppm(atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), argv[5]);
+	if ((argc == 6 || argc == 7) && !strcmp(argv[1], "--render")) {
+		int style = argc == 7 ? (strcmp(argv[6], "legacy") ? ST_FLAT : ST_LEGACY)
+		                      : read_style(getenv("FLSPLASH_CONF") ? getenv("FLSPLASH_CONF") : SPLASH_CONF);
+		return render_ppm(atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), argv[5], style);
+	}
 	if (argc > 1) {
-		fprintf(stderr, "usage: flsplash [--handover | --text | --render MS W H FILE.ppm]\n");
+		fprintf(stderr, "usage: flsplash [--handover | --text | --render MS W H FILE.ppm [flat|legacy]]\n");
 		return 2;
 	}
 	if (getuid() != 0 || read_pid() || in_cmdline("nosplash"))

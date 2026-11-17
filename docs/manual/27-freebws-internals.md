@@ -368,3 +368,27 @@ From the README and `docs/M8-BROWSER.md`:
   name and the rule, if it can be seen.
 - **Sign-in tests** are the most useful: they show whether the user agent, the opener and the cookies are right for each provider.
 - The project's `help wanted` and `good first issue` labels for FreeBWS are planned (chapter 26, section 11).
+
+## 17. Round 20: watchdogs and the log
+
+The r19 laptop test showed a white page or a frozen window after a Google sign-in and on claude.ai. The causes found in the source
+(an outside review, confirmed) and what changed:
+
+- **The frame watchdog ran once, 12 s after the start.** It now runs every second on the GPU (dmabuf) path. A page that has been
+  loading for 8 s and shows no new frame for 5 s makes the browser write `buffers=shm` to its config, log it, and start again on the
+  CPU path with the page the tab was on. A page at rest is not a fault (no frame is normal then). The first rule (no frame at all after
+  12 s) stays.
+- **Redirects were stopped.** `navigate_hook` could call `webkit_web_view_stop_loading` on a redirect, which aborts a live chain; a
+  sign-in is a chain of them. A redirect is never stopped now. The ad blocker's per-host sheet (tens of thousands of selectors) was
+  rebuilt on every cross-host hop: it is cached per host (12 hosts), a tab that already has the host's sheet does nothing, and the
+  network filters are added or removed only when the state differs.
+- **A hung web process** (loading, no progress for 30 s) is ended with `webkit_web_view_terminate_web_process`; `on_terminated` reloads
+  the page once (at most twice per tab). On by default only when tabs share a process (under 3 GB); `FREEBWS_HANGKILL=1|0` decides by hand.
+- **OAuth popups** are no longer related to their opener when tabs share one process (they join another tab's process, or get their
+  own); `FREEBWS_POPUP_RELATE=1` restores the old way. Caveat: a popup that needs `window.opener` (postMessage back to the page) may
+  need that switch; it is not proven either way on the laptop.
+- **The log**: `~/.cache/freebws/log` always records starts, watchdog actions, web process ends and popups; `FREEBWS_DEBUG=1` adds every
+  load event, redirect and progress change. Cut at 256 KB. Attach it to a bug report next to `flreport`.
+- CAPTCHAs are not bypassed: Cloudflare's challenge stays allowed by the ad blocker (as before) and nothing more.
+- Test hook: `watchdog_test=1` in the config (or `FREEBWS_WATCHDOG_TEST=1`) stops counting frames 6 s after the start; tests in
+  `build/m20-features.sh freebws-watchdog` use it with a local server that stalls for ever.

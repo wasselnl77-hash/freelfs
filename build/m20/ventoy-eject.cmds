@@ -1,0 +1,41 @@
+# The r19 laptop bug, second try: the stick has a VENTOY layout (exFAT "Ventoy" + FAT "VTOYEFI"), and the running
+# system reads through a device-mapper device over the stick (what a Ventoy boot does; here dmlinear makes it).
+# Hypothesis under test: Files' eject button used to take that stick away from under the system.
+# Now: the stick is "boot" (no eject button), flmount refuses, the stick stays, apps still open (pixels).
+# Limit: a real Ventoy boot may not register as a holder this way; flreport now records holders/slaves to find out.
+@desktop
+@put @OUT@/dmlinear /tmp/dmlinear
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@mon drive_add 0 if=none,id=u,file=@VENTOY@,format=raw
+@mon device_add usb-storage,drive=u,id=ud,bus=xhci.0
+@waitok 60 the Ventoy data partition (sda1) is mounted under /drives :: grep -q '^/dev/sda1 /drives/Ventoy ' /proc/mounts
+@ok VTOYEFI is not offered :: ! su -s /bin/sh tester -c 'flmount list' | grep -q VTOYEFI
+@ok flmount offers it as an ordinary removable drive first (no holder yet) :: su -s /bin/sh tester -c 'flmount list' | grep sda1 | grep -q removable
+# the kernel claims a disk exclusively: dm over the whole disk needs its partitions unmounted first (a real Ventoy boot
+# makes the mapping before any partition is mounted)
+@ok unmount the data partition so the mapping can be made :: su -s /bin/sh tester -c 'flmount unmount /dev/sda1' && ! grep -q ' /drives/Ventoy ' /proc/mounts
+@ok the device-mapper device over the stick is made :: /tmp/dmlinear vtoy /dev/sda && ls /sys/block/sda/holders | grep -q dm
+@ok the stick is now listed as "boot" (the system reads through it) :: su -s /bin/sh tester -c 'flmount list' | grep sda1 | grep -q boot
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@shot @OUT@/ve-1-files.ppm
+# where the eject button of the first drive is (it must not be there: nothing happens)
+@mouse 321 490
+@click
+@wait 4
+@shot @OUT@/ve-2-after-click.ppm
+@ok the stick is still there (a click could not have ejected it) :: test -e /sys/block/sda
+@ok flmount eject is refused with the reason :: ! su -s /bin/sh tester -c 'flmount eject /dev/sda1' 2> /tmp/ej.err && grep -q 'Ventoy boot' /tmp/ej.err
+@ok the stick is still there after the refusal :: test -e /sys/block/sda && test -e /sys/block/sda/holders/dm-0
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/ve-3-gm.ppm
+@shotdiff @OUT@/ve-2-after-click.ppm @OUT@/ve-3-gm.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/ve-3-gm.ppm 150
+@ok General Manager runs in Home :: test "$(readlink /proc/$(pgrep -u tester -x general-manager | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager

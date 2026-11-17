@@ -462,3 +462,14 @@ notifications and the desktop layer), `wp_viewporter`, fractional scale, Wayland
 RandR, and XSettings. "Screen recording in Snappel" is listed as later in `docs/ROADMAP-NEXT.md`.
 
 Read `src/flcomp/README` (353 lines) for the full design notes. This chapter follows it and the headers of the source files.
+
+## Round 20: who gets the server-side title bar
+
+flcomp offers `zxdg_decoration_manager_v1` and draws a title bar only for a Wayland window that created a decoration object and did
+not ask for client-side frames. GTK3 (which Firefox, also the Flatpak one, uses) has no support for xdg-decoration (it knows only
+KDE's older `org_kde_kwin_server_decoration`, which flcomp does not offer), so a GTK3 Firefox on Wayland creates no such object and
+draws its own title bar; flcomp adds none. The window's log line says it: `flcomp: window "org.mozilla.firefox" (Wayland): no
+xdg-decoration object, the client draws its own title bar` (in `flcomp.log`, collected by `flreport`). For X11 windows (Xwayland) flcomp
+draws its frame unless the program asks for none with `_MOTIF_WM_HINTS`; a program that draws its own title bar under X11 would get two
+(the log says "flcomp draws the frame"). Which of the two Firefox uses on the laptop was not checked (no Firefox in the test image); the
+log line answers it at the next laptop test.

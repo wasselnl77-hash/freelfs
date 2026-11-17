@@ -106,6 +106,11 @@ struct tab {
 	int want_fg;		/* a popup: it takes the front when its page is ready */
 	int shown;		/* ready-to-show came, or the fallback timer ran */
 	guint show_src;		/* the fallback timer that shows a popup whose ready-to-show never comes */
+	uint32_t load_t;	/* now_ms() when the current load started */
+	uint32_t prog_t;	/* now_ms() when the load progress last changed (the hang watchdog) */
+	int hangkilled;		/* the hang watchdog ended this tab's web process: reload, not an error page */
+	int hangs;		/* times the hang watchdog ended this tab's process (at most 2: then it leaves it be) */
+	int redirects;		/* redirects in the current load (debug log) */
 };
 
 static struct B {
@@ -154,7 +159,17 @@ static struct B {
 	const char *features;	/* WebKit features to set, "Name=0,Name=1" */
 	char *ua;		/* the user agent every page gets (useragent= in the config) */
 	int dssl_native;	/* 0: always use the JS engine (FREEBWS_DSSL=engine) */
+	WebKitWebView *popup_skip;	/* tab_realize: do not pick this view as the related one */
 	int share_process;	/* tabs are related views: one web process for all (FREEBWS_SHARE=1) */
+	int hangkill;		/* a tab that is loading and shows no progress for 30 s loses its web process */
+	int debug;		/* FREEBWS_DEBUG=1: verbose log in ~/.cache/freebws/log */
+	FILE *logf;
+	/* the frame watchdog */
+	uint64_t wd_frames;	/* B.frames at the last tick that saw progress */
+	unsigned wd_stall_s;	/* seconds without a new frame while a page is loading */
+	int wd_test;		/* FREEBWS_WATCHDOG_TEST=1 (or watchdog_test=1 in the config): frames stop counting 6 s after the
+				 * start, and the watchdog runs in shm mode too: the test of the fallback */
+	time_t t0;		/* the start */
 	/* toolbar extras */
 	struct popup *pop;
 	int pop_kind, pop_folder;	/* the open popup; for POP_FOLDER: the folder (-1: bar overflow) */
@@ -183,6 +198,36 @@ static uint32_t now_ms(void)
 	struct timespec t;
 	clock_gettime(CLOCK_MONOTONIC, &t);
 	return (uint32_t)(t.tv_sec * 1000 + t.tv_nsec / 1000000);
+}
+
+/* ~/.cache/freebws/log: what happened, for a laptop test. Important events (watchdogs, crashes,
+ * failed loads) are always written; FREEBWS_DEBUG=1 adds every load event and redirect. Cut at 256 KB. */
+static void flog(int verbose, const char *fmt, ...) G_GNUC_PRINTF(2, 3);
+static void flog(int verbose, const char *fmt, ...)
+{
+	if (verbose && !B.debug)
+		return;
+	if (!B.logf) {
+		char *path = g_build_filename(cache_dir(), "log", NULL);
+		struct stat st;
+		if (!stat(path, &st) && st.st_size > 256 * 1024)
+			B.logf = fopen(path, "w");
+		else
+			B.logf = fopen(path, "a");
+		g_free(path);
+		if (!B.logf)
+			return;
+		setvbuf(B.logf, NULL, _IOLBF, 0);
+	}
+	time_t tt = time(NULL);
+	struct tm tm;
+	localtime_r(&tt, &tm);
+	fprintf(B.logf, "%02d:%02d:%02d ", tm.tm_hour, tm.tm_min, tm.tm_sec);
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(B.logf, fmt, ap);
+	va_end(ap);
+	fputc('\n', B.logf);
 }
 
 static struct wpe_view_backend *tab_vb(struct tab *t)
@@ -263,7 +308,8 @@ static void show_pixels(const uint8_t *p, int w, int h, int stride)
 	wl_surface_attach(B.page, s->b, 0, 0);
 	wl_surface_damage_buffer(B.page, 0, 0, w, h);
 	wl_surface_commit(B.page);
-	B.frames++;
+	if (!B.wd_test || time(NULL) - B.t0 < 6)
+		B.frames++;
 }
 
 static void export_shm(void *data, struct wpe_fdo_shm_exported_buffer *eb)
@@ -322,7 +368,8 @@ static void export_dmabuf(void *data, struct wpe_view_backend_exportable_fdo_dma
 	wl_surface_attach(B.page, b, 0, 0);
 	wl_surface_damage_buffer(B.page, 0, 0, (int32_t)r->width, (int32_t)r->height);
 	wl_surface_commit(B.page);
-	B.frames++;
+	if (!B.wd_test || time(NULL) - B.t0 < 6)
+		B.frames++;
 	wpe_view_backend_exportable_fdo_dispatch_frame_complete(t->exp);
 }
 
@@ -497,7 +544,7 @@ static void tab_realize(struct tab *t, WebKitWebView *related)
 {
 	if (!related && B.share_process)
 		for (int i = 0; i < B.ntabs && !related; i++)
-			if (B.tabs[i]->view && B.tabs[i] != t)
+			if (B.tabs[i]->view && B.tabs[i] != t && B.tabs[i]->view != B.popup_skip)
 				related = B.tabs[i]->view;
 	int w = B.page_rect.w > 1 ? B.page_rect.w : 1024, h = B.page_rect.h > 1 ? B.page_rect.h : 600;
 	t->exp = wpe_view_backend_exportable_fdo_create(&fdo_client, t, (uint32_t)w, (uint32_t)h);
@@ -1954,7 +2001,11 @@ static void on_title(WebKitWebView *v, GParamSpec *p, struct tab *t)
 
 static void on_progress(WebKitWebView *v, GParamSpec *p, struct tab *t)
 {
-	t->progress = webkit_web_view_get_estimated_load_progress(v);
+	double pr = webkit_web_view_get_estimated_load_progress(v);
+	if (pr != t->progress)
+		t->prog_t = now_ms();
+	t->progress = pr;
+	flog(1, "progress %.2f %s", pr, webkit_web_view_get_uri(v) ? webkit_web_view_get_uri(v) : "");
 	if (t == B.cur)
 		fl_win_redraw(B.win);
 }
@@ -1985,13 +2036,23 @@ static void on_load(WebKitWebView *v, WebKitLoadEvent ev, struct tab *t)
 	if (ev == WEBKIT_LOAD_FINISHED && getenv("FREEBWS_EVAL"))
 		g_timeout_add(3000, eval_later, t);
 	t->loading = ev != WEBKIT_LOAD_FINISHED;
+	t->prog_t = now_ms();
+	flog(1, "load %s %s", ev == WEBKIT_LOAD_STARTED ? "started" : ev == WEBKIT_LOAD_REDIRECTED ? "redirected" :
+	     ev == WEBKIT_LOAD_COMMITTED ? "committed" : "finished", webkit_web_view_get_uri(v) ? webkit_web_view_get_uri(v) : "");
 	if (ev == WEBKIT_LOAD_STARTED || ev == WEBKIT_LOAD_REDIRECTED) {
-		if (ev == WEBKIT_LOAD_STARTED)
+		if (ev == WEBKIT_LOAD_STARTED) {
+			t->load_t = now_ms();
 			t->adb.blocked = 0;
+			t->redirects = 0;
+		} else {
+			t->redirects++;
+		}
 		/* link clicks, redirects, scripts: the page's host gets its blocker settings (a navigation we
-		 * started ourselves did this already; for the same host it does nothing) */
+		 * started ourselves did this already; for the same host it does nothing). A redirect is never
+		 * stopped: a login is a chain of them, and aborting one leaves a white page. While the filters are
+		 * still being made (gating) the load that started the wait is already held. */
 		const char *u = webkit_web_view_get_uri(v);
-		if (u && navigate_hook(t, u))
+		if (u && !(ev == WEBKIT_LOAD_REDIRECTED && t->gating) && navigate_hook(t, u) && ev == WEBKIT_LOAD_STARTED)
 			webkit_web_view_stop_loading(v);
 	}
 	if (t->loading)
@@ -2091,9 +2152,18 @@ static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *na, st
 	guint btn = webkit_navigation_action_get_mouse_button(na);
 	guint mods = webkit_navigation_action_get_modifiers(na);
 	int bg = btn == 2 || (mods & wpe_input_keyboard_modifier_control);
-	struct tab *n = tab_create(v, NULL, 0);
+	/* Tabs that share one web process are all related already. Relating the popup to its opener on top
+	 * (an OAuth window) hung the page on the laptop, so then it joins another tab's process, not the
+	 * opener's (FREEBWS_POPUP_RELATE=1 restores the old way). */
+	WebKitWebView *rel = v;
+	if (B.share_process && !getenv("FREEBWS_POPUP_RELATE"))
+		rel = NULL;
+	B.popup_skip = v;
+	struct tab *n = tab_create(rel, NULL, 0);
+	B.popup_skip = NULL;
 	if (!n)
 		return NULL;
+	flog(0, "popup opened by \"%s\", %s", t->title, rel ? "related to the opener" : "not related to the opener");
 	n->opener = t;
 	n->want_fg = !bg;
 	n->show_src = g_timeout_add_seconds(5, popup_show_late, n);
@@ -2156,7 +2226,21 @@ static gboolean on_policy(WebKitWebView *v, WebKitPolicyDecision *d, WebKitPolic
 static void on_terminated(WebKitWebView *v, WebKitWebProcessTerminationReason r, struct tab *t)
 {
 	fprintf(stderr, "freebws: web process of \"%s\" ended (%d)\n", t->title, (int)r);
+	flog(0, "web process of \"%s\" ended (%d)%s", t->title, (int)r, t->hangkilled ? ", ended by the hang watchdog" : "");
 	t->loading = 0;
+	if (t->hangkilled) {	/* we ended it ourselves because the page hung: one more try */
+		t->hangkilled = 0;
+		const char *u = webkit_web_view_get_uri(v);
+		char *again = g_strdup(u && strncmp(u, "freebws://", 10) ? u : t->uri);
+		if (t == B.cur) {
+			webkit_web_view_load_uri(v, again);
+			focus_page(1);
+		} else {
+			t->reload = 1;
+		}
+		g_free(again);
+		return;
+	}
 	if (t == B.cur) {
 		const char *u = webkit_web_view_get_uri(v);
 		g_strlcpy(t->err_uri, u && strncmp(u, "freebws://", 10) ? u : t->uri, sizeof t->err_uri);
@@ -2951,25 +3035,83 @@ static GSourceFuncs src_funcs = { src_prepare, src_check, src_dispatch, NULL };
 /* The GPU path is only proven on the hardware it was tried on. When it does not deliver, the
  * browser remembers "buffers=shm" in its config and starts again with the CPU path, once:
  *   - no frame has reached the window 12 seconds after the start (a GPU, driver or compositor
- *     combination that does not hand buffers over), or
+ *     combination that does not hand buffers over),
+ *   - the frames stop while a page is loading (about 5 s without a new frame: the laptop froze after
+ *     a login redirect chain with the GPU path), or
  *   - the compositor ended our connection with a protocol error in the first minute (it refused a
  *     buffer: a modifier or format it cannot import).
- * A wrong guess costs 12 seconds, not a blank or vanishing browser. */
+ * A wrong guess costs a few seconds, not a blank or vanishing browser. The restart loads the page
+ * the tab was on. */
 static void dmabuf_fallback(const char *why)
 {
 	fprintf(stderr, "freebws: %s, restarting with shm buffers\n", why);
+	flog(0, "%s: falling back to shm buffers (frames=%llu)", why, (unsigned long long)B.frames);
 	cfg_set("buffers", "shm");
 	setenv("FREEBWS_BUFFERS", "shm", 1);
-	execv("/proc/self/exe", B.argv);
+	unsetenv("FREEBWS_WATCHDOG_TEST");
+	if (B.wd_test)
+		cfg_set("watchdog_test", "0");
+	const char *u = B.cur && B.cur->view ? webkit_web_view_get_uri(B.cur->view) : NULL;
+	char *av[3] = { B.argv ? B.argv[0] : (char *)"freebws", (char *)(u && *u && strncmp(u, "freebws://", 10) ? u : NULL), NULL };
+	/* the real path, not /proc/self/exe: the process name (comm) is taken from the file name, and "exe" is not "freebws" */
+	char self[4096];
+	ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+	self[n > 0 ? n : 0] = 0;
+	execv(n > 0 ? self : "/proc/self/exe", av);
 	fprintf(stderr, "freebws: restart failed: %s\n", strerror(errno));
+	flog(0, "restart failed: %s", strerror(errno));
 }
 
+/* every second, for as long as the browser runs on the GPU path */
 static gboolean dmabuf_watchdog(gpointer d)
 {
-	if (B.frames > 0 || !B.use_dmabuf)
+	if (!B.use_dmabuf && !B.wd_test)
 		return G_SOURCE_REMOVE;
-	dmabuf_fallback("no frame from the GPU path after 12 s");
-	return G_SOURCE_REMOVE;
+	if (B.frames == 0) {
+		if (time(NULL) - start_time >= 12) {
+			dmabuf_fallback("no frame from the GPU path after 12 s");
+			return G_SOURCE_REMOVE;
+		}
+		return G_SOURCE_CONTINUE;
+	}
+	if (B.frames != B.wd_frames) {
+		B.wd_frames = B.frames;
+		B.wd_stall_s = 0;
+		return G_SOURCE_CONTINUE;
+	}
+	/* no new frame: normal for a page at rest, a fault when a page has been loading for a while */
+	struct tab *c = B.cur;
+	if (c && c->view && c->loading && now_ms() - c->load_t >= 8000) {
+		if (++B.wd_stall_s == 3)
+			flog(0, "no new frame for 3 s while loading %s (progress %.2f)", c->uri, c->progress);
+		if (B.wd_stall_s >= 5) {
+			dmabuf_fallback("no new frame for 5 s while a page was loading");
+			return G_SOURCE_REMOVE;
+		}
+	} else {
+		B.wd_stall_s = 0;
+	}
+	return G_SOURCE_CONTINUE;
+}
+
+/* A web process that is loading and has shown no progress for 30 s is ended; on_terminated reloads the
+ * page. Only when the tabs share one process (one stuck page freezes them all), or FREEBWS_HANGKILL=1. */
+static gboolean hang_watchdog(gpointer d)
+{
+	uint32_t now = now_ms();
+	for (int i = 0; i < B.ntabs; i++) {
+		struct tab *t = B.tabs[i];
+		if (!t->view || !t->loading || t->hangs >= 2 || now - t->prog_t < 30000)
+			continue;
+		flog(0, "tab \"%s\" is loading with no progress for 30 s (%s, progress %.2f): ending its web process",
+		     t->title, t->uri, t->progress);
+		t->hangkilled = 1;
+		t->hangs++;
+		t->prog_t = now;
+		webkit_web_view_terminate_web_process(t->view);
+		break;	/* with a shared process the others end with it */
+	}
+	return G_SOURCE_CONTINUE;
 }
 
 /* flcomp writes $XDG_RUNTIME_DIR/flcomp-dmabuf-planes when its GPU path takes buffers of several planes
@@ -3076,6 +3218,7 @@ int main(int argc, char **argv)
 	if (argc > 1 && !strcmp(argv[1], "--sandbox-child"))	/* what sandbox_probe runs inside bwrap */
 		return 0;
 	cfg_load();
+	B.debug = getenv("FREEBWS_DEBUG") != NULL;
 	if (argc > 1 && !strcmp(argv[1], "--sandbox-check")) {
 		char why[400];
 		int ok = sandbox_probe(why, sizeof why);
@@ -3154,10 +3297,19 @@ int main(int argc, char **argv)
 	fprintf(stderr, "freebws: %s buffers, loading %s\n", B.use_dmabuf ? "dmabuf" : "shm", start);
 
 	start_time = time(NULL);
-	if (B.use_dmabuf) {
-		B.argv = argv;
-		g_timeout_add_seconds(12, dmabuf_watchdog, NULL);
+	B.argv = argv;
+	B.t0 = time(NULL);
+	B.wd_test = getenv("FREEBWS_WATCHDOG_TEST") != NULL || cfg_int("watchdog_test", 0);
+	if (B.use_dmabuf || B.wd_test)
+		g_timeout_add_seconds(1, dmabuf_watchdog, NULL);
+	{
+		const char *hk = getenv("FREEBWS_HANGKILL");
+		B.hangkill = hk ? atoi(hk) : B.share_process;
+		if (B.hangkill)
+			g_timeout_add_seconds(5, hang_watchdog, NULL);
 	}
+	flog(0, "started: %s buffers, share_process=%d, hangkill=%d, loading %s", B.use_dmabuf ? "dmabuf" : "shm",
+	     B.share_process, B.hangkill, start);
 	g_timeout_add_seconds(10, mem_tick, NULL);
 	GSource *src = g_source_new(&src_funcs, sizeof(struct flsrc));
 	g_source_attach(src, NULL);

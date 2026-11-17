@@ -99,7 +99,7 @@ int theme_reset(void)
 
 const char *themes_dir(void)
 {
-	static char dir[560];
+	static char dir[600]; /* fl_conf_path() is at most 511 bytes, then "/themes" */
 	snprintf(dir, sizeof dir, "%s", fl_conf_path());
 	char *sl = strrchr(dir, '/');
 	if (sl)
@@ -252,4 +252,20 @@ int user_delete(const char *name)
 	char path[700];
 	path_of(name, path, sizeof path);
 	return unlink(path);
+}
+
+/* ---- the custom accent field (Colours) ------------------------------------------------------------
+ * The field holds a hex colour the person typed. It is refilled from desktop.conf only when the
+ * configured accent changes (a swatch, Set, Reset, another app), so a field the person has cleared
+ * stays cleared and a removed accent does not come back from the field. cur: accent= from
+ * desktop.conf, NULL when unset; is_swatch: cur is one of the six ids (then the field stays empty). */
+void accent_field_sync(const char *cur, int is_swatch, char *seen, size_t seen_cap, char *hex, size_t hex_cap)
+{
+	const char *now = cur ? cur : "";
+	if (!strcmp(now, seen))
+		return;
+	snprintf(seen, seen_cap, "%s", now);
+	hex[0] = 0;
+	if (cur && !is_swatch)
+		snprintf(hex, hex_cap, "%s", cur);
 }

@@ -43,10 +43,17 @@ install: all
 	install -Dm644 flui.pc $(DESTDIR)$(LIBDIR)/pkgconfig/flui.pc
 	install -Dm644 README $(DESTDIR)$(PREFIX)/share/doc/flui/README
 
-clean:
-	rm -f $(OBJS) $(LIB) libflui.so flui.pc xdg-shell-client-protocol.h xdg-shell-protocol.c
+# scrollbar and list presses with synthetic pointer events (no compositor, no fonts)
+test-scroll: test-scroll.c ui.c gfx.c internal.h flui.h flpalette.h
+	$(CC) $(CFLAGS) -o $@ test-scroll.c ui.c gfx.c -lm
 
-.PHONY: all install clean
+check: test-scroll
+	./test-scroll
+
+clean:
+	rm -f $(OBJS) $(LIB) libflui.so flui.pc xdg-shell-client-protocol.h xdg-shell-protocol.c test-scroll
+
+.PHONY: all install check clean
 
 # for building the clients against this tree before it is installed
 libflui.so: $(LIB)

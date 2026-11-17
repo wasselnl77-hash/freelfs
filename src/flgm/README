@@ -16,7 +16,10 @@ Tabs
                 columns with accent-tinted cells; the column headers show the machine totals.
                 Click a header to sort. End task (button or Delete) sends SIGTERM to the
                 selected row, all processes of a group included; Shift+Delete sends SIGKILL.
-                Memory is private memory (resident minus shared). Disk is read+write bytes per
+                Memory is PSS: the program's share of its memory, a page shared by several
+                programs split between them (smaps_rollup, read every 2 s at most; the resident
+                size where that cannot be read). Flatpak apps count by their application id
+                ("flatpak run org.mozilla.firefox"). Disk is read+write bytes per
                 second from /proc/PID/io, which only your own processes allow: others show a
                 dash. Network per process is always a dash (needs root); the header shows the
                 total of all adapters.
@@ -25,7 +28,12 @@ Tabs
                 CPU has an Overall / Logical processors switch. GPU busy percent and VRAM come
                 from /sys/class/drm/cardN/device (amdgpu); drivers without them show "not
                 reported". Up and Down move through the list; a window that is too short
-                scrolls the page.
+                scrolls the page. Memory has "What is in use" below the graph: the apps' own
+                memory, files kept in RAM (live system and tmpfs on a live system), graphics
+                buffers when the driver reports them, the kernel, and drivers and the rest. The
+                parts add up to In use. The ? beside it says why the programs' numbers are
+                larger: shared libraries and program files count as Cached, not In use.
+                The window shows at once; the machine data is read on the first turn after it.
   Startup apps  .desktop files in ~/.config/autostart (XDG_CONFIG_HOME) and the system
                 directories (/etc/xdg/autostart, XDG_CONFIG_DIRS). The switch writes
                 Hidden=true into the user's file; for a system entry it writes a small
@@ -47,6 +55,8 @@ Headless screenshots: FLUI_PPM=FILE FLUI_PPM_DELAY=3500 GM_INTERVAL_MS=250 (see 
 Tests
   make check          sys.c, proc.c, startup.c against the host /proc and a scratch autostart dir,
                       then fake-test.c against a fake /proc and /sys (300 processes, long and
-                      non-UTF-8 names, vanished and reused pids, missing files, counters going back)
+                      non-UTF-8 names, vanished and reused pids, missing files, counters going back,
+                      PSS and its fallback, a Flatpak app's group, the memory split, and a hung
+                      smaps_rollup (a FIFO with no writer): the scan returns and the read times out)
   tests/e2e.sh        headless flcomp + the window: Ctrl+Shift+Esc starts it, search, Down, Delete
                       ends a victim process of its own, screenshots (needs FLCOMP=, GM_SYSROOT=)

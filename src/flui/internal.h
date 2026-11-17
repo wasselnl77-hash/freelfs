@@ -32,4 +32,8 @@ HIDDEN int fl_text_init(void);
 HIDDEN fl_app *fl_win_app(fl_win *w);
 HIDDEN void fl_wins_relayout(fl_app *a);
 
+/* run_pass: the start of a pass (first: of a frame) and its end (releases, clears the events) */
+HIDDEN void fl_ui_pass_begin(fl_ui *ui, int first);
+HIDDEN void fl_ui_pass_end(fl_ui *ui);
+
 #endif

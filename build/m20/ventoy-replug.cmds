@@ -1,0 +1,61 @@
+# A Ventoy-layout stick WITHOUT the system on it: eject in Files really ejects, apps open afterwards (pixels), and the
+# stick is plugged in again, twice: each time Files shows its files (no "input/output error"), then ejected again.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@mon drive_add 0 if=none,id=u,file=@VENTOY@,format=raw
+@mon device_add usb-storage,drive=u,id=ud,bus=xhci.0
+@waitok 60 sda1 is mounted under /drives :: grep -q '^/dev/sda1 /drives/Ventoy ' /proc/mounts
+@ok a file on the stick :: su -s /bin/sh tester -c 'echo hi > /drives/Ventoy/note.txt'
+@ok the stick is a removable drive with an eject button (not boot) :: su -s /bin/sh tester -c 'flmount list' | grep sda1 | grep -q removable
+su -s /bin/sh tester -c 'cd /drives/Ventoy; set -a; . /tmp/sessenv; setsid flfiles /drives/Ventoy </dev/null >/tmp/files.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@shot @OUT@/vr-1-files.ppm
+@mouse 321 490
+@click
+@waitok 40 the stick is gone (no mount, no disk) :: ! grep -q ' /drives/Ventoy ' /proc/mounts && ! test -e /sys/block/sda
+@wait 3
+@ok no mountpoint is left under /drives :: ! test -e /drives/Ventoy
+@shot @OUT@/vr-2-after-eject.ppm
+@shotdiff @OUT@/vr-1-files.ppm @OUT@/vr-2-after-eject.ppm 3000 150 40 1010 600
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/vr-3-gm.ppm
+@shotdiff @OUT@/vr-2-after-eject.ppm @OUT@/vr-3-gm.ppm 40000 0 0 1280 750
+@shotcolors @OUT@/vr-3-gm.ppm 150
+@ok General Manager runs in Home :: test "$(readlink /proc/$(pgrep -u tester -x general-manager | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager
+@wait 2
+@key meta_l
+@wait 2
+@type settings
+@wait 2
+@key ret
+@wait 6
+@shot @OUT@/vr-4-settings.ppm
+@shotcolors @OUT@/vr-4-settings.ppm 100
+@ok Settings runs in Home :: test "$(readlink /proc/$(pgrep -u tester -x flsettings | head -1)/cwd)" = /home/tester
+@ok close it :: pkill -u tester -x flsettings; sleep 1; ! pgrep -u tester -x flsettings
+# plug it in again: first time
+@mon device_del ud
+@wait 2
+@mon drive_del u
+@mon drive_add 0 if=none,id=u2,file=@VENTOY@,format=raw
+@mon device_add usb-storage,drive=u2,id=ud2,bus=xhci.0
+@waitok 60 plugged in again: mounted :: grep -q '^/dev/sda1 /drives/Ventoy ' /proc/mounts
+@ok the files are readable at once (no input/output error) :: su -s /bin/sh tester -c 'cat /drives/Ventoy/note.txt' | grep -q hi && ls /drives/Ventoy > /dev/null
+@ok eject it again by command, as Files does :: su -s /bin/sh tester -c 'flmount eject /dev/sda1'; sleep 3; ! grep -q ' /drives/Ventoy ' /proc/mounts && ! test -e /sys/block/sda
+@mon device_del ud2
+@wait 2
+@mon drive_del u2
+@mon drive_add 0 if=none,id=u3,file=@VENTOY@,format=raw
+@mon device_add usb-storage,drive=u3,id=ud3,bus=xhci.0
+@waitok 60 plugged in a second time: mounted :: grep -q '^/dev/sda1 /drives/Ventoy ' /proc/mounts
+@ok the files are readable the second time too :: su -s /bin/sh tester -c 'cat /drives/Ventoy/note.txt' | grep -q hi
+@ok Files can still be started and shows a window :: su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; setsid flfiles /drives/Ventoy </dev/null >/tmp/files2.log 2>&1 &'; sleep 5; pgrep -u tester -x flfiles
+@shot @OUT@/vr-5-files-again.ppm
+@shotcolors @OUT@/vr-5-files-again.ppm 100

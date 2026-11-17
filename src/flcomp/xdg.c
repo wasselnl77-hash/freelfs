@@ -5,6 +5,7 @@
 #include "xdg-shell-protocol.h"
 #include "xdg-decoration-unstable-v1-protocol.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -830,6 +831,16 @@ static void window_commit(struct window *w, bool was_mapped)
 	bool now = w->surf->px != NULL;
 	w->mapped = now;
 	if (now && !was_mapped) {
+		/* how the frame was settled, for the log (flreport collects it): GTK3 programs, Firefox among them,
+		 * never create an xdg-decoration object and draw their own title bar; GTK4 and Qt ask */
+		if (w->xw)
+			fprintf(stderr, "flcomp: window \"%s\" (X11): %s\n", w->app_id ? w->app_id : "?",
+				window_framed(w) ? "flcomp draws the frame (a program that draws its own must ask with _MOTIF_WM_HINTS)"
+					    : "no frame (the program asked for none)");
+		else
+			fprintf(stderr, "flcomp: window \"%s\" (Wayland): %s\n", w->app_id ? w->app_id : "?",
+				w->deco_res ? (w->ssd ? "xdg-decoration, server-side frame" : "xdg-decoration, client-side frame")
+					    : "no xdg-decoration object, the client draws its own title bar");
 		window_place(w);
 		w->ws = w->parent ? w->parent->ws : C.ws_cur;
 		anim_window_open(w);

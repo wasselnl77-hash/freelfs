@@ -103,6 +103,7 @@ struct fl_app {
 	fl_win *wins;
 	int nwins;
 	fl_win *pfocus, *kfocus;
+	fl_win *btn_win;          /* the window that got the press: its drag and release go there, even off it */
 	uint32_t serial, ptr_serial;
 	int shape;
 
@@ -350,19 +351,11 @@ static void decorate(fl_win *w)
 
 /* ---- the pass ------------------------------------------------------------------------- */
 
-static void clear_events(fl_ui *ui)
-{
-	ui->press = ui->release = 0;
-	ui->wheel = 0;
-	ui->key = 0;
-	ui->text[0] = 0;
-	ui->_wheel_taken = 0;
-}
-
 static void run_pass(fl_win *w, uint32_t *px)
 {
 	fl_ui *ui = &w->ui;
 	for (int pass = 0; pass < 3; pass++) {
+		fl_ui_pass_begin(ui, pass == 0);
 		ui->cv = (fl_canvas){px, w->w, w->h, w->w, {0, 0, w->w, w->h}};
 		ui->cursor = FL_CURSOR_ARROW;
 		ui->_repass = 0;
@@ -398,9 +391,7 @@ static void run_pass(fl_win *w, uint32_t *px)
 			ui->focus = (ui->key == XKB_KEY_Tab || !ui->_last_focus) ? ui->_first_focus : ui->_last_focus;
 			ui->_repass = 1;
 		}
-		if (ui->release & FL_BTN_L)
-			ui->active = 0;
-		clear_events(ui);
+		fl_ui_pass_end(ui);
 		if (!ui->_repass)
 			break;
 	}
@@ -685,6 +676,10 @@ static void reap(fl_app *a)
 		fl_win *w = *pp;
 		if (w->dead) {
 			*pp = w->next;
+			if (a->btn_win == w)
+				a->btn_win = NULL;
+			if (a->pfocus == w)
+				a->pfocus = NULL;
 			free(w->title);
 			free(w->app_id);
 			free(w);
@@ -736,7 +731,7 @@ static void pointer_leave(void *data, struct wl_pointer *p, uint32_t serial, str
 static void pointer_motion(void *data, struct wl_pointer *p, uint32_t time, wl_fixed_t x, wl_fixed_t y)
 {
 	fl_app *a = data;
-	fl_win *w = a->pfocus;
+	fl_win *w = a->btn_win ? a->btn_win : a->pfocus;
 	if (!w)
 		return;
 	w->ui.mx = wl_fixed_to_int(x);
@@ -751,7 +746,9 @@ static void pointer_button(void *data, struct wl_pointer *p, uint32_t serial, ui
                            uint32_t button, uint32_t state)
 {
 	fl_app *a = data;
-	fl_win *w = a->pfocus;
+	int down = state == WL_POINTER_BUTTON_STATE_PRESSED;
+	/* a release goes to the window the press went to, even when the pointer has left it */
+	fl_win *w = !down && a->btn_win ? a->btn_win : a->pfocus;
 	a->serial = serial;
 	if (!w)
 		return;
@@ -759,8 +756,8 @@ static void pointer_button(void *data, struct wl_pointer *p, uint32_t serial, ui
 	int bit = button == BTN_LEFT_ ? FL_BTN_L : button == BTN_RIGHT_ ? FL_BTN_R : button == BTN_MIDDLE_ ? FL_BTN_M : 0;
 	if (!bit)
 		return;
-	int down = state == WL_POINTER_BUTTON_STATE_PRESSED;
 	if (down) {
+		a->btn_win = w;
 		ui->btn_held |= bit;
 		ui->press = bit;
 		if (time - w->click_t < 400 && abs(ui->mx - w->click_x) < 5 && abs(ui->my - w->click_y) < 5)
@@ -774,6 +771,8 @@ static void pointer_button(void *data, struct wl_pointer *p, uint32_t serial, ui
 	} else {
 		ui->btn_held &= ~bit;
 		ui->release = bit;
+		if (!ui->btn_held)
+			a->btn_win = NULL;
 	}
 	if (w->o.pointer)
 		w->o.pointer(w, down ? FL_PTR_DOWN : FL_PTR_UP, ui->mx, ui->my, bit, w->o.ud);

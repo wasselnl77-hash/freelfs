@@ -17,6 +17,10 @@ typedef uint64_t u64;
 #ifndef SYS_DIR
 #define SYS_DIR "/sys"
 #endif
+/* a live system (flsettings about.c uses the same mark) */
+#ifndef LIVE_MARK
+#define LIVE_MARK "/run/live"
+#endif
 
 /* ---- history (60 one-second samples, oldest first) ---------------------------------- */
 
@@ -97,6 +101,8 @@ struct sys {
 	u64 p_tot[MAXCPU + 1], p_idle[MAXCPU + 1];
 	double load[3];
 	u64 mem_total, mem_avail, mem_free, mem_cached, mem_buffers, mem_slab, mem_shmem;
+	u64 mem_unrec, mem_pt, mem_kstack; /* SUnreclaim, PageTables, KernelStack */
+	int live;
 	u64 swap_total, swap_free, commit, commit_limit;
 	struct hist h_mem;
 	int nproc, nthreads;
@@ -134,7 +140,15 @@ struct proc {
 	char *cmd;
 	int threads, kernel;
 	u64 ticks, p_ticks;
-	u64 priv_kb; /* resident minus shared */
+	u64 priv_kb; /* resident minus shared: the fallback for anon_kb */
+	u64 rss_kb;  /* resident, from statm */
+	u64 mem_kb;  /* PSS from smaps_rollup; rss_kb until that is read */
+	u64 anon_kb; /* Pss_Anon from smaps_rollup; priv_kb until that is read */
+	int pss_ok;  /* mem_kb and anon_kb came from smaps_rollup */
+	int pss_busy; /* a smaps_rollup read is in flight (rdr.c) */
+	double pss_t; /* when smaps_rollup was last asked for */
+	u64 pss_rss;  /* rss_kb at that time: a change of 1 MB asks again */
+	int cmd_state; /* 0: the command line is known; 1: to be read; 2: read in flight */
 	u64 start;   /* starttime from stat: tells a reused pid apart */
 	u64 io, p_io;
 	int io_ok, have_prev;
@@ -151,6 +165,7 @@ struct procs {
 	double t_prev;
 	int ncpu;
 	long hz;
+	double pss_round_t; /* last round of smaps_rollup reads (every 2 s at most) */
 	int failed; /* the last scan could not read the process table */
 };
 
@@ -163,10 +178,35 @@ int apps_count(void);
 const struct appinfo *apps_get(int i);
 void procs_init(struct procs *ps, int ncpu);
 void procs_scan(struct procs *ps);
+/* sums over the table: anon_kb of every process, and mem_kb of the processes of one app */
+void procs_mem(const struct procs *ps, u64 *anon_kb, u64 *pss_kb);
+u64 procs_app_mem(const struct procs *ps, int app);
 void gm_clean_utf8(char *s); /* control bytes and invalid UTF-8 become '?' */
 const char *user_name(unsigned uid);
 const char *state_name(char s);
 struct proc *procs_find(struct procs *ps, int pid);
+
+/* ---- reads that may hang (rdr.c) ----------------------------------------------------------
+ * /proc/PID/cmdline and smaps_rollup take the process's mm lock, which a process stuck in a
+ * hung page fault (NFS, USB, FUSE) holds: the read then blocks. These reads run on a worker
+ * thread. The caller asks, and collects the answer on a later scan; a read that takes longer
+ * than the timeout is given up and its worker is replaced. */
+enum { RDR_PSS = 1, RDR_CMDLINE = 2 };
+int rdr_submit(int kind, int pid, u64 start);   /* 0: queued, -1: no room or reader disabled */
+int rdr_take(int kind, int pid, u64 start, char *buf, size_t cap, u64 *a, u64 *b);
+        /* 1: done (buf, a = bytes or PSS kB, b = Pss_Anon kB); 0: in flight; -1: failed or unknown */
+void rdr_pump(void);                            /* once per scan: times out stuck reads */
+void rdr_set_sync(int on);                      /* tests: read in the caller, no thread */
+void rdr_set_timeout(double seconds);           /* tests: default 3 s */
+
+/* ---- memory in use, split (sys.c) ------------------------------------------------------ */
+
+/* All in kB. The parts add up to used exactly (other is what is left). */
+struct memsplit {
+	u64 used, apps, files, graphics, system, other;
+};
+
+void mem_split(struct memsplit *m, const struct sys *s, u64 apps_anon_kb);
 
 /* ---- startup apps (startup.c) ------------------------------------------------------ */
 

@@ -1,0 +1,14 @@
+# Boot screen styles (flat is the default, legacy is the old 3D one), the boot-step log, and the greeter take-over.
+# The splash itself runs before the serial login can look, so this checks what it left behind (the style file, the log)
+# and renders both styles with `flsplash --render` (no screen needed): flat has the plain #0d1110 ground.
+@desktop
+@ok the splash daemon ran the flat style (its log; the style file itself is removed when it ends) :: grep -q 'start, style flat' /run/flsplash.log
+@ok no boot step failed on this boot (the splash log has no "rc: step failed") :: ! grep 'rc: step failed' /run/flsplash.log
+@ok the splash log is readable (what it says follows) :: cat /run/flsplash.log
+@ok flsplash-set is setuid root, group seat :: [ "$(stat -c %U:%G:%a /usr/bin/flsplash-set)" = root:seat:4750 ]
+@put @HERE@/ppmcheck.py /tmp/ppmcheck.py
+@ok the flat splash is #0d1110 in all four corners, with a logo in the middle :: flsplash --render 2000 1280 800 /tmp/flat.ppm && python3 -I /tmp/ppmcheck.py /tmp/flat.ppm flat
+@ok switching to legacy through the helper works (empty password of tester) :: su -s /bin/sh tester -c 'flsplash-set legacy' && grep -q 'splash=legacy' /etc/freelfs/splash.conf
+@ok the legacy splash is the old 3D picture (corner is not the flat colour, many colours) :: flsplash --render 2000 1280 800 /tmp/legacy.ppm && python3 -I /tmp/ppmcheck.py /tmp/legacy.ppm legacy
+@ok a bad argument is refused :: ! su -s /bin/sh tester -c 'flsplash-set sparkly'
+@ok back to flat :: su -s /bin/sh tester -c 'flsplash-set flat' && grep -q 'splash=flat' /etc/freelfs/splash.conf

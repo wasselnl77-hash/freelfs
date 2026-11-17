@@ -36,4 +36,7 @@ int user_load(const char *name);   /* 0, or -1 (missing, not a theme file) */
 int user_delete(const char *name);
 int name_ok(const char *name);     /* letters, digits, space, - and _ , 1..32 */
 
+/* Colours: the custom accent field follows the configured accent only when that changes */
+void accent_field_sync(const char *cur, int is_swatch, char *seen, size_t seen_cap, char *hex, size_t hex_cap);
+
 #endif

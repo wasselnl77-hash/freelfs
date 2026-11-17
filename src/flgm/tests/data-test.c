@@ -47,6 +47,7 @@ static struct startup *find(struct startup *v, int n, const char *file)
 
 int main(void)
 {
+	rdr_set_sync(1); /* the reads that may hang run in the caller here: no thread in the test */
 	/* formatting */
 	CHECK(!strcmp(fmt_pct(0), "0%") && !strcmp(fmt_pct(3.24), "3.2%") && !strcmp(fmt_pct(42.4), "42%"), "fmt_pct");
 	CHECK(!strcmp(fmt_mem(250 * 1024), "250.0 MB") && !strcmp(fmt_mem(2048 * 1024), "2.00 GB"), "fmt_mem");
@@ -84,6 +85,9 @@ int main(void)
 		CHECK(me->name[0] && me->cmd && me->uid == getuid() && me->priv_kb > 0, "self: %s, uid %u, %lu kB", me->name, me->uid,
 		      (unsigned long)me->priv_kb);
 		CHECK(me->io_ok, "own /proc/PID/io readable");
+		CHECK(me->pss_ok && me->mem_kb > 0 && me->mem_kb <= me->rss_kb && me->anon_kb <= me->mem_kb,
+		      "own PSS from smaps_rollup: PSS %lu kB, anon %lu kB, RSS %lu kB", (unsigned long)me->mem_kb,
+		      (unsigned long)me->anon_kb, (unsigned long)me->rss_kb);
 	}
 	struct proc *init = procs_find(&ps, 1);
 	CHECK(init && init->ppid == 0, "pid 1 present");

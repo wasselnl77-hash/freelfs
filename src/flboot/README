@@ -47,3 +47,7 @@ from it cannot change /; /tmp, /run and the home folders (@home) still work.
 Tests: tests/menu-test.sh runs the real menu code (conf.c, menu.c, gfx.c) on a
 stand-in firmware (tests/hostmenu.c) with scripted keys and writes screenshots:
   FONT=.../Lat2-Terminus16.psfu.gz tests/menu-test.sh [SHOTDIR]
+
+Safe graphics (round 20): every menu gets an entry "FreeLFS (Safe graphics, kernel X)", the newest kernel with the command line
+plus "nomodeset nouveau.modeset=0": no GPU driver takes the screen, the firmware framebuffer (simpledrm) shows the desktop. It is
+left out when an entry of flboot.conf already has nomodeset. Test: tests/menu-test.sh.

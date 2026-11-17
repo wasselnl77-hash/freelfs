@@ -58,7 +58,13 @@ struct G {
 	fl_font *wm_font;
 	float wm_px;
 	float s_mid, s_base, s_em, s_pen; /* flsplash's wordmark: ink middle, baseline, em, pen start */
+	int flat;		/* flsplash ran its flat style: no wordmark flight, the card fades in from #0d1110 */
 };
+
+/* flsplash's flat style has one plain colour as its room (flsplash.c, "flat") */
+static int flat_room;
+#define FLAT_BG 0x0d1110
+#define FLAT_MS 600.0f
 
 static void load_users(struct G *g)
 {
@@ -225,6 +231,8 @@ static void anim_tick(void *ud)
 /* flsplash's room without the logo: top to the floor line (61% of the height), then the dark floor */
 static fl_color room_color(int y, int h)
 {
+	if (flat_room)
+		return FL_HEX(FLAT_BG);
 	static const struct { float at; int rgb[3]; } st[] = {
 		{0.00f, {0x0d, 0x10, 0x12}}, {0.60f, {0x21, 0x27, 0x2c}}, {0.62f, {0x1b, 0x22, 0x25}},
 		{0.65f, {0x16, 0x1b, 0x1d}}, {0.74f, {0x10, 0x13, 0x15}}, {0.83f, {0x0a, 0x0d, 0x0f}},
@@ -445,7 +453,7 @@ static void draw(fl_ui *ui, void *ud)
 			if (g->anim == 1)
 				fl_timer_arm(g->anim_timer, 16, 16);
 		}
-		p = (float)anim_elapsed(g) / WM_MS;
+		p = (float)anim_elapsed(g) / (g->flat ? FLAT_MS : (float)WM_MS);
 		if (p >= 1) {
 			p = 1;
 			g->anim = 0;
@@ -556,7 +564,7 @@ static void draw(fl_ui *ui, void *ud)
 	fl_color foot = fl_th.dim;
 	if (p < 1) {
 		/* the card comes up out of the room while the word is still on its way */
-		int ac = (int)lroundf(255 * smooth01((p - 0.45f) / 0.55f));
+		int ac = g->flat ? (int)lroundf(255 * smooth01(p)) : (int)lroundf(255 * smooth01((p - 0.45f) / 0.55f));
 		/* run_pass(w, NULL) calls draw without pixels (layout only): nothing to blend then */
 		for (int yy = card.y; cv->px && yy < card.y + CH && yy < H; yy++) {
 			fl_color row = fl_mix(room_color(yy, H), fl_th.bg, bgk);
@@ -566,6 +574,13 @@ static void draw(fl_ui *ui, void *ud)
 			}
 		}
 		foot = fl_mix(fl_mix(room_color(H - 20, H), fl_th.bg, bgk), fl_th.dim, ac);
+		if (g->flat) {	/* a plain fade of the card: the title is at rest, shown once the card is mostly there */
+			if (ac >= 128)
+				wordmark(cv, g, wm_x1, wm_b1, (float)WM_REST_PX, 0.0f, 255);
+			if (!g->done)
+				fl_text_in(cv, g->small, fl_r(W - 216, H - 12 - 16, 200, 16), FL_RIGHT, 0, foot, "FreeLFS 0.1");
+			return;
+		}
 		float e = smooth01(p);
 		float em = lerpf(g->s_em, (float)WM_REST_PX, e);
 		float sp = lerpf(0.20f, 0.0f, e);
@@ -620,7 +635,26 @@ int main(int argc, char **argv)
 	const char *at = getenv("FLGREET_ANIM_T");
 	if ((at && *at) || access("/run/flsplash.released", F_OK) == 0) {
 		float mid;
-		if (splash_wordmark(ow, oh, &mid, &g->s_base, &g->s_em)) {
+		/* the style flsplash ran (it writes /run/flsplash.style); FLGREET_STYLE=flat|legacy for tests */
+		char style[16] = "";
+		const char *es = getenv("FLGREET_STYLE");
+		if (es && *es) {
+			snprintf(style, sizeof style, "%s", es);
+		} else {
+			FILE *sf = fopen("/run/flsplash.style", "r");
+			if (sf) {
+				if (!fgets(style, sizeof style, sf))
+					style[0] = 0;
+				fclose(sf);
+			}
+		}
+		if (!strncmp(style, "flat", 4)) {
+			flat_room = 1;
+			g->flat = 1;
+			g->anim = at && *at ? 2 : 1;
+			g->anim_ms = at ? atol(at) : 0;
+			g->anim_timer = fl_timer_new(g->app, anim_tick, g);
+		} else if (splash_wordmark(ow, oh, &mid, &g->s_base, &g->s_em)) {
 			g->s_mid = mid;
 			g->s_pen = -1;
 			g->anim = at && *at ? 2 : 1;
