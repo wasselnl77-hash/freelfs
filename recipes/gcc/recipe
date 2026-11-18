@@ -4,6 +4,7 @@ pkgname=(gcc gcc-libs)
 pkgbase=gcc
 version=16.2.0
 release=1
+jobs=heavy   # C++ giant: about 1 GB of RAM per job (see build/config.sh)
 summary="The GNU Compiler Collection (C and C++)"
 url=https://gcc.gnu.org/
 license=(GPL-3.0-or-later)

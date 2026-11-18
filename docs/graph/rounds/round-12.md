@@ -1,0 +1,383 @@
+---
+tags: [round]
+---
+# Round 12
+
+#round
+
+Commit `6a1e3de`: Round 12: RAM trim, live store, desktop icons, small fixes, security ops
+
+350 files changed.
+
+## Components touched
+
+- [[docs/graph/components/flcomp|flcomp]]: 19 files, +371 -57
+  - `src/flcomp/Makefile` (+5 -2)
+  - `src/flcomp/README` (+9 -2)
+  - [[docs/graph/files/flcomp/comp.h|src/flcomp/comp.h]] (+47 -3)
+  - [[docs/graph/files/flcomp/fl-shell-client-protocol.c|src/flcomp/fl-shell-client-protocol.c]] (+6 -2)
+  - [[docs/graph/files/flcomp/fl-shell-client-protocol.h|src/flcomp/fl-shell-client-protocol.h]] (+22 -0)
+  - [[docs/graph/files/flcomp/fl-shell-protocol.c|src/flcomp/fl-shell-protocol.c]] (+6 -2)
+  - [[docs/graph/files/flcomp/fl-shell-protocol.h|src/flcomp/fl-shell-protocol.h]] (+21 -0)
+  - [[docs/graph/files/flcomp/flshell.c|src/flcomp/flshell.c]] (+21 -1)
+  - [[docs/graph/files/flcomp/gl.c|src/flcomp/gl.c]] (+133 -1)
+  - [[docs/graph/files/flcomp/lock.c|src/flcomp/lock.c]] (+3 -3)
+  - [[docs/graph/files/flcomp/osd.c|src/flcomp/osd.c]] (+5 -5)
+  - [[docs/graph/files/flcomp/overview.c|src/flcomp/overview.c]] (+8 -8)
+  - `src/flcomp/protocol/fl-shell.xml` (+34 -1)
+  - [[docs/graph/files/flcomp/render.c|src/flcomp/render.c]] (+3 -1)
+  - `src/flcomp/session` (+4 -1)
+  - [[docs/graph/files/flcomp/surface.c|src/flcomp/surface.c]] (+17 -1)
+  - [[docs/graph/files/flcomp/switcher.c|src/flcomp/switcher.c]] (+3 -3)
+  - [[docs/graph/files/flcomp/theme.c|src/flcomp/theme.c]] (+18 -15)
+  - [[docs/graph/files/flcomp/xwdeco.c|src/flcomp/xwdeco.c]] (+6 -6)
+- [[docs/graph/components/flcrash|flcrash]]: 2 files, +6 -2
+  - `src/flcrash/README` (+2 -1)
+  - [[docs/graph/files/flcrash/flcrash.c|src/flcrash/flcrash.c]] (+4 -1)
+- [[docs/graph/components/flinstall|flinstall]]: 1 file, +2 -0
+  - `src/flinstall/flinstall.desktop` (+2 -0)
+- [[docs/graph/components/fllock|fllock]]: 2 files, +119 -3
+  - [[docs/graph/files/fllock/fl-shell-client-protocol.h|src/fllock/fl-shell-client-protocol.h]] (+107 -0)
+  - [[docs/graph/files/fllock/fl-shell-protocol.c|src/fllock/fl-shell-protocol.c]] (+12 -3)
+- [[docs/graph/components/flpanel|flpanel]]: 8 files, +141 -4
+  - `src/flpanel/Makefile` (+1 -1)
+  - `src/flpanel/README` (+5 -0)
+  - [[docs/graph/files/flpanel/deskicons.c|src/flpanel/deskicons.c]] (+101 -0)
+  - [[docs/graph/files/flpanel/fl-shell-client-protocol.h|src/flpanel/fl-shell-client-protocol.h]] (+22 -0)
+  - [[docs/graph/files/flpanel/fl-shell-protocol.c|src/flpanel/fl-shell-protocol.c]] (+6 -2)
+  - [[docs/graph/files/flpanel/flpanel.h|src/flpanel/flpanel.h]] (+2 -0)
+  - [[docs/graph/files/flpanel/menu.c|src/flpanel/menu.c]] (+2 -0)
+  - [[docs/graph/files/flpanel/panel.c|src/flpanel/panel.c]] (+2 -1)
+- [[docs/graph/components/flpkg|flpkg]]: 9 files, +882 -34
+  - `src/flpkg/Makefile` (+2 -1)
+  - [[docs/graph/files/flpkg/cmd_pkg.c|src/flpkg/cmd_pkg.c]] (+32 -6)
+  - [[docs/graph/files/flpkg/flpkg.h|src/flpkg/flpkg.h]] (+1 -1)
+  - [[docs/graph/files/flpkg/main.c|src/flpkg/main.c]] (+4 -2)
+  - [[docs/graph/files/flpkg/repo.c|src/flpkg/repo.c]] (+97 -21)
+  - [[docs/graph/files/flpkg/sign.c|src/flpkg/sign.c]] (+32 -3)
+  - [[docs/graph/files/flpkg/sign.h|src/flpkg/sign.h]] (+45 -0)
+  - `src/flpkg/tests/test-trust.sh` (+151 -0)
+  - [[docs/graph/files/flpkg/trust.c|src/flpkg/trust.c]] (+518 -0)
+- [[docs/graph/components/flreport|flreport]]: 2 files, +11 -0
+  - `src/flreport/README` (+2 -0)
+  - `src/flreport/flreport` (+9 -0)
+- [[docs/graph/components/flsnap|flsnap]]: 4 files, +23 -9
+  - `src/flsnap/README` (+3 -1)
+  - `src/flsnap/flsnap` (+- --)
+  - [[docs/graph/files/flsnap/flsnap.c|src/flsnap/flsnap.c]] (+9 -6)
+  - `src/flsnap/tests/test-flsnap.sh` (+11 -2)
+- [[docs/graph/components/flstore|flstore]]: 4 files, +78 -5
+  - `src/flstore/README` (+8 -0)
+  - [[docs/graph/files/flstore/flstore.c|src/flstore/flstore.c]] (+33 -4)
+  - [[docs/graph/files/flstore/flstore.h|src/flstore/flstore.h]] (+4 -1)
+  - [[docs/graph/files/flstore/views.c|src/flstore/views.c]] (+33 -0)
+- [[docs/graph/components/flui|flui]]: 8 files, +412 -87
+  - `src/flui/Makefile` (+2 -1)
+  - [[docs/graph/files/flui/conf.c|src/flui/conf.c]] (+78 -76)
+  - [[docs/graph/files/flui/flpalette.h|src/flui/flpalette.h]] (+150 -0)
+  - [[docs/graph/files/flui/flui.h|src/flui/flui.h]] (+29 -1)
+  - [[docs/graph/files/flui/internal.h|src/flui/internal.h]] (+1 -0)
+  - [[docs/graph/files/flui/text.c|src/flui/text.c]] (+121 -1)
+  - [[docs/graph/files/flui/ui.c|src/flui/ui.c]] (+10 -4)
+  - [[docs/graph/files/flui/wl.c|src/flui/wl.c]] (+21 -4)
+- [[docs/graph/components/flvideo|flvideo]]: 3 files, +289 -8
+  - `src/flvideo/Makefile` (+1 -1)
+  - `src/flvideo/README` (+8 -3)
+  - [[docs/graph/files/flvideo/flvideo.c|src/flvideo/flvideo.c]] (+280 -4)
+- [[docs/graph/components/freebws|freebws]]: 5 files, +162 -1
+  - `src/freebws/README` (+20 -1)
+  - `src/freebws/data/settings.html` (+1 -0)
+  - [[docs/graph/files/freebws/freebws.c|src/freebws/freebws.c]] (+131 -0)
+  - [[docs/graph/files/freebws/pages.c|src/freebws/pages.c]] (+8 -0)
+  - [[docs/graph/files/freebws/pages.h|src/freebws/pages.h]] (+2 -0)
+
+## Packages touched
+
+- [[docs/graph/packages/acl|pkg/acl]]: `recipes/acl/recipe`
+- [[docs/graph/packages/alsa-lib|pkg/alsa-lib]]: `recipes/alsa-lib/recipe`
+- [[docs/graph/packages/appstream|pkg/appstream]]: `recipes/appstream/recipe`
+- [[docs/graph/packages/attr|pkg/attr]]: `recipes/attr/recipe`
+- [[docs/graph/packages/bash|pkg/bash]]: `recipes/bash/recipe`
+- [[docs/graph/packages/bc|pkg/bc]]: `recipes/bc/recipe`
+- [[docs/graph/packages/binutils|pkg/binutils]]: `recipes/binutils/recipe`
+- [[docs/graph/packages/bison|pkg/bison]]: `recipes/bison/recipe`
+- [[docs/graph/packages/brotli|pkg/brotli]]: `recipes/brotli/recipe`
+- [[docs/graph/packages/btrfs-progs|pkg/btrfs-progs]]: `recipes/btrfs-progs/recipe`
+- [[docs/graph/packages/bubblewrap|pkg/bubblewrap]]: `recipes/bubblewrap/recipe`
+- [[docs/graph/packages/bzip2|pkg/bzip2]]: `recipes/bzip2/recipe`
+- [[docs/graph/packages/cmake|pkg/cmake]]: `recipes/cmake/recipe`
+- [[docs/graph/packages/coreutils|pkg/coreutils]]: `recipes/coreutils/recipe`
+- [[docs/graph/packages/curl|pkg/curl]]: `recipes/curl/recipe`
+- [[docs/graph/packages/dbus|pkg/dbus]]: `recipes/dbus/recipe`
+- [[docs/graph/packages/dhcpcd|pkg/dhcpcd]]: `recipes/dhcpcd/recipe`
+- [[docs/graph/packages/diffutils|pkg/diffutils]]: `recipes/diffutils/recipe`
+- [[docs/graph/packages/dosfstools|pkg/dosfstools]]: `recipes/dosfstools/recipe`
+- [[docs/graph/packages/e2fsprogs|pkg/e2fsprogs]]: `recipes/e2fsprogs/recipe`
+- [[docs/graph/packages/expat|pkg/expat]]: `recipes/expat/recipe`
+- [[docs/graph/packages/expect|pkg/expect]]: `recipes/expect/recipe`
+- [[docs/graph/packages/ffmpeg|pkg/ffmpeg]]: `recipes/ffmpeg/recipe`
+- [[docs/graph/packages/file|pkg/file]]: `recipes/file/recipe`
+- [[docs/graph/packages/findutils|pkg/findutils]]: `recipes/findutils/recipe`
+- [[docs/graph/packages/fl-drawtest|pkg/fl-drawtest]]: `recipes/fl-drawtest/recipe`
+- [[docs/graph/packages/flarchive|pkg/flarchive]]: `recipes/flarchive/recipe`
+- [[docs/graph/packages/flatpak|pkg/flatpak]]: `recipes/flatpak/recipe`
+- [[docs/graph/packages/flboot|pkg/flboot]]: `recipes/flboot/recipe`
+- [[docs/graph/packages/flcomp|pkg/flcomp]]: `recipes/flcomp/recipe`
+- [[docs/graph/packages/flcrash|pkg/flcrash]]: `recipes/flcrash/recipe`
+- [[docs/graph/packages/fledit|pkg/fledit]]: `recipes/fledit/recipe`
+- [[docs/graph/packages/flex|pkg/flex]]: `recipes/flex/recipe`
+- [[docs/graph/packages/flfiles|pkg/flfiles]]: `recipes/flfiles/recipe`
+- [[docs/graph/packages/flgm|pkg/flgm]]: `recipes/flgm/recipe`
+- [[docs/graph/packages/flgreet|pkg/flgreet]]: `recipes/flgreet/recipe`
+- [[docs/graph/packages/flinitrd|pkg/flinitrd]]: `recipes/flinitrd/recipe`
+- [[docs/graph/packages/flinstall|pkg/flinstall]]: `recipes/flinstall/recipe`
+- [[docs/graph/packages/fllock|pkg/fllock]]: `recipes/fllock/recipe`
+- [[docs/graph/packages/flmusic|pkg/flmusic]]: `recipes/flmusic/recipe`
+- [[docs/graph/packages/flpackages|pkg/flpackages]]: `recipes/flpackages/recipe`
+- [[docs/graph/packages/flpanel|pkg/flpanel]]: `recipes/flpanel/recipe`
+- [[docs/graph/packages/flpdf|pkg/flpdf]]: `recipes/flpdf/recipe`
+- [[docs/graph/packages/flpkg|pkg/flpkg]]: `recipes/flpkg/recipe`
+- [[docs/graph/packages/flportal|pkg/flportal]]: `recipes/flportal/recipe`
+- [[docs/graph/packages/flreport|pkg/flreport]]: `recipes/flreport/recipe`
+- [[docs/graph/packages/flsettings|pkg/flsettings]]: `recipes/flsettings/recipe`
+- [[docs/graph/packages/flsetup|pkg/flsetup]]: `recipes/flsetup/recipe`
+- [[docs/graph/packages/flsh|pkg/flsh]]: `recipes/flsh/recipe`
+- [[docs/graph/packages/flsnap|pkg/flsnap]]: `recipes/flsnap/recipe`
+- [[docs/graph/packages/flsound|pkg/flsound]]: `recipes/flsound/recipe`
+- [[docs/graph/packages/flsplash|pkg/flsplash]]: `recipes/flsplash/recipe`
+- [[docs/graph/packages/flstore|pkg/flstore]]: `recipes/flstore/recipe`
+- [[docs/graph/packages/flterm|pkg/flterm]]: `recipes/flterm/recipe`
+- [[docs/graph/packages/fltime|pkg/fltime]]: `recipes/fltime/recipe`
+- [[docs/graph/packages/flui|pkg/flui]]: `recipes/flui/recipe`
+- [[docs/graph/packages/flvideo|pkg/flvideo]]: `recipes/flvideo/recipe`
+- [[docs/graph/packages/flview|pkg/flview]]: `recipes/flview/recipe`
+- [[docs/graph/packages/fontconfig|pkg/fontconfig]]: `recipes/fontconfig/recipe`
+- [[docs/graph/packages/freebws|pkg/freebws]]: `recipes/freebws/recipe`
+- [[docs/graph/packages/freetype|pkg/freetype]]: `recipes/freetype/recipe`
+- [[docs/graph/packages/fribidi|pkg/fribidi]]: `recipes/fribidi/recipe`
+- [[docs/graph/packages/fuse3|pkg/fuse3]]: `recipes/fuse3/recipe`
+- [[docs/graph/packages/gawk|pkg/gawk]]: `recipes/gawk/recipe`
+- [[docs/graph/packages/gcc|pkg/gcc]]: `recipes/gcc/recipe`
+- [[docs/graph/packages/gdbm|pkg/gdbm]]: `recipes/gdbm/recipe`
+- [[docs/graph/packages/gdk-pixbuf|pkg/gdk-pixbuf]]: `recipes/gdk-pixbuf/recipe`
+- [[docs/graph/packages/gettext|pkg/gettext]]: `recipes/gettext/recipe`
+- [[docs/graph/packages/glib|pkg/glib]]: `recipes/glib/recipe`
+- [[docs/graph/packages/glib-networking|pkg/glib-networking]]: `recipes/glib-networking/recipe`
+- [[docs/graph/packages/glibc|pkg/glibc]]: `recipes/glibc/recipe`
+- [[docs/graph/packages/glslang|pkg/glslang]]: `recipes/glslang/recipe`
+- [[docs/graph/packages/gmp|pkg/gmp]]: `recipes/gmp/recipe`
+- [[docs/graph/packages/gnupg|pkg/gnupg]]: `recipes/gnupg/recipe`
+- [[docs/graph/packages/gperf|pkg/gperf]]: `recipes/gperf/recipe`
+- [[docs/graph/packages/gpgme|pkg/gpgme]]: `recipes/gpgme/recipe`
+- [[docs/graph/packages/grep|pkg/grep]]: `recipes/grep/recipe`
+- [[docs/graph/packages/groff|pkg/groff]]: `recipes/groff/recipe`
+- [[docs/graph/packages/gst-libav|pkg/gst-libav]]: `recipes/gst-libav/recipe`
+- [[docs/graph/packages/gst-plugins-bad|pkg/gst-plugins-bad]]: `recipes/gst-plugins-bad/recipe`
+- [[docs/graph/packages/gst-plugins-base|pkg/gst-plugins-base]]: `recipes/gst-plugins-base/recipe`
+- [[docs/graph/packages/gst-plugins-good|pkg/gst-plugins-good]]: `recipes/gst-plugins-good/recipe`
+- [[docs/graph/packages/gstreamer|pkg/gstreamer]]: `recipes/gstreamer/recipe`
+- [[docs/graph/packages/gzip|pkg/gzip]]: `recipes/gzip/recipe`
+- [[docs/graph/packages/harfbuzz|pkg/harfbuzz]]: `recipes/harfbuzz/recipe`
+- [[docs/graph/packages/icu|pkg/icu]]: `recipes/icu/recipe`
+- [[docs/graph/packages/inetutils|pkg/inetutils]]: `recipes/inetutils/recipe`
+- [[docs/graph/packages/initscripts|pkg/initscripts]]: `recipes/initscripts/recipe`
+- [[docs/graph/packages/iproute2|pkg/iproute2]]: `recipes/iproute2/recipe`
+- [[docs/graph/packages/iwd|pkg/iwd]]: `recipes/iwd/recipe`
+- [[docs/graph/packages/json-glib|pkg/json-glib]]: `recipes/json-glib/recipe`
+- [[docs/graph/packages/kbd|pkg/kbd]]: `recipes/kbd/recipe`
+- [[docs/graph/packages/kmod|pkg/kmod]]: `recipes/kmod/recipe`
+- [[docs/graph/packages/lcms2|pkg/lcms2]]: `recipes/lcms2/recipe`
+- [[docs/graph/packages/less|pkg/less]]: `recipes/less/recipe`
+- [[docs/graph/packages/libX11|pkg/libX11]]: `recipes/libX11/recipe`
+- [[docs/graph/packages/libXau|pkg/libXau]]: `recipes/libXau/recipe`
+- [[docs/graph/packages/libXcomposite|pkg/libXcomposite]]: `recipes/libXcomposite/recipe`
+- [[docs/graph/packages/libXcursor|pkg/libXcursor]]: `recipes/libXcursor/recipe`
+- [[docs/graph/packages/libXdamage|pkg/libXdamage]]: `recipes/libXdamage/recipe`
+- [[docs/graph/packages/libXdmcp|pkg/libXdmcp]]: `recipes/libXdmcp/recipe`
+- [[docs/graph/packages/libXext|pkg/libXext]]: `recipes/libXext/recipe`
+- [[docs/graph/packages/libXfixes|pkg/libXfixes]]: `recipes/libXfixes/recipe`
+- [[docs/graph/packages/libXfont2|pkg/libXfont2]]: `recipes/libXfont2/recipe`
+- [[docs/graph/packages/libXi|pkg/libXi]]: `recipes/libXi/recipe`
+- [[docs/graph/packages/libXrandr|pkg/libXrandr]]: `recipes/libXrandr/recipe`
+- [[docs/graph/packages/libXrender|pkg/libXrender]]: `recipes/libXrender/recipe`
+- [[docs/graph/packages/libXtst|pkg/libXtst]]: `recipes/libXtst/recipe`
+- [[docs/graph/packages/libXxf86vm|pkg/libXxf86vm]]: `recipes/libXxf86vm/recipe`
+- [[docs/graph/packages/libarchive|pkg/libarchive]]: `recipes/libarchive/recipe`
+- [[docs/graph/packages/libass|pkg/libass]]: `recipes/libass/recipe`
+- [[docs/graph/packages/libassuan|pkg/libassuan]]: `recipes/libassuan/recipe`
+- [[docs/graph/packages/libburn|pkg/libburn]]: `recipes/libburn/recipe`
+- [[docs/graph/packages/libcap|pkg/libcap]]: `recipes/libcap/recipe`
+- [[docs/graph/packages/libdisplay-info|pkg/libdisplay-info]]: `recipes/libdisplay-info/recipe`
+- [[docs/graph/packages/libdrm|pkg/libdrm]]: `recipes/libdrm/recipe`
+- [[docs/graph/packages/libdssl|pkg/libdssl]]: `recipes/libdssl/recipe`
+- [[docs/graph/packages/libelf|pkg/libelf]]: `recipes/libelf/recipe`
+- [[docs/graph/packages/libepoxy|pkg/libepoxy]]: `recipes/libepoxy/recipe`
+- [[docs/graph/packages/libevdev|pkg/libevdev]]: `recipes/libevdev/recipe`
+- [[docs/graph/packages/libffi|pkg/libffi]]: `recipes/libffi/recipe`
+- [[docs/graph/packages/libfontenc|pkg/libfontenc]]: `recipes/libfontenc/recipe`
+- [[docs/graph/packages/libfyaml|pkg/libfyaml]]: `recipes/libfyaml/recipe`
+- [[docs/graph/packages/libgcrypt|pkg/libgcrypt]]: `recipes/libgcrypt/recipe`
+- [[docs/graph/packages/libgpg-error|pkg/libgpg-error]]: `recipes/libgpg-error/recipe`
+- [[docs/graph/packages/libinput|pkg/libinput]]: `recipes/libinput/recipe`
+- [[docs/graph/packages/libisoburn|pkg/libisoburn]]: `recipes/libisoburn/recipe`
+- [[docs/graph/packages/libisofs|pkg/libisofs]]: `recipes/libisofs/recipe`
+- [[docs/graph/packages/libjpeg-turbo|pkg/libjpeg-turbo]]: `recipes/libjpeg-turbo/recipe`
+- [[docs/graph/packages/libksba|pkg/libksba]]: `recipes/libksba/recipe`
+- [[docs/graph/packages/libogg|pkg/libogg]]: `recipes/libogg/recipe`
+- [[docs/graph/packages/libpipeline|pkg/libpipeline]]: `recipes/libpipeline/recipe`
+- [[docs/graph/packages/libplacebo|pkg/libplacebo]]: `recipes/libplacebo/recipe`
+- [[docs/graph/packages/libpng|pkg/libpng]]: `recipes/libpng/recipe`
+- [[docs/graph/packages/libpsl|pkg/libpsl]]: `recipes/libpsl/recipe`
+- [[docs/graph/packages/libseccomp|pkg/libseccomp]]: `recipes/libseccomp/recipe`
+- [[docs/graph/packages/libsoup|pkg/libsoup]]: `recipes/libsoup/recipe`
+- [[docs/graph/packages/libtasn1|pkg/libtasn1]]: `recipes/libtasn1/recipe`
+- [[docs/graph/packages/libtool|pkg/libtool]]: `recipes/libtool/recipe`
+- [[docs/graph/packages/libva|pkg/libva]]: `recipes/libva/recipe`
+- [[docs/graph/packages/libvorbis|pkg/libvorbis]]: `recipes/libvorbis/recipe`
+- [[docs/graph/packages/libwebp|pkg/libwebp]]: `recipes/libwebp/recipe`
+- [[docs/graph/packages/libwpe|pkg/libwpe]]: `recipes/libwpe/recipe`
+- [[docs/graph/packages/libxcb|pkg/libxcb]]: `recipes/libxcb/recipe`
+- [[docs/graph/packages/libxcrypt|pkg/libxcrypt]]: `recipes/libxcrypt/recipe`
+- [[docs/graph/packages/libxcvt|pkg/libxcvt]]: `recipes/libxcvt/recipe`
+- [[docs/graph/packages/libxkbcommon|pkg/libxkbcommon]]: `recipes/libxkbcommon/recipe`
+- [[docs/graph/packages/libxkbfile|pkg/libxkbfile]]: `recipes/libxkbfile/recipe`
+- [[docs/graph/packages/libxml2|pkg/libxml2]]: `recipes/libxml2/recipe`
+- [[docs/graph/packages/libxmlb|pkg/libxmlb]]: `recipes/libxmlb/recipe`
+- [[docs/graph/packages/libxshmfence|pkg/libxshmfence]]: `recipes/libxshmfence/recipe`
+- [[docs/graph/packages/libxslt|pkg/libxslt]]: `recipes/libxslt/recipe`
+- [[docs/graph/packages/libyaml|pkg/libyaml]]: `recipes/libyaml/recipe`
+- [[docs/graph/packages/linux|pkg/linux]]: `recipes/linux/recipe`
+- [[docs/graph/packages/linux-api-headers|pkg/linux-api-headers]]: `recipes/linux-api-headers/recipe`
+- [[docs/graph/packages/llvm|pkg/llvm]]: `recipes/llvm/recipe`
+- [[docs/graph/packages/lua|pkg/lua]]: `recipes/lua/recipe`
+- [[docs/graph/packages/lz4|pkg/lz4]]: `recipes/lz4/recipe`
+- [[docs/graph/packages/lzo|pkg/lzo]]: `recipes/lzo/recipe`
+- [[docs/graph/packages/m4|pkg/m4]]: `recipes/m4/recipe`
+- [[docs/graph/packages/make|pkg/make]]: `recipes/make/recipe`
+- [[docs/graph/packages/man-db|pkg/man-db]]: `recipes/man-db/recipe`
+- [[docs/graph/packages/markupsafe|pkg/markupsafe]]: `recipes/markupsafe/recipe`
+- [[docs/graph/packages/mesa|pkg/mesa]]: `recipes/mesa/recipe`
+- [[docs/graph/packages/mpc|pkg/mpc]]: `recipes/mpc/recipe`
+- [[docs/graph/packages/mpdecimal|pkg/mpdecimal]]: `recipes/mpdecimal/recipe`
+- [[docs/graph/packages/mpfr|pkg/mpfr]]: `recipes/mpfr/recipe`
+- [[docs/graph/packages/mpv|pkg/mpv]]: `recipes/mpv/recipe`
+- [[docs/graph/packages/mtdev|pkg/mtdev]]: `recipes/mtdev/recipe`
+- [[docs/graph/packages/mtools|pkg/mtools]]: `recipes/mtools/recipe`
+- [[docs/graph/packages/mupdf|pkg/mupdf]]: `recipes/mupdf/recipe`
+- [[docs/graph/packages/nasm|pkg/nasm]]: `recipes/nasm/recipe`
+- [[docs/graph/packages/ncurses|pkg/ncurses]]: `recipes/ncurses/recipe`
+- [[docs/graph/packages/nghttp2|pkg/nghttp2]]: `recipes/nghttp2/recipe`
+- [[docs/graph/packages/ninja|pkg/ninja]]: `recipes/ninja/recipe`
+- [[docs/graph/packages/npth|pkg/npth]]: `recipes/npth/recipe`
+- [[docs/graph/packages/openssl|pkg/openssl]]: `recipes/openssl/recipe`
+- [[docs/graph/packages/opus|pkg/opus]]: `recipes/opus/recipe`
+- [[docs/graph/packages/orc|pkg/orc]]: `recipes/orc/recipe`
+- [[docs/graph/packages/ostree|pkg/ostree]]: `recipes/ostree/recipe`
+- [[docs/graph/packages/patch|pkg/patch]]: `recipes/patch/recipe`
+- [[docs/graph/packages/pcre2|pkg/pcre2]]: `recipes/pcre2/recipe`
+- [[docs/graph/packages/perl|pkg/perl]]: `recipes/perl/recipe`
+- [[docs/graph/packages/pipewire|pkg/pipewire]]: `recipes/pipewire/recipe`
+- [[docs/graph/packages/pixman|pkg/pixman]]: `recipes/pixman/recipe`
+- [[docs/graph/packages/pkgconf|pkg/pkgconf]]: `recipes/pkgconf/recipe`
+- [[docs/graph/packages/procps-ng|pkg/procps-ng]]: `recipes/procps-ng/recipe`
+- [[docs/graph/packages/psmisc|pkg/psmisc]]: `recipes/psmisc/recipe`
+- [[docs/graph/packages/python|pkg/python]]: `recipes/python/recipe`
+- [[docs/graph/packages/pyyaml|pkg/pyyaml]]: `recipes/pyyaml/recipe`
+- [[docs/graph/packages/readline|pkg/readline]]: `recipes/readline/recipe`
+- [[docs/graph/packages/ruby|pkg/ruby]]: `recipes/ruby/recipe`
+- [[docs/graph/packages/seatd|pkg/seatd]]: `recipes/seatd/recipe`
+- [[docs/graph/packages/sed|pkg/sed]]: `recipes/sed/recipe`
+- [[docs/graph/packages/shadow|pkg/shadow]]: `recipes/shadow/recipe`
+- [[docs/graph/packages/shared-mime-info|pkg/shared-mime-info]]: `recipes/shared-mime-info/recipe`
+- [[docs/graph/packages/snappel|pkg/snappel]]: `recipes/snappel/recipe`
+- [[docs/graph/packages/spirv-tools|pkg/spirv-tools]]: `recipes/spirv-tools/recipe`
+- [[docs/graph/packages/sqlite|pkg/sqlite]]: `recipes/sqlite/recipe`
+- [[docs/graph/packages/squashfs-tools|pkg/squashfs-tools]]: `recipes/squashfs-tools/recipe`
+- [[docs/graph/packages/sysklogd|pkg/sysklogd]]: `recipes/sysklogd/recipe`
+- [[docs/graph/packages/sysvinit|pkg/sysvinit]]: `recipes/sysvinit/recipe`
+- [[docs/graph/packages/tar|pkg/tar]]: `recipes/tar/recipe`
+- [[docs/graph/packages/tcl|pkg/tcl]]: `recipes/tcl/recipe`
+- [[docs/graph/packages/texinfo|pkg/texinfo]]: `recipes/texinfo/recipe`
+- [[docs/graph/packages/udev|pkg/udev]]: `recipes/udev/recipe`
+- [[docs/graph/packages/unifdef|pkg/unifdef]]: `recipes/unifdef/recipe`
+- [[docs/graph/packages/util-linux|pkg/util-linux]]: `recipes/util-linux/recipe`
+- [[docs/graph/packages/vim|pkg/vim]]: `recipes/vim/recipe`
+- [[docs/graph/packages/vulkan-loader|pkg/vulkan-loader]]: `recipes/vulkan-loader/recipe`
+- [[docs/graph/packages/wayland|pkg/wayland]]: `recipes/wayland/recipe`
+- [[docs/graph/packages/wireplumber|pkg/wireplumber]]: `recipes/wireplumber/recipe`
+- [[docs/graph/packages/woff2|pkg/woff2]]: `recipes/woff2/recipe`
+- [[docs/graph/packages/wpebackend-fdo|pkg/wpebackend-fdo]]: `recipes/wpebackend-fdo/recipe`
+- [[docs/graph/packages/wpewebkit|pkg/wpewebkit]]: `recipes/wpewebkit/recipe`
+- [[docs/graph/packages/xcb-util|pkg/xcb-util]]: `recipes/xcb-util/recipe`
+- [[docs/graph/packages/xcb-util-image|pkg/xcb-util-image]]: `recipes/xcb-util-image/recipe`
+- [[docs/graph/packages/xcb-util-keysyms|pkg/xcb-util-keysyms]]: `recipes/xcb-util-keysyms/recipe`
+- [[docs/graph/packages/xcb-util-renderutil|pkg/xcb-util-renderutil]]: `recipes/xcb-util-renderutil/recipe`
+- [[docs/graph/packages/xcb-util-wm|pkg/xcb-util-wm]]: `recipes/xcb-util-wm/recipe`
+- [[docs/graph/packages/xdg-dbus-proxy|pkg/xdg-dbus-proxy]]: `recipes/xdg-dbus-proxy/recipe`
+- [[docs/graph/packages/xdg-desktop-portal|pkg/xdg-desktop-portal]]: `recipes/xdg-desktop-portal/recipe`
+- [[docs/graph/packages/xkbcomp|pkg/xkbcomp]]: `recipes/xkbcomp/recipe`
+- [[docs/graph/packages/xwayland|pkg/xwayland]]: `recipes/xwayland/recipe`
+- [[docs/graph/packages/xz|pkg/xz]]: `recipes/xz/recipe`
+- [[docs/graph/packages/zlib|pkg/zlib]]: `recipes/zlib/recipe`
+- [[docs/graph/packages/zstd|pkg/zstd]]: `recipes/zstd/recipe`
+
+## Other files
+
+- `README.md` (+30 -11)
+- `build/53-iso.sh` (+2 -0)
+- `build/70-repo.sh` (+42 -6)
+- `build/cve-check.py` (+633 -0)
+- `build/cve-names.conf` (+280 -0)
+- `build/iso-test.py` (+24 -0)
+- `build/m10-features.tty` (+12 -0)
+- `build/m10-samples.py` (+4 -1)
+- `build/mk-mp3.py` (+71 -0)
+- `config/etc/rc.d/rc.sysinit` (+2 -1)
+- `docs/CVE-REPORT.md` (+341 -0)
+- `docs/INTEGRATION-TODO.md` (+21 -5)
+- `docs/PLAN.md` (+9 -7)
+- `docs/RAM-PROFILE.md` (+48 -3)
+- `docs/ROADMAP-NEXT.md` (+33 -22)
+- `docs/SECURITY.md` (+271 -0)
+- `docs/flpkg.md` (+12 -5)
+- `docs/m7/egg-below-panel.png` (+- --)
+- `docs/m7/flvideo-open-dialog.png` (+- --)
+- `docs/m7/live-desktop-icon.png` (+- --)
+- `docs/m7/live-store-message.png` (+- --)
+- `docs/m7/m10-accent-blue-settings-1G.png` (+- --)
+- `docs/m7/m10-archive-1G.png` (+- --)
+- `docs/m7/m10-desktop-1G.png` (+- --)
+- `docs/m7/m10-desktop-wallpaper-1G.png` (+- --)
+- `docs/m7/m10-end-1G.png` (+- --)
+- `docs/m7/m10-files-open-png-1G.png` (+- --)
+- `docs/m7/m10-files-open-txt-1G.png` (+- --)
+- `docs/m7/m10-flboot-ask-2G.png` (+- --)
+- `docs/m7/m10-flboot-list-2G.png` (+- --)
+- `docs/m7/m10-fledit-1G.png` (+- --)
+- `docs/m7/m10-gm-performance-1G.png` (+- --)
+- `docs/m7/m10-gm-processes-1G.png` (+- --)
+- `docs/m7/m10-gm-startup-1G.png` (+- --)
+- `docs/m7/m10-image-1G.png` (+- --)
+- `docs/m7/m10-image-wallpaper-1G.png` (+- --)
+- `docs/m7/m10-music-1G.png` (+- --)
+- `docs/m7/m10-music-mp3-1G.png` (+- --)
+- `docs/m7/m10-overview-1G.png` (+- --)
+- `docs/m7/m10-pdf-1G.png` (+- --)
+- `docs/m7/m10-print-1G.png` (+- --)
+- `docs/m7/m10-snap-desktop-2G.png` (+- --)
+- `docs/m7/m10-snap-gm-2G.png` (+- --)
+- `docs/m7/m10-store-1G.png` (+- --)
+- `docs/m7/m10-store-updates-1G.png` (+- --)
+- `docs/m7/m10-video-1G.png` (+- --)
+- `docs/m7/m10-ws1-back-1G.png` (+- --)
+- `docs/m7/m10-ws1-files-1G.png` (+- --)
+- `docs/m7/m10-ws2-empty-1G.png` (+- --)
+- `docs/m7/m11-gpu-desktop-1G.png` (+- --)
+- `docs/m7/m11-gpu-https-1G.png` (+- --)
+- `docs/m7/m11-gpu-start-1G.png` (+- --)
+- `docs/m7/m11-gpu-wiki-1G.png` (+- --)
+- `docs/m7/m11-x11-desktop-1G.png` (+- --)
+- `docs/m7/m11-x11-xclient-1G.png` (+- --)
+- `docs/m7/m11-x11-xclient-snapped-1G.png` (+- --)
+
+See also: [INDEX](../INDEX.md) · [Round 13](round-13.md)

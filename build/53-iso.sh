@@ -158,7 +158,7 @@ squash_step() {
 		mksquashfs "$w/stage" "$w/iso/live/root.sfs" -quiet -noappend -comp zstd \
 			-Xcompression-level "$level" -b 256K -no-xattrs -processors "$jobs" -mem 768M \
 			-wildcards -e "boot/*" -e "var/cache/flpkg/*"
-	' _ "$ROOT" "$W" "$level" "$FLFS_JOBS"
+	' _ "$ROOT" "$W" "$level" "$(nproc)"
 }
 msg "root.sfs: squashfs (zstd level $level) of $ROOT plus the live changes"
 squash_step

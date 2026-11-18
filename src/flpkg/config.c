@@ -96,6 +96,10 @@ void config_load(const char *path)
 			set(&cfg.signkey, v);
 		else if (!strcmp(k, "jobs"))
 			cfg.jobs = (int)parse_long(v, lineno);
+		else if (!strcmp(k, "jobs_light"))
+			cfg.jobs_light = (int)parse_long(v, lineno);
+		else if (!strcmp(k, "jobs_heavy"))
+			cfg.jobs_heavy = (int)parse_long(v, lineno);
 		else if (!strcmp(k, "snapshots"))
 			cfg.snapshots = (int)parse_long(v, lineno);
 		else if (!strcmp(k, "compression_level"))
@@ -124,6 +128,10 @@ env:
 		long n = sysconf(_SC_NPROCESSORS_ONLN);
 		cfg.jobs = n > 0 ? (int)n : 1;
 	}
+	if (cfg.jobs_light < 1)
+		cfg.jobs_light = cfg.jobs;
+	if (cfg.jobs_heavy < 1)
+		cfg.jobs_heavy = cfg.jobs;
 	if (getenv("SOURCE_DATE_EPOCH"))
 		cfg.source_date_epoch = strtoll(getenv("SOURCE_DATE_EPOCH"), NULL, 10);
 }

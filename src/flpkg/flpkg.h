@@ -90,7 +90,9 @@ struct config {
 	char *libdir;     /* recipe.sh, triggers */
 	struct repo_cfg *repos;
 	size_t nrepos;
-	int jobs;
+	int jobs;         /* general value: MAKEFLAGS for non-recipe use */
+	int jobs_light;   /* jobs for recipes without jobs=heavy */
+	int jobs_heavy;   /* jobs for recipes with jobs=heavy */
 	int zstd_level;
 	bool backup_config;
 	char *signatures; /* required, optional or never */

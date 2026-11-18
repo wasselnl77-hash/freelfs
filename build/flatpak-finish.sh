@@ -16,7 +16,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 log=$FLFS_WORK/logs/flatpak-finish.log
 mkdir -p "$FLFS_WORK/logs"
 exec >> "$log" 2>&1
-export FLFS_JOBS=1
+export FLFS_JOBS=1 FLFS_JOBS_HEAVY=1 FLFS_JOBS_LIGHT=1
 step() { echo "=== $(date +%T) $*"; }
 
 step "waiting for build/m8-finish.sh"

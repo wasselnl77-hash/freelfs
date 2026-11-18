@@ -11,7 +11,7 @@
 # environment before calling "run".
 # SPDX-License-Identifier: MIT
 
-scalars=(pkgbase version release summary url worksrc build_style)
+scalars=(pkgbase version release summary url worksrc build_style jobs)
 arrays=(pkgname arch license groups source sha256 depends makedepends
 	checkdepends provides conflicts replaces sysusers sysgroups owner options)
 

@@ -40,14 +40,35 @@ FLFS_IMG_SIZE=${FLFS_IMG_SIZE:-80G}
 FLFS_CHECK=${FLFS_CHECK:-core}
 
 # Build environment
-# Parallel jobs: one per GB of memory left after keeping 4 GB for the desktop
-# (an integrated GPU's video memory comes out of the same RAM), at most one
-# per CPU. Big C++ builds like LLVM need about 1 GB per job.
-if [ -z "${FLFS_JOBS:-}" ]; then
-	FLFS_JOBS=$(awk '/^MemTotal:/ {print int(($2 / 1024 - 4096) / 1024)}' /proc/meminfo)
-	[ "$FLFS_JOBS" -ge 1 ] 2> /dev/null || FLFS_JOBS=1
-	[ "$FLFS_JOBS" -le "$(nproc)" ] || FLFS_JOBS=$(nproc)
-fi
+# Parallel jobs come in two classes. flpkg picks one per package from the
+# recipe's jobs= line (jobs=heavy, otherwise light):
+#   heavy  C++ giants (llvm, gcc, mesa, wpewebkit, icu, spirv-llvm-translator),
+#          about 1 GB per job: one per GB of memory left after keeping 4 GB
+#          for the desktop (an integrated GPU's video memory comes out of the
+#          same RAM), at most one per CPU.
+#   light  everything else, the kernel included, about 0.4 GB per job: one per
+#          400 MB left after keeping 2 GB for the desktop, zram swap counted at
+#          half its size as extra memory, at most one per CPU.
+# FLFS_JOBS_HEAVY and FLFS_JOBS_LIGHT override one class. FLFS_JOBS sets both
+# classes (unless the class is set too) and the general value below.
+# The stage scripts and chroot use FLFS_JOBS, which is the heavy value.
+flfs_ncpu=$(nproc)
+flfs_mem_mb=$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)
+flfs_zram_mb=$(awk '/\/dev\/zram/ {s += $3} END {print int(s / 2048)}' /proc/swaps)
+flfs_cap() { # flfs_cap N -- N, at least 1 and at most the CPU count
+	local n=$1
+	[ "$n" -ge 1 ] 2> /dev/null || n=1
+	[ "$n" -le "$flfs_ncpu" ] || n=$flfs_ncpu
+	echo "$n"
+}
+flfs_heavy_auto=$(flfs_cap "$(awk '/^MemTotal:/ {print int(($2 / 1024 - 4096) / 1024)}' /proc/meminfo)")
+flfs_light_auto=$(flfs_cap $(( (flfs_mem_mb + flfs_zram_mb - 2048) / 400 )))
+# below 12 GB RAM keep headroom for the desktop and agents: at most 6 light jobs
+[ "$flfs_mem_mb" -ge 12288 ] || [ "$flfs_light_auto" -le 6 ] || flfs_light_auto=6
+FLFS_JOBS_HEAVY=${FLFS_JOBS_HEAVY:-${FLFS_JOBS:-$flfs_heavy_auto}}
+FLFS_JOBS_LIGHT=${FLFS_JOBS_LIGHT:-${FLFS_JOBS:-$flfs_light_auto}}
+FLFS_JOBS=${FLFS_JOBS:-$FLFS_JOBS_HEAVY}
+export FLFS_JOBS FLFS_JOBS_HEAVY FLFS_JOBS_LIGHT
 export MAKEFLAGS="-j$FLFS_JOBS" NINJAJOBS=$FLFS_JOBS TESTSUITEFLAGS="-j$FLFS_JOBS"
 export LC_ALL=POSIX
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-1767225600}  # 2026-01-01, for reproducible builds

@@ -35,5 +35,6 @@ mount --bind "$FLFS_LOGS" "$FLFS_BOOTSTRAP/logs"
 exec chroot "$FLFS" /usr/bin/env -i \
 	HOME=/root TERM="${TERM:-dumb}" PS1='(freelfs chroot) \u:\w\$ ' \
 	PATH=/usr/bin:/usr/sbin FLFS_IN_CHROOT=1 FLFS_ARCH="$FLFS_ARCH" \
-	FLFS_JOBS="$FLFS_JOBS" FLFS_CHECK="$FLFS_CHECK" \
+	FLFS_JOBS="$FLFS_JOBS" FLFS_JOBS_HEAVY="$FLFS_JOBS_HEAVY" \
+	FLFS_JOBS_LIGHT="$FLFS_JOBS_LIGHT" FLFS_CHECK="$FLFS_CHECK" \
 	"$@"

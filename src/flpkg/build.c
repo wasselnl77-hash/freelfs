@@ -22,6 +22,7 @@
 
 struct recipe {
 	char *pkgbase, *version, *release, *summary, *url, *worksrc;
+	char *jobs; /* "heavy" or "light" (the default): which job count the build gets */
 	struct strlist pkgname, arch, license, groups, source, sha256, depends, makedepends,
 		checkdepends, provides, conflicts, replaces, sysusers, sysgroups, owner, options,
 		function;
@@ -34,7 +35,7 @@ static const struct {
 	size_t off;
 	bool list;
 } fields[] = {
-	S(pkgbase), S(version), S(release), S(summary), S(url), S(worksrc),
+	S(pkgbase), S(version), S(release), S(summary), S(url), S(worksrc), S(jobs),
 	L(pkgname), L(arch), L(license), L(groups), L(source), L(sha256), L(depends),
 	L(makedepends), L(checkdepends), L(provides), L(conflicts), L(replaces),
 	L(sysusers), L(sysgroups), L(owner), L(options), L(function),
@@ -117,6 +118,8 @@ static void validate(const struct recipe *r, const char *arch)
 		die("recipe: release must be a number");
 	if (!r->summary)
 		die("recipe: summary is not set");
+	if (r->jobs && strcmp(r->jobs, "heavy") && strcmp(r->jobs, "light"))
+		die("recipe: jobs must be heavy or light, not '%s'", r->jobs);
 	if (r->source.n != r->sha256.n)
 		die("recipe: %zu sources but %zu sha256 sums", r->source.n, r->sha256.n);
 	for (size_t i = 0; i < r->sha256.n; i++) {
@@ -487,8 +490,12 @@ int cmd_build(int argc, char **argv)
 	unpack_sources(src, r.source.n, srcdir);
 
 	/* The environment the recipe's functions see. */
-	char *jobs = xasprintf("%d", cfg.jobs);
-	char *makeflags = xasprintf("-j%d", cfg.jobs);
+	/* Heavy recipes (C++ giants) get the memory-based heavy count, the rest
+	 * the light count; both come from build/config.sh via flpkg.conf. */
+	int njobs = r.jobs && !strcmp(r.jobs, "heavy") ? cfg.jobs_heavy : cfg.jobs_light;
+	msg("%s: %d jobs (%s)", r.pkgbase, njobs, r.jobs ? r.jobs : "light");
+	char *jobs = xasprintf("%d", njobs);
+	char *makeflags = xasprintf("-j%d", njobs);
 	char *epoch = xasprintf("%lld", (long long)cfg.source_date_epoch);
 	char *worksrc = xasprintf("%s-%s", r.pkgbase, r.version);
 	env_set(&env, "HOME", work);

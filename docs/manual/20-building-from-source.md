@@ -89,7 +89,9 @@ for example `FLFS_ARCH=aarch64 ./build/...`. An aarch64 build is not expected to
 | `FLFS_WORK` | `~/freelfs-work` | work area on the host |
 | `FLFS_CACHE` | `$FLFS_WORK/cache/sources` | downloaded upstream sources |
 | `FLFS` | `$FLFS_WORK/rootfs-$FLFS_ARCH` | the target root (empty inside the chroot) |
-| `FLFS_JOBS` | RAM in GB minus 4, at least 1, at most the CPU count | parallel jobs; also sets `MAKEFLAGS`, `NINJAJOBS` and `TESTSUITEFLAGS` |
+| `FLFS_JOBS` | the heavy count (see below) | general job count for the stage scripts; also sets `MAKEFLAGS`, `NINJAJOBS` and `TESTSUITEFLAGS`. Setting it forces every package to that count |
+| `FLFS_JOBS_HEAVY` | RAM in GB minus 4, at least 1, at most the CPU count | jobs for packages whose recipe says `jobs=heavy` (LLVM, GCC, Mesa, WebKit, ICU) |
+| `FLFS_JOBS_LIGHT` | (RAM in MB minus 2048, plus half of zram, divided by 400), at least 1, at most the CPU count | jobs for all other packages, the kernel included |
 | `FLFS_CHECK` | `core` | package test suites: `none`, `core` (glibc, binutils, gmp, mpfr, mpc) or `all` |
 | `FLFS_IMAGE_ROOT` | `$FLFS/.bootstrap/pkg/root` | the root that `50-image.sh` turns into an image |
 | `FLFS_IMG` | `$FLFS_WORK/freelfs-$FLFS_ARCH.img` | the image file |
@@ -98,8 +100,11 @@ for example `FLFS_ARCH=aarch64 ./build/...`. An aarch64 build is not expected to
 
 `config.sh` also sets `LC_ALL=POSIX`, and exports `FLFS`, `FLFS_TGT` and `FLFS_ARCH`.
 
-The job count formula (`FLFS_JOBS`) is written for the current 7 GB build host. A 16 GB build machine is planned
-for about mid-January 2027 (chapter 28); the limits will then be raised. The environment variable overrides the formula.
+Job counts are per package. A recipe with `jobs=heavy` gets `FLFS_JOBS_HEAVY`, about 1 GB of RAM per job; any other
+package gets `FLFS_JOBS_LIGHT`, about 400 MB per job, with zram swap counted at half its size. The variables override
+the formulas; `FLFS_JOBS` forces every package to one count. `./build/jobs-test.sh [PACKAGE...]` prints the counts
+without building. The formulas are written for the current 7 GB build host. A 16 GB build machine is planned for
+about mid-January 2027 (chapter 28); the limits will then be raised.
 
 ## 4. The build stages in order
 
@@ -362,8 +367,8 @@ in the repository ("not yet verified").
 - To rebuild one package: `./build/60-packages.sh NAME`. The stamp for that package is removed and the repository
   and root are rebuilt.
 - Keep the desktop usable during long builds: `./build/gentle.sh ./build/60-packages.sh`.
-- The `FLFS_JOBS` default is conservative. If a link step runs out of memory, lower `FLFS_JOBS`; if the build is
-  slow and memory is free, raise it.
+- The job defaults are conservative. If a link step runs out of memory, lower `FLFS_JOBS_HEAVY` (or `FLFS_JOBS_LIGHT`
+  for ordinary packages); if the build is slow and memory is free, raise them.
 - The 7 GB build host cannot link clang (about 8 GB is needed). The Intel 3D drivers of Mesa therefore wait for the
   16 GB build machine planned for about mid-January 2027 (chapter 28). The recipes `llvm`, `spirv-llvm-translator` and `libclc` are kept in the repository
   in the group `deferred` (`docs/HARDWARE.md`, chapter 28).

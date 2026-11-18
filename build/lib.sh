@@ -34,7 +34,8 @@ clean_env() {
 	if [ -z "${FLFS_CLEAN:-}" ]; then
 		exec env -i FLFS_CLEAN=1 HOME="$HOME" TERM="${TERM:-dumb}" \
 			FLFS="$FLFS" FLFS_WORK="$FLFS_WORK" FLFS_ARCH="$FLFS_ARCH" \
-			FLFS_JOBS="$FLFS_JOBS" FLFS_CHECK="$FLFS_CHECK" \
+			FLFS_JOBS="$FLFS_JOBS" FLFS_JOBS_HEAVY="$FLFS_JOBS_HEAVY" \
+			FLFS_JOBS_LIGHT="$FLFS_JOBS_LIGHT" FLFS_CHECK="$FLFS_CHECK" \
 			/bin/bash --noprofile --norc "$0" "$@"
 	fi
 	set +h

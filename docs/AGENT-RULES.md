@@ -18,7 +18,13 @@ Read this fully before starting. Plan: docs/ROADMAP-NEXT.md. Look: docs/PLAN.md 
   rootfs ld.so (see how src/*/Makefile `check` targets do it), screenshots via
   FLUI_PPM / FLCOMP_HEADLESS + FLCOMP_SCREENSHOT.
 - Long commands go through build/gentle.sh or `nice -n 19 ionice -c3`. Host has
-  limited RAM: never more than 4 compile jobs.
+  limited RAM. Package builds (build/60-packages.sh) pick their job count per
+  recipe: `jobs=heavy` recipes (llvm, gcc, mesa, wpewebkit, icu,
+  spirv-llvm-translator; C++ giants, about 1 GB per job) get the heavy count,
+  everything else (the kernel included, about 400 MB per job, zram counted at
+  half its size) gets the light count. `build/jobs-test.sh` prints the counts
+  for this host without building. Never run two heavy builds at once. Your own
+  host-side compiles stay at 4 jobs at most.
 
 ## Look
 - Palette: bg 1d2125, panel 272c33, raised 343a43, line 3a4048, text d8dce0,

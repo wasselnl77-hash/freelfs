@@ -43,6 +43,8 @@ setup_step() {
 		cache = /var/cache/flpkg
 		keys = ${KEY%/*}
 		jobs = $FLFS_JOBS
+		jobs_heavy = $FLFS_JOBS_HEAVY
+		jobs_light = $FLFS_JOBS_LIGHT
 		repo base file://$REPO
 	EOF
 }

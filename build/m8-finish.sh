@@ -13,7 +13,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib.sh"
 log=$FLFS_WORK/logs/m8-finish.log
 exec >> "$log" 2>&1
-export FLFS_JOBS=1
+export FLFS_JOBS=1 FLFS_JOBS_HEAVY=1 FLFS_JOBS_LIGHT=1
 step() { echo "=== $(date +%T) $*"; }
 
 # WPE WebKit: wait for a build that is running, or start (resume) one. The
