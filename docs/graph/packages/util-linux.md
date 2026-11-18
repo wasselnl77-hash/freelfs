@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 2.42.2, release 1. Miscellaneous system utilities (mount, fdisk, agetty, ...)
+Version 2.42.2, release 2. Miscellaneous system utilities (mount, fdisk, agetty, ...)
 
 - License: GPL-2.0-or-later LGPL-2.1-or-later BSD-3-Clause; URL: https://github.com/util-linux/util-linux
 - Groups: [[docs/graph/groups/base|base]]

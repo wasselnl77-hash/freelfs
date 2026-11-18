@@ -180,3 +180,31 @@ build_pkg() {
 	_run "$step" "$dir" "$@"
 	rm -rf "$FLFS_BUILD"
 }
+
+# ---- the root account of an image (round 23) -------------------------------------------------------
+# Release images have root locked (shadow field "!"): nobody logs in as root; the live user "tester" and the
+# installed user administer through flauth. Only FLFS_DEV_ROOT=1 (test images: the serial-console harnesses
+# log in as root) keeps root without a password, and such an image says so in /etc/issue.
+
+# root_hash FILE -- the second field of root's line in a shadow file
+root_hash() { awk -F: '$1 == "root" {print $2; found = 1} END {if (!found) print "MISSING"}' "$1"; }
+
+# check_root_locked SHADOW -- die when root's hash is empty (or missing) in a release build; in a dev build
+# (FLFS_DEV_ROOT=1) an empty hash is accepted, anything else too
+check_root_locked() {
+	local h
+	h=$(root_hash "$1")
+	[ "$h" != MISSING ] || die "no root line in $1"
+	if [ -z "$h" ] && [ "${FLFS_DEV_ROOT:-0}" != 1 ]; then
+		die "root has an EMPTY password hash in $1: a release image must have root locked (FLFS_DEV_ROOT=1 only for test images)"
+	fi
+}
+
+# set_root_hash SHADOW HASH -- replace root's hash field in place (HASH may be empty)
+set_root_hash() {
+	local f=$1 h=$2 tmp
+	tmp=$(mktemp "$f.XXXXXX") || die "cannot write next to $f"
+	awk -F: -v OFS=: -v h="$h" '$1 == "root" {$2 = h; $3 = "20454"} {print}' "$f" > "$tmp"
+	chmod --reference="$f" "$tmp"
+	mv -f "$tmp" "$f"
+}

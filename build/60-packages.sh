@@ -91,16 +91,26 @@ root_step() {
 	flpkg --root "$ROOT" install -y base desktop
 }
 
-# What the installer will do (M9): shadow files, time zone, keys, and for
-# development images a root login without password.
+# What the installer will do (M9): shadow files, time zone, keys; root is locked (FLFS_DEV_ROOT=1: no password).
 firstboot_step() {
 	chroot "$ROOT" /usr/sbin/pwconv
 	chroot "$ROOT" /usr/sbin/grpconv
-	chroot "$ROOT" /usr/bin/passwd -d root
-	sed -i '/^FreeLFS/a Development image: log in as root, there is no password.' "$ROOT/etc/issue"
+	# round 23: root is locked ("!") unless FLFS_DEV_ROOT=1 (test images); build/root-lock.sh switches it later
+	if [ "${FLFS_DEV_ROOT:-0}" = 1 ]; then
+		chroot "$ROOT" /usr/bin/passwd -d root
+		sed -i '/^FreeLFS/a Development image: log in as root, there is no password.' "$ROOT/etc/issue"
+	else
+		chroot "$ROOT" /usr/bin/passwd -l root
+	fi
 	ln -sfn /usr/share/zoneinfo/UTC "$ROOT/etc/localtime"
 	touch "$ROOT"/etc/sub{u,g}id
-	install -m644 "$KEY.pub" "$ROOT/etc/flpkg/keys/"
+	# round 23: bootstrap.pub stays out of the images; only the repo key (freelfs-repo.pub, from base-files) is
+	# trusted. FLFS_DEV_ROOT=1 test builds keep it so the local build repo can still be added.
+	if [ "${FLFS_DEV_ROOT:-0}" = 1 ]; then
+		install -m644 "$KEY.pub" "$ROOT/etc/flpkg/keys/"
+	else
+		rm -f "$ROOT/etc/flpkg/keys/bootstrap.pub"
+	fi
 	rm -rf "$ROOT/var/cache/flpkg/pkg" # downloaded copies of the packages
 }
 

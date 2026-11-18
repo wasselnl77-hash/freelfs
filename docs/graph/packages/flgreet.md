@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 8. FreeLFS login screen: runs on tty1, flcomp plus a password check, then login
+Version 0.1, release 9. FreeLFS login screen: runs on tty1, flcomp plus a password check, then login
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

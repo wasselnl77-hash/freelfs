@@ -9,9 +9,10 @@ Two programs, C17, MIT.
 
 ## Source files
 
-- [[docs/graph/files/flinstall/common.h|src/flinstall/common.h]] -- 160 lines -- 8 fn
-- [[docs/graph/files/flinstall/flinstall.c|src/flinstall/flinstall.c]] -- 1929 lines -- 59 fn
-- [[docs/graph/files/flinstall/helper.c|src/flinstall/helper.c]] -- 2431 lines -- 70 fn
+- [[docs/graph/files/flinstall/common.h|src/flinstall/common.h]] -- 154 lines -- 8 fn
+- [[docs/graph/files/flinstall/flauth-check.h|src/flinstall/flauth-check.h]] -- 248 lines -- 12 fn
+- [[docs/graph/files/flinstall/flinstall.c|src/flinstall/flinstall.c]] -- 2032 lines -- 61 fn
+- [[docs/graph/files/flinstall/helper.c|src/flinstall/helper.c]] -- 2484 lines -- 72 fn
 
 ## Uses
 
@@ -21,7 +22,7 @@ Two programs, C17, MIT.
 
 ## Talks to
 
-- none found
+- CLI [[docs/graph/components/flauth|flauth]]: `flauth`
 
 ## Used by
 

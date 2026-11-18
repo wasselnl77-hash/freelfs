@@ -11,7 +11,7 @@ A big clock, the date, your name and a password field on a plain screen. Super+L
 
 - [[docs/graph/files/fllock/fl-shell-client-protocol.h|src/fllock/fl-shell-client-protocol.h]] -- 678 lines (generated)
 - [[docs/graph/files/fllock/fl-shell-protocol.c|src/fllock/fl-shell-protocol.c]] -- 85 lines (generated)
-- [[docs/graph/files/fllock/fllock-check.c|src/fllock/fllock-check.c]] -- 132 lines -- 3 fn
+- [[docs/graph/files/fllock/fllock-check.c|src/fllock/fllock-check.c]] -- 135 lines -- 3 fn
 - [[docs/graph/files/fllock/fllock.c|src/fllock/fllock.c]] -- 415 lines -- 10 fn
 
 ## Uses

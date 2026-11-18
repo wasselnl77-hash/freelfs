@@ -7,6 +7,8 @@
  * At the next boot flinitrd finds the file next to the ISO and mounts it as /home. Without the file
  * everything stays in RAM. Only for a live session started from an ISO file on a stick (Ventoy): a stick written
  * with dd has no file system to hold the image. Installed setuid root for the group seat, like flmount.
+ * create asks for the person's password every time (flauth, class persist-create: one-shot); the live
+ * session's tester needs none.
  * SPDX-License-Identifier: MIT */
 #define _GNU_SOURCE
 #include <ctype.h>
@@ -22,6 +24,8 @@
 #include <sys/statvfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include "flauth-check.h"
 
 #ifndef BLKROSET
 #define BLKROSET _IO(0x12, 93)
@@ -86,6 +90,7 @@ static int parse_size(const char *s, unsigned long long *out)
 
 int main(int argc, char **argv)
 {
+	int tried = getenv("FLAUTH_TRIED") != NULL; /* read before the environment is cleared */
 	for (int fd = 3; fd < 256; fd++)
 		close(fd);
 	if (argc == 2 && !strcmp(argv[1], "status")) {
@@ -114,6 +119,13 @@ int main(int argc, char **argv)
 		return fail("%s", "this live session did not start from an ISO file on a stick (Ventoy), so there is no place for the image");
 	if (access(IMG, F_OK) == 0)
 		return fail("%s", "freelfs-persist.img exists already (remove it from the stick to make a new one)");
+	if (!flauth_gate(tried, "persist-create", "Create the persistent home file on the boot stick.", "/usr/bin/flpersist",
+	                 argc, argv)) {
+		fputs("flpersist: your password is needed, but the password dialog (flauth) could not be started. Nothing was changed\n", stderr);
+		return 77;
+	}
+	clearenv();
+	setenv("PATH", "/usr/sbin:/usr/bin", 1);
 	/* the stick is read-only since boot: make it writable */
 	int fd = open(dev, O_RDONLY | O_CLOEXEC);
 	if (fd >= 0) {

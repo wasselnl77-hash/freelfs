@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 2.8, release 1. Network programs: ping, ftp, telnet, hostname, ...
+Version 2.8, release 2. Network programs: ping, ftp, telnet, hostname, ...
 
 - License: GPL-3.0-or-later; URL: https://www.gnu.org/software/inetutils/
 - Groups: [[docs/graph/groups/base|base]]

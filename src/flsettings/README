@@ -89,7 +89,8 @@ used by the panel). Date and time: "Set time automatically" is the ntp service
 (fltime-set ntp on|off; the line under it says when it last synchronised, from
 /run/fltime.status; "Sync now" asks again). With it off, a date (YYYY-MM-DD) and time
 (HH:MM) field and "Set" set the clock in the chosen zone (fltime-set time). When the
-helper may not be run (the account is not in the group seat) or is missing, the page
+helper may not be run (the account is not in the group seat) or is missing, or the password was wrong
+or cancelled (every change asks for the password, flauth class "time"), the page
 says so in red and nothing changes.
 Test hooks: FLTIME_SET, FLTIME_CONF, FLTIME_STATUS, FL_TZ_ETC, FL_ZONEINFO, FL_NOW (a fixed
 time); for FLUI_PPM screenshots FLSETTINGS_TEST_MOUSE=x,y, FLSETTINGS_TEST_SEARCH=text,

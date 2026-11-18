@@ -24,4 +24,8 @@ install: all
 clean:
 	$(RM) flauth flauth-dialog
 
-.PHONY: all install clean
+# the policy tests (no root): stamp class and caller, one-shot classes, the live-only empty password
+check: flauth
+	sh tests/policy.sh
+
+.PHONY: all install check clean

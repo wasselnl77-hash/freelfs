@@ -1,0 +1,21 @@
+# The userspace of the kernel's nf_tables firewall: /usr/sbin/nft. FreeLFS drops all unsolicited inbound traffic by
+# default with /etc/nftables.conf, applied by the rc service "firewall" (config/etc/rc.d/init.d/firewall, in the
+# initscripts package). No CLI shell (no readline/libedit linked), no JSON, no Python, no man pages: about 0.5 MB.
+# License GPL-2.0-only; the kernel side is in the linux package.
+pkgname=nftables
+version=1.1.7
+release=1
+summary="nft: the packet filter / firewall control tool for nf_tables"
+url=https://www.netfilter.org/projects/nftables/
+license=(GPL-2.0-only)
+arch=(x86_64)
+groups=(base)
+depends=(glibc libmnl libnftnl gmp)
+makedepends=(bison flex)
+source=(https://www.netfilter.org/pub/nftables/nftables-$version.tar.xz)
+sha256=(a6fbf060d8d4fff001517a2b94f356bb4366bfbf0ba366366f9d27cc38caa58f)
+build_style=autotools
+configure_args=(--sbindir=/usr/sbin --disable-static --disable-man-doc --disable-python --without-cli
+	--without-json --without-xtables --disable-debug)
+
+check() { :; }

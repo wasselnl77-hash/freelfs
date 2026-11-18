@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -38,7 +39,7 @@ static const char *const step_name[ST_COUNT] = {"Language", "Keyboard", "Wi-Fi",
 enum {
 	ID_LANG = 100, ID_KBD = 140, ID_TRY = 150, ID_BACK = 160, ID_NEXT = 161, ID_STEP = 170,
 	ID_DISK = 200, ID_MODE = 230, ID_EDIT = 240, ID_RESCAN = 241,
-	ID_NAME = 300, ID_FULL = 301, ID_PW = 302, ID_PW2 = 303,
+	ID_NAME = 300, ID_FULL = 301, ID_PW = 302, ID_PW2 = 303, ID_ROOTSAME = 304, ID_RPW = 305, ID_RPW2 = 306,
 	ID_SEARCH = 400, ID_MAP = 401, ID_POP = 410,
 	ID_CONFIRM = 500, ID_RESTART = 501,
 	ID_ROW = 600, ID_ED = 800, ID_EDSIZE = 900, ID_EDNAME = 901
@@ -144,6 +145,8 @@ struct S {
 	int ed_for;               /* disk the working copy is made from, -1 */
 	/* account */
 	char user[40], full[80], pw[FI_PW_MAX + 4], pw2[FI_PW_MAX + 4];
+	int root_same;            /* 1: root gets the same password (default) */
+	char rpw[FI_PW_MAX + 4], rpw2[FI_PW_MAX + 4];
 	int user_edited;
 	struct fi_reserved res;
 	/* time zone */
@@ -166,6 +169,8 @@ struct S {
 	int nlog;
 	char fail_msg[300];
 	char restart_err[160];
+	pid_t apid;               /* flauth (disk-write) running, 0 none */
+	int auth_pending;
 };
 
 static struct S S;
@@ -175,6 +180,8 @@ static void redraw(void)
 	if (S.win)
 		fl_win_redraw(S.win);
 }
+
+static void auth_start(void);
 
 /* ---- the helper ----------------------------------------------------------------------------------- */
 
@@ -332,7 +339,11 @@ static void on_line(char *line)
 		S.inst = 2;
 		S.cur_step = S.total_steps;
 		S.pct = 100;
+	} else if (!strcmp(cmd, "NEEDAUTH")) {
+		auth_start();
 	} else if (!strcmp(cmd, "FAIL")) {
+		if (S.auth_pending)
+			return; /* the helper's FAIL after NEEDAUTH: flauth decides now */
 		S.inst = 3;
 		snprintf(S.fail_msg, sizeof S.fail_msg, "%s", p ? p : "");
 	} else if (line[0]) {
@@ -371,6 +382,59 @@ static void helper_event(void *ud, int fd, short rev)
 			S.rbuf[S.rlen++] = tmp[i];
 	}
 	redraw();
+}
+
+/* The helper asked for the password (NEEDAUTH disk-write): run flauth as the person, class disk-write, one
+ * shot. Its exit status: 0 stamped (send "install" again), 1 wrong password, 2 cancelled, 3 locked out or
+ * broken, 4 the account has no password. The window keeps running; a pidfd tells when flauth ended. */
+static void auth_done(void *ud, int fd, short rev)
+{
+	int st = 0;
+	(void)ud;
+	(void)rev;
+	fl_fd_remove(S.app, fd);
+	close(fd);
+	waitpid(S.apid, &st, 0);
+	S.apid = 0;
+	S.auth_pending = 0;
+	int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 3;
+	if (rc == 0) {
+		hsend("install");
+	} else {
+		static const char *const msg[] = {
+		    "",
+		    "The password was not right. Nothing was changed on the disk. Start the installer again to retry.",
+		    "The password question was cancelled. Nothing was changed on the disk.",
+		    "The password check is locked for now (too many wrong tries) or could not run. Nothing was changed on the disk. Wait a minute and start the installer again.",
+		    "This account has no password, so the installation cannot be confirmed. Set a password first. Nothing was changed on the disk.",
+		};
+		S.inst = 3;
+		snprintf(S.fail_msg, sizeof S.fail_msg, "%s", rc >= 1 && rc <= 4 ? msg[rc] : msg[3]);
+	}
+	redraw();
+}
+
+static void auth_start(void)
+{
+	if (S.auth_pending)
+		return;
+	pid_t pid = fork();
+	if (pid == 0) {
+		execl("/usr/bin/flauth", "flauth", "--class", "disk-write", "--reason", "Install FreeLFS on DISK.", (char *)NULL);
+		_exit(127);
+	}
+	int pfd = pid > 0 ? (int)syscall(SYS_pidfd_open, pid, 0) : -1;
+	if (pid < 0 || pfd < 0) {
+		if (pid > 0) {
+			waitpid(pid, NULL, 0);
+		}
+		S.inst = 3;
+		snprintf(S.fail_msg, sizeof S.fail_msg, "The password question could not be started. Nothing was changed on the disk.");
+		return;
+	}
+	S.apid = pid;
+	S.auth_pending = 1;
+	fl_fd_add(S.app, pfd, POLLIN, auth_done, NULL);
 }
 
 static int helper_start(void)
@@ -706,10 +770,12 @@ static void send_config(void)
 	hsend("set user %s", S.user);
 	hsend("set fullname %s", S.full[0] ? S.full : S.user);
 	hsend("set password %s", S.pw);
+	hsend("set rootmode %s", S.root_same ? "same" : "own");
+	hsend("set rootpassword %s", S.root_same ? "" : S.rpw);
 	hsend("set lang %s", LANGS[S.lang].id);
 	hsend("set keyboard %s", fl_kbd_layouts[S.kbd].id);
 	hsend("set tz %s", tz_name());
-	S.expect_ok += 8;
+	S.expect_ok += 10;
 	if (S.mode == 2)
 		ed_send();
 }
@@ -742,6 +808,8 @@ static void start_install(void)
 	/* the password is in the helper now: wipe our copy */
 	explicit_bzero(S.pw, sizeof S.pw);
 	explicit_bzero(S.pw2, sizeof S.pw2);
+	explicit_bzero(S.rpw, sizeof S.rpw);
+	explicit_bzero(S.rpw2, sizeof S.rpw2);
 }
 
 /* ---- movement ---------------------------------------------------------------------------------------------- */
@@ -1338,7 +1406,7 @@ static void step_user(fl_ui *ui, fl_rect b)
 	if (up)
 		text_at(ui, S.small, x, y + 6, fl_th.err, up);
 	else if (S.user[0])
-		text_at(ui, S.small, x, y + 6, fl_th.dim, "Your folder will be /usr/<name>.");
+		text_at(ui, S.small, x, y + 6, fl_th.dim, "Your folder will be /home/<name>.");
 	else
 		text_at(ui, S.small, x, y + 6, fl_th.dim, "Lowercase letters, digits, - and _. This is also your home folder's name.");
 	y += 18 + 18;
@@ -1356,7 +1424,34 @@ static void step_user(fl_ui *ui, fl_rect b)
 	else if (S.pw[0] && !strcmp(S.pw, S.pw2))
 		text_at(ui, S.small, x, y + 6, fl_th.accent, "The passwords match.");
 	y += 18 + 20;
-	paragraph(ui, S.small, x, y, w, fl_th.dim, FI_ROOT_NOTE);
+	{
+		fl_rect cr = fl_r(x, y, w, 30);
+		int res = fl_widget(ui, ID_ROOTSAME, cr, FL_FOCUSABLE);
+		fl_stroke_rect(&ui->cv, fl_r(x, y + 6, 18, 18), 1, S.root_same ? fl_th.accent : fl_th.dim);
+		if (S.root_same)
+			fl_fill_rect(&ui->cv, fl_r(x + 4, y + 10, 10, 10), fl_th.accent);
+		text_at(ui, ui->f_reg, x + 30, y + 6, fl_th.text, "Use the same password for the administrator (root)");
+		if ((res & FL_CLICK) || ((res & FL_FOCUS) && ui->key == XKB_KEY_space))
+			S.root_same = !S.root_same;
+		y += 34;
+	}
+	if (S.root_same) {
+		paragraph(ui, S.small, x, y, w, fl_th.dim, "The administrator account (root) can log in with your password.");
+	} else {
+		int hw = (w - 12) / 2;
+		label_above(ui, x, y, "Administrator (root) password");
+		label_above(ui, x + hw + 12, y, "Administrator password again");
+		pw_field(ui, ID_RPW, fl_r(x, y + 20, hw, 34), S.rpw, sizeof S.rpw);
+		pw_field(ui, ID_RPW2, fl_r(x + hw + 12, y + 20, hw, 34), S.rpw2, sizeof S.rpw2);
+		y += 20 + 34;
+		const char *re = S.rpw[0] ? fi_password_error(S.rpw) : NULL;
+		if (re)
+			text_at(ui, S.small, x, y + 6, fl_th.err, re);
+		else if (S.rpw2[0] && strcmp(S.rpw, S.rpw2))
+			text_at(ui, S.small, x, y + 6, fl_th.err, "The two administrator passwords are not the same.");
+		else if (S.rpw[0] && !strcmp(S.rpw, S.rpw2))
+			text_at(ui, S.small, x, y + 6, fl_th.accent, "The passwords match.");
+	}
 	if (!S.user_edited && ui->focus != ID_NAME) {
 		/* suggest a user name from the full name until the person types one */
 		char sug[40] = "";
@@ -1380,6 +1475,8 @@ static void step_user(fl_ui *ui, fl_rect b)
 
 static int user_ok(void)
 {
+	if (!S.root_same && (fi_password_error(S.rpw) || strcmp(S.rpw, S.rpw2)))
+		return 0;
 	return S.user[0] && !user_problem() && !fi_password_error(S.pw) && !strcmp(S.pw, S.pw2);
 }
 
@@ -1632,7 +1729,7 @@ static int can_next(const char **why)
 	}
 	case ST_USER:
 		if (!user_ok()) {
-			*why = "Fill in a user name and the same password twice.";
+			*why = "Fill in a user name and the same password twice (at least 8 characters).";
 			return 0;
 		}
 		return 1;
@@ -1804,6 +1901,11 @@ static void apply_test(const char *spec)
 			snprintf(S.pw2, sizeof S.pw2, "%s", t + 3);
 		} else if (!strncmp(t, "pw2=", 4))
 			snprintf(S.pw2, sizeof S.pw2, "%s", t + 4);
+		else if (!strncmp(t, "rootpw=", 7)) { /* test option: a separate root password */
+			S.root_same = 0;
+			snprintf(S.rpw, sizeof S.rpw, "%s", t + 7);
+			snprintf(S.rpw2, sizeof S.rpw2, "%s", t + 7);
+		}
 		else if (!strncmp(t, "lang=", 5))
 			pick_lang(atoi(t + 5));
 		else if (!strncmp(t, "kbd=", 4)) {
@@ -1871,6 +1973,7 @@ int main(int argc, char **argv)
 	S.small = fl_font_ui(400, 12);
 	S.mono = fl_font_mono(400, 13);
 	S.zone = -1;
+	S.root_same = 1;
 	S.sel_disk = 0;
 	S.ed_for = -1;
 	S.lang = 0;

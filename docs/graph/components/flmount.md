@@ -9,8 +9,9 @@ tags: [component, system]
 
 ## Source files
 
-- [[docs/graph/files/flmount/flmount.c|src/flmount/flmount.c]] -- 1097 lines -- 38 fn
-- [[docs/graph/files/flmount/flpersist.c|src/flmount/flpersist.c]] -- 167 lines -- 4 fn
+- [[docs/graph/files/flmount/flauth-check.h|src/flmount/flauth-check.h]] -- 248 lines -- 12 fn
+- [[docs/graph/files/flmount/flmount.c|src/flmount/flmount.c]] -- 1129 lines -- 39 fn
+- [[docs/graph/files/flmount/flpersist.c|src/flmount/flpersist.c]] -- 179 lines -- 4 fn
 
 ## Uses
 

@@ -11,7 +11,8 @@ index (`flpkg sync` as root); without a repo the app says so. Changes go
 through `flpkg-seat`.
 
 flpkg-seat is setuid root (mode 4750, root:seat, set by the recipe). It takes
-only `install NAME...` and `remove NAME...`, accepts a NAME only if it matches
+only `install NAME...`, `remove NAME...` and `upgrade`, after the person's password (flauth, class "pkg",
+reused for 120 s by the same calling program; exit 77 when the dialog cannot be started), accepts a NAME only if it matches
 [a-z0-9+._-]+, starts with a letter or digit, is at most 64 characters and does
 not end in ".flpkg", clears the environment (PATH only), and runs
 `/usr/bin/flpkg install|remove -y -- NAME...`. Removal never uses --cascade, so

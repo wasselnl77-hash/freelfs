@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 2. Password prompt for root actions (setuid helper and dialog)
+Version 0.1, release 3. Password prompt for root actions (setuid helper and dialog)
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

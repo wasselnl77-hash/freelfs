@@ -5,7 +5,7 @@ tags: [package-group]
 
 #package-group
 
-173 packages:
+175 packages:
 
 - [[docs/graph/packages/alsa-lib|pkg/alsa-lib]]
 - [[docs/graph/packages/appstream|pkg/appstream]]
@@ -108,6 +108,8 @@ tags: [package-group]
 - [[docs/graph/packages/libinput|pkg/libinput]]
 - [[docs/graph/packages/libjpeg-turbo|pkg/libjpeg-turbo]]
 - [[docs/graph/packages/libksba|pkg/libksba]]
+- [[docs/graph/packages/libmnl|pkg/libmnl]]
+- [[docs/graph/packages/libnftnl|pkg/libnftnl]]
 - [[docs/graph/packages/libogg|pkg/libogg]]
 - [[docs/graph/packages/libplacebo|pkg/libplacebo]]
 - [[docs/graph/packages/libpng|pkg/libpng]]

@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 3. FreeLFS lock screen: clock, date and password; the compositor holds the lock
+Version 0.1, release 4. FreeLFS lock screen: clock, date and password; the compositor holds the lock
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

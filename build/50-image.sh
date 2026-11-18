@@ -57,6 +57,7 @@ tool() {
 }
 
 ESP_MB=512
+check_root_locked "$ROOT/etc/shadow" # round 23: a release image never has an empty root password
 work=$FLFS_WORK/image-work
 rm -rf "$work"
 mkdir -p "$work"

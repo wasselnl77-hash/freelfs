@@ -5,7 +5,7 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flsplash|flsplash]] -- 139 lines
+Component: [[docs/graph/components/flsplash|flsplash]] -- 134 lines
 
 ## Includes
 

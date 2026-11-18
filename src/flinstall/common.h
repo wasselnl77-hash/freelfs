@@ -19,17 +19,11 @@
 #define FI_ESP_BYTES (512 * FI_MIB)
 #define FI_MIN_BOOT_BYTES (200 * FI_MIB)  /* manual: smallest /boot */
 #define FI_MIN_ROOT_BYTES (6 * FI_GIB)    /* the system is about 3 GB; leave room */
-/* The one-line switch for the administrator (root) account: 1 = root gets the first user's
- * password, 0 = root is locked (shadow field "!": no login as root; administration then goes
- * through the account's own groups and the setuid helpers). The window's wording follows. */
-#define FI_ROOT_SAME_PASSWORD 1
-#if FI_ROOT_SAME_PASSWORD
-#define FI_ROOT_NOTE "The administrator account (root) uses the same password."
-#else
-#define FI_ROOT_NOTE "The administrator account (root) is locked: nobody can log in as root."
-#endif
+/* The administrator (root) account on the installed system is a runtime choice (the account step):
+ * "same" = root gets the first user's password, "own" = root gets a separate password. Root is never
+ * left empty. The live ISO itself has root locked. */
 
-#define FI_PW_MIN 4
+#define FI_PW_MIN 8
 #define FI_PW_MAX 128
 
 #define FI_RESERVED_MAX 512
@@ -105,7 +99,7 @@ static inline const char *fi_password_error(const char *pw)
 {
 	size_t n = strlen(pw);
 	if (n < FI_PW_MIN)
-		return "At least 4 characters.";
+		return "At least 8 characters.";
 	if (n > FI_PW_MAX)
 		return "Too long.";
 	return NULL;

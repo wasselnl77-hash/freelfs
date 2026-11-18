@@ -19,7 +19,7 @@ Pages (sidebar, like Settings)
   Animations   on, reduced (fades only) or off; speed 0.5x to 2x
   Boot screen  Flat (default: a flat F, a thin spinner, fades in and out) or Legacy (3D: the glossy logo);
                a small preview of each. The choice is system-wide (/etc/freelfs/splash.conf) and asks for
-               the password (flauth) through /usr/bin/flsplash-set, a setuid helper in group seat. It applies
+               the password (flauth, class "splash", reused for 120 s) through /usr/bin/flsplash-set, a setuid helper in group seat. It applies
                at the next boot.
 
 desktop.conf keys (defaults in brackets; a key equal to its default is removed, not written)

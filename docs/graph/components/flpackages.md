@@ -9,9 +9,9 @@ A window like flfiles: Installed and Available tabs, a search field, the package
 
 ## Source files
 
-- [[docs/graph/files/flpackages/flauth-check.h|src/flpackages/flauth-check.h]] -- 39 lines -- 1 fn
+- [[docs/graph/files/flpackages/flauth-check.h|src/flpackages/flauth-check.h]] -- 248 lines -- 12 fn
 - [[docs/graph/files/flpackages/flpackages.c|src/flpackages/flpackages.c]] -- 1812 lines -- 68 fn
-- [[docs/graph/files/flpackages/flpkg-seat.c|src/flpackages/flpkg-seat.c]] -- 148 lines -- 2 fn
+- [[docs/graph/files/flpackages/flpkg-seat.c|src/flpackages/flpkg-seat.c]] -- 134 lines -- 2 fn
 
 ## Uses
 
@@ -20,7 +20,7 @@ A window like flfiles: Installed and Available tabs, a search field, the package
 
 ## Talks to
 
-- CLI [[docs/graph/components/flauth|flauth]]: `flauth`
+- none found
 
 ## Used by
 

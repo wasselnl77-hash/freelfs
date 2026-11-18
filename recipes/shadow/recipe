@@ -2,13 +2,17 @@
 # the installer creates them with pwconv and grpconv.
 pkgname=shadow
 version=4.20.2
-release=2
+release=3
 summary="Password and account management (login, passwd, useradd, ...)"
 url=https://github.com/shadow-maint/shadow
 license=(BSD-3-Clause)
 arch=(x86_64)
 groups=(base)
 depends=(glibc acl attr libxcrypt)
+# round 23: su stays setuid but is for group wheel only (SU_WHEEL_ONLY above). newuidmap and newgidmap lose
+# setuid: /etc/subuid and /etc/subgid are empty and no rootless container tool is shipped. Put the setuid bit
+# back (chmod 4755) when one is installed. login honours /etc/securetty (CONSOLE, base-files) for root.
+owner=("/usr/bin/newuidmap 0 0 0755" "/usr/bin/newgidmap 0 0 0755")
 source=(https://github.com/shadow-maint/shadow/releases/download/$version/shadow-$version.tar.xz)
 sha256=(b89f432b75ae55a2d852b446d0365484795fdf533ab97d550e325fa15594a224)
 
@@ -18,6 +22,8 @@ prepare() {
 	sed -e 's:#ENCRYPT_METHOD SHA512:ENCRYPT_METHOD YESCRYPT:' \
 		-e 's:/var/spool/mail:/var/mail:' \
 		-e '/PATH=/{s@/sbin:@@;s@/bin:@@}' \
+		-e 's:^SU_WHEEL_ONLY.*:SU_WHEEL_ONLY\tyes:' \
+		-e 's:^LOGIN_RETRIES.*:LOGIN_RETRIES\t\t3:' \
 		-i etc/login.defs
 }
 

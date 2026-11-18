@@ -68,11 +68,15 @@ etc_step() {
 	ldconfig
 }
 
-# Development images only: root has no password, so the console login works
+# Root is locked. Only with FLFS_DEV_ROOT=1 (test images) root has no password, so the console login works
 # straight away. The installer (M9) sets real passwords.
 dev_login_step() {
-	passwd -d root
-	sed -i '/^FreeLFS/a Development image: log in as root, there is no password.' /etc/issue
+	if [ "${FLFS_DEV_ROOT:-0}" = 1 ]; then
+		passwd -d root
+		sed -i '/^FreeLFS/a Development image: log in as root, there is no password.' /etc/issue
+	else
+		passwd -l root # round 23: release images have root locked
+	fi
 }
 
 run_step  9.1-strip       strip_step

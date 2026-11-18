@@ -9,8 +9,8 @@ flsplash -- the FreeLFS boot screen
 
 ## Source files
 
-- [[docs/graph/files/flsplash/flauth-check.h|src/flsplash/flauth-check.h]] -- 39 lines -- 1 fn
-- [[docs/graph/files/flsplash/flsplash-set.c|src/flsplash/flsplash-set.c]] -- 139 lines -- 4 fn
+- [[docs/graph/files/flsplash/flauth-check.h|src/flsplash/flauth-check.h]] -- 248 lines -- 12 fn
+- [[docs/graph/files/flsplash/flsplash-set.c|src/flsplash/flsplash-set.c]] -- 134 lines -- 4 fn
 - [[docs/graph/files/flsplash/flsplash.c|src/flsplash/flsplash.c]] -- 1669 lines -- 68 fn
 - [[docs/graph/files/flsplash/genart.c|src/flsplash/genart.c]] -- 837 lines -- 28 fn
 
@@ -20,7 +20,7 @@ flsplash -- the FreeLFS boot screen
 
 ## Talks to
 
-- CLI [[docs/graph/components/flauth|flauth]]: `flauth`
+- none found
 
 ## Used by
 

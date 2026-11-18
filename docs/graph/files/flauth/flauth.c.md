@@ -5,7 +5,7 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flauth|flauth]] -- 272 lines
+Component: [[docs/graph/components/flauth|flauth]] -- 291 lines
 
 ## Includes
 
@@ -14,6 +14,6 @@ Component: [[docs/graph/components/flauth|flauth]] -- 272 lines
 
 ## Functions (best effort)
 
-- `ct_equal`, `dir_path`, `find_spwd`, `make_dir`, `stamp`, `lock_left`, `set_failures`, `ask`, `main`
+- `ct_equal`, `find_spwd`, `make_dir`, `lock_left`, `set_failures`, `ask`, `usage`, `main`
 
 See also: [flauth component](../../components/flauth.md) · [src/flauth/flauth.c](../../../../src/flauth/flauth.c)

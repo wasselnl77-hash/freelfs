@@ -15,7 +15,7 @@ Pages behind a sidebar: General (theme, panel labels), Display, Mouse & touchpad
 - [[docs/graph/files/flsettings/bluetooth.h|src/flsettings/bluetooth.h]] -- 18 lines
 - [[docs/graph/files/flsettings/cmd.c|src/flsettings/cmd.c]] -- 342 lines -- 13 fn
 - [[docs/graph/files/flsettings/cmd.h|src/flsettings/cmd.h]] -- 42 lines
-- [[docs/graph/files/flsettings/datetime.c|src/flsettings/datetime.c]] -- 453 lines -- 19 fn
+- [[docs/graph/files/flsettings/datetime.c|src/flsettings/datetime.c]] -- 456 lines -- 19 fn
 - [[docs/graph/files/flsettings/datetime.h|src/flsettings/datetime.h]] -- 18 lines
 - [[docs/graph/files/flsettings/display.c|src/flsettings/display.c]] -- 862 lines -- 34 fn
 - [[docs/graph/files/flsettings/display.h|src/flsettings/display.h]] -- 19 lines

@@ -53,6 +53,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "flauth-check.h"
+
 #ifndef BLKROSET
 #define BLKROSET _IO(0x12, 93)
 #endif
@@ -77,6 +79,25 @@ struct part {
 static int allow_internal;
 static uid_t owner_uid;
 static gid_t owner_gid;
+static int g_tried;	/* FLAUTH_TRIED was set when we started (read before the environment was cleared) */
+static int g_argc;
+static char **g_argv;
+
+static void err(const char *fmt, ...);
+
+/* An internal disk (only with --internal) needs the person's password (class mount-internal, flauth; the
+ * stamp of this program is reused for two minutes). 1: go on. 0: refused, the message is printed. When
+ * flauth has to run, this call does not return: flauth starts flmount again with the same arguments. */
+static int password_for(const struct part *p)
+{
+	if (!p || p->cls != C_INTERNAL)
+		return 1;
+	if (flauth_gate(g_tried, "mount-internal", "Mount, unmount or eject an internal disk.", "/usr/bin/flmount", g_argc,
+	                g_argv))
+		return 1;
+	err("your password is needed (flauth)");
+	return 0;
+}
 
 static void err(const char *fmt, ...)
 {
@@ -664,6 +685,8 @@ static int cmd_mount(const char *dev)
 	int n = v ? enumerate(v, MAXP) : 0;
 	struct part *p = v ? find_part(v, n, dev) : NULL;
 	int rc = 1;
+	if (p && !password_for(p))
+		p = NULL, rc = 77;
 	if (p) {
 		char mp[PATH_MAX];
 		if (do_mount(p, mp, sizeof mp) >= 0) {
@@ -708,6 +731,8 @@ static int cmd_unmount(const char *dev)
 	int n = v ? enumerate(v, MAXP) : 0;
 	struct part *p = v ? find_part(v, n, dev) : NULL;
 	int rc = 1, cnt = 0;
+	if (p && !password_for(p))
+		p = NULL, rc = 77;
 	if (p && (p->cls == C_BOOT || p->held)) {
 		err("%s", STICK_MSG);
 	} else if (p) {
@@ -731,6 +756,8 @@ static int cmd_remount(const char *dev)
 	int n = v ? enumerate(v, MAXP) : 0;
 	struct part *p = v ? find_part(v, n, dev) : NULL;
 	int rc = 1;
+	if (p && !password_for(p))
+		p = NULL, rc = 77;
 	if (p && p->cls != C_BOOT) {
 		sync();
 		unmount_dev(dev, 1, NULL);
@@ -778,6 +805,8 @@ static int cmd_eject(const char *dev)
 	int n = v ? enumerate(v, MAXP) : 0;
 	struct part *p = v ? find_part(v, n, dev) : NULL;
 	int rc = 1;
+	if (p && !password_for(p))
+		p = NULL, rc = 77;
 	if (!p)
 		goto out;
 	if (p->cls == C_BOOT) {
@@ -1046,6 +1075,9 @@ static int cmd_gone(const char *dev)
 
 int main(int argc, char **argv)
 {
+	g_tried = getenv("FLAUTH_TRIED") != NULL;
+	g_argc = argc;
+	g_argv = argv;
 	for (int fd = 3; fd < 256; fd++)	/* the caller's status pipe (fd 3) must not stay open in anything we start */
 		close(fd);
 	(void)!chdir("/");	/* our own folder must never keep a drive busy */

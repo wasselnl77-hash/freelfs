@@ -123,15 +123,22 @@ When erasing, the summary asks you to tick a box before the button says
 |---|---|
 | Full name | Free text |
 | User name | Lower case letters, digits, `_` and `-`, starting with a letter or `_`, up to 32 characters. Names that already exist as a user, a group or a folder in `/home` are refused |
-| Password | At least 4 characters, typed twice. The window shows it as squares and wipes it after sending it |
+| Password | At least 8 characters, typed twice. The window shows it as squares and wipes it after sending it |
 
 The new user is put in these groups: `users`, `seat`, `audio`, `video`, `render`,
 `wheel` and `netdev`. `wheel` and `netdev` are groups the system uses for some
 administration tasks (the system guide, chapters 10 to 19, covers them).
 
-**Root's password is the same as the first user's password** in this version
-(a one-line switch in the installer's code, `FI_ROOT_SAME_PASSWORD`). Change it
-after the first boot with the usual `passwd` command if you want a different one.
+**The administrator (root) account.** The box "Use the same password for the administrator (root)"
+is ticked by default: root gets the same password as the first user. Untick it to give root its own
+password (a second pair of fields, also at least 8 characters, typed twice). Root is never left without a
+password or locked by the installer. The live ISO itself has root locked; on the live system you work as
+`tester`. Root cannot log in over the serial port on an installed system (`/etc/securetty`); `su` works for
+group `wheel`, which the first user is in.
+
+**The password question.** The install step needs a password for any account except the live session's
+`tester` (empty password, live system only): a small dialog (flauth) opens when you press Install. A wrong
+or cancelled password stops the install before the disk is touched.
 
 ### 6. Time zone
 

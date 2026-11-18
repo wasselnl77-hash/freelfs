@@ -1,17 +1,21 @@
 /* flauth -- ask the person for her password before a root action.
  *
- *   flauth [--reason TEXT] [-- CMD ARGS...]
+ *   flauth --class CLASS [--reason TEXT] [-- CMD ARGS...]
  *
  * Installed setuid root for the group seat (mode 4750), PAM-free: the password is checked against /etc/shadow with
  * crypt(). The window is flauth-dialog, run as the person (never as root); the password comes back through a pipe.
- * On success flauth stamps /run/flauth/ok-UID (valid 5 minutes; flpkg-seat and flsnap look for it, flauth-check.h)
- * and, with a CMD, runs it as the person. An account with an empty password (the live session's tester) needs
- * no dialog. Exit codes: 0 right (or CMD ran), 1 wrong password three times, 2 cancelled, 3 locked out for a while
- * or broken, 4 no password can unlock this account.
+ * CLASS says which root action the stamp is for (flauth-check.h: pkg, time, splash, mount-internal are reusable
+ * for 120 s by the same calling program; disk-write, persist-create, snap-rollback, snap-delete are one-shot).
+ * On success flauth writes the stamp /run/flauth/ok-UID.CLASS, bound to the program that started flauth (its
+ * parent, resolved through /proc), and, with a CMD, runs it as the person. The live session's tester (empty
+ * password, only on the live system) needs no dialog. An empty password anywhere else is refused: set one first.
+ * Exit codes: 0 right (or CMD ran), 1 wrong password three times, 2 cancelled, 3 locked out, broken or misused,
+ * 4 no password can unlock this account (none set, locked or expired).
  * Rate limit: three wrong passwords in a row lock the account out of flauth for 30 s, then 60 s ... up to 10 minutes;
  * every wrong password also costs a second, and checks take turns on a lock file.
- * Tests (not as root): FLAUTH_SHADOW=FILE, FLAUTH_DIR=DIR, FLAUTH_DIALOG=PROGRAM replace /etc/shadow, /run/flauth and
- * /usr/libexec/flauth-dialog; a privileged copy ignores them.
+ * Tests (not as root): FLAUTH_SHADOW=FILE, FLAUTH_DIR=DIR, FLAUTH_DIALOG=PROGRAM, FLAUTH_LIVE=PATH, FLAUTH_USER=NAME
+ * replace /etc/shadow, /run/flauth, /usr/libexec/flauth-dialog, /run/live and the account name; a privileged copy
+ * ignores them.
  * SPDX-License-Identifier: MIT */
 #define _GNU_SOURCE
 #include "flauth-check.h"
@@ -38,11 +42,6 @@ static int ct_equal(const char *a, const char *b)
 	return d == 0;
 }
 
-static const char *dir_path(void)
-{
-	return geteuid() != 0 && getenv("FLAUTH_DIR") ? getenv("FLAUTH_DIR") : FLAUTH_DIR;
-}
-
 static struct spwd *find_spwd(const char *name)
 {
 	const char *alt = geteuid() != 0 ? getenv("FLAUTH_SHADOW") : NULL;
@@ -60,7 +59,7 @@ static struct spwd *find_spwd(const char *name)
 
 static int make_dir(void)
 {
-	const char *d = dir_path();
+	const char *d = flauth_dir();
 	if (mkdir(d, 0700) < 0 && errno != EEXIST)
 		return -1;
 	struct stat st;
@@ -69,22 +68,11 @@ static int make_dir(void)
 	return 0;
 }
 
-static void stamp(uid_t uid)
-{
-	char p[300];
-	snprintf(p, sizeof p, "%s/ok-%u", dir_path(), (unsigned)uid);
-	int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
-	if (fd >= 0) {
-		futimens(fd, NULL);
-		close(fd);
-	}
-}
-
 /* failures so far and when the last one was; the lock-out in seconds still to wait (0: none) */
 static long lock_left(uid_t uid, int *n_out)
 {
 	char p[300];
-	snprintf(p, sizeof p, "%s/fail-%u", dir_path(), (unsigned)uid);
+	snprintf(p, sizeof p, "%s/fail-%u", flauth_dir(), (unsigned)uid);
 	FILE *f = fopen(p, "r");
 	int n = 0;
 	long t = 0;
@@ -107,7 +95,7 @@ static long lock_left(uid_t uid, int *n_out)
 static void set_failures(uid_t uid, int n)
 {
 	char p[300];
-	snprintf(p, sizeof p, "%s/fail-%u", dir_path(), (unsigned)uid);
+	snprintf(p, sizeof p, "%s/fail-%u", flauth_dir(), (unsigned)uid);
 	if (n == 0) {
 		unlink(p);
 		return;
@@ -163,12 +151,23 @@ static int ask(const char *reason, const char *error, const char *user, char *bu
 	return n && WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 0 : 2;
 }
 
+static void usage(void)
+{
+	fputs("usage: flauth --class CLASS [--reason TEXT] [-- CMD ARGS...]\n"
+	      "CLASS: pkg, time, splash, mount-internal (reusable 2 min); disk-write, persist-create,\n"
+	      "       snap-rollback, snap-delete (one-shot)\n", stderr);
+}
+
 int main(int argc, char **argv)
 {
 	struct rlimit z = {0, 0};
 	setrlimit(RLIMIT_CORE, &z);
 	prctl(PR_SET_DUMPABLE, 0);
+	/* the caller's descriptors must not reach the dialog or the command */
+	for (int fd = 3; fd < 256; fd++)
+		close(fd);
 	const char *reason = "This needs your permission.";
+	const char *cls = NULL;
 	int a = 1;
 	while (a < argc && argv[a][0] == '-') {
 		if (!strcmp(argv[a], "--")) {
@@ -178,24 +177,35 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[a], "--reason") && a + 1 < argc) {
 			reason = argv[a + 1];
 			a += 2;
+		} else if (!strcmp(argv[a], "--class") && a + 1 < argc) {
+			cls = argv[a + 1];
+			a += 2;
 		} else {
-			fputs("usage: flauth [--reason TEXT] [-- CMD ARGS...]\n", stderr);
+			usage();
 			return 3;
 		}
 	}
+	if (!cls || !flauth_class(cls, NULL)) {
+		usage();
+		return 3;
+	}
 	uid_t uid = getuid();
-	struct passwd *pw = getpwuid(uid);
-	if (!pw) {
+	char name[64];
+	if (flauth_user(uid, name, sizeof name) < 0) {
 		fputs("flauth: unknown user\n", stderr);
 		return 3;
 	}
-	char name[64];
-	snprintf(name, sizeof name, "%s", pw->pw_name);
-	int ok = 0;
 	if (geteuid() != 0 && !getenv("FLAUTH_DIR")) {
 		fputs("flauth: not installed setuid root\n", stderr);
 		return 3;
 	}
+	/* which program asked: the stamp is only good for it (read now, while the parent is still the caller) */
+	char exe[PATH_MAX] = "";
+	if (uid != 0 && flauth_caller_exe(exe, sizeof exe) < 0) {
+		fputs("flauth: cannot tell which program started it\n", stderr);
+		return 3;
+	}
+	int ok = 0;
 	if (uid == 0) {
 		ok = 1;
 	} else if (make_dir() < 0) {
@@ -209,11 +219,16 @@ int main(int argc, char **argv)
 			return 4;
 		}
 		if (sp->sp_pwdp[0] == 0) {
-			ok = 1; /* an empty password: no question (the live session's tester) */
+			/* no password: only the live session's tester, and only on the live system */
+			if (!(flauth_live() && !strcmp(name, FLAUTH_LIVE_USER))) {
+				fputs("flauth: this account has no password; set one first\n", stderr);
+				return 4;
+			}
+			ok = 1;
 		} else {
 			char hash[256];
 			snprintf(hash, sizeof hash, "%s", sp->sp_pwdp);
-			int lk = open(dir_path(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+			int lk = open(flauth_dir(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 			int rc = 1;
 			char err[96] = "";
 			for (int tries = 0; tries < 3 && !ok; tries++) {
@@ -254,12 +269,16 @@ int main(int argc, char **argv)
 				if (lk >= 0)
 					flock(lk, LOCK_UN);
 			}
+			if (lk >= 0)
+				close(lk);
 			if (!ok)
 				return rc;
 		}
 	}
-	if (uid != 0)
-		stamp(uid);
+	if (uid != 0 && flauth_write_stamp(uid, cls, exe) < 0) {
+		fputs("flauth: cannot write the stamp\n", stderr);
+		return 3;
+	}
 	if (a >= argc)
 		return 0;
 	/* the command runs as the person; if it is setuid itself (flpkg-seat, flsnap) it finds the stamp */

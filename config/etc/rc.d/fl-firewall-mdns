@@ -1,0 +1,13 @@
+#!/bin/sh
+# fl-firewall-mdns on|off -- let mDNS (UDP 5353) in while avahi-daemon runs, and close it again afterwards.
+# Called by flcupsd (config/cups/flcupsd). Does nothing when there is no firewall (nft missing or no table).
+NFT=${NFT:-/usr/sbin/nft}
+[ -x "$NFT" ] || exit 0
+"$NFT" list chain inet filter mdns > /dev/null 2>&1 || exit 0
+case $1 in
+	on)
+		"$NFT" flush chain inet filter mdns
+		"$NFT" add rule inet filter mdns udp dport 5353 accept ;;
+	off) "$NFT" flush chain inet filter mdns ;;
+	*) echo "usage: $0 on|off" >&2; exit 2 ;;
+esac

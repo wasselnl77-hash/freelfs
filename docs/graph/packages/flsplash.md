@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.2, release 6. FreeLFS boot screen: a flat logo with a spinner (or the legacy 3D one) on the KMS framebuffer, no compositor
+Version 0.2, release 7. FreeLFS boot screen: a flat logo with a spinner (or the legacy 3D one) on the KMS framebuffer, no compositor
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

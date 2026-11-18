@@ -9,8 +9,8 @@ flsnap keeps read-only snapshots of @ (the root subvolume) in @snapshots, which 
 
 ## Source files
 
-- [[docs/graph/files/flsnap/flauth-check.h|src/flsnap/flauth-check.h]] -- 39 lines -- 1 fn
-- [[docs/graph/files/flsnap/flsnap.c|src/flsnap/flsnap.c]] -- 939 lines -- 38 fn
+- [[docs/graph/files/flsnap/flauth-check.h|src/flsnap/flauth-check.h]] -- 248 lines -- 12 fn
+- [[docs/graph/files/flsnap/flsnap.c|src/flsnap/flsnap.c]] -- 929 lines -- 38 fn
 
 ## Uses
 
@@ -18,7 +18,7 @@ flsnap keeps read-only snapshots of @ (the root subvolume) in @snapshots, which 
 
 ## Talks to
 
-- CLI [[docs/graph/components/flauth|flauth]]: `flauth`
+- none found
 
 ## Used by
 

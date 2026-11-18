@@ -36,7 +36,8 @@ else
 	for n in boot-2G boot-1G m10-features-1G m10-snapshots-1G m11-x11-1G m12-sandbox-1G m16; do printf '%-28s NOT RUN (no disk image)\n' $n | tee -a "$out/table.txt"; done
 fi
 suite iso-test-1G python3 build/iso-test.py --iso "$twin" --mem 1G --profile "$out/idle-profile.txt"
-suite m10-install python3 build/m10-install.py --iso "$real"
+# round 23: the real ISO has root locked, and m10-install logs in as root on the serial console (the live ISO, then the installed disk): it runs on the dev twin
+suite m10-install python3 build/m10-install.py --iso "$twin"
 suite m17 build/m17-features.sh "$twin"
 suite m18-honest build/m18-honest.sh "$twin"
 suite m18-realiso python3 build/m18-realiso.py --iso "$real"

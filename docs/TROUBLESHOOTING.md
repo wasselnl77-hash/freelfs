@@ -40,6 +40,7 @@ hardware notes and the five laptop reports (the last one is from 17 November).
 - [12. Making a good bug report](#12-making-a-good-bug-report)
 - [13. FAQ](#13-faq)
 - [14. Open questions](#14-open-questions)
+- [15. Login, root, passwords and the firewall (round 23)](#15-login-root-passwords-and-the-firewall-round-23)
 
 ## How to read this guide
 
@@ -1278,3 +1279,38 @@ The notes do not settle these. If you see one, send a report:
 8. **Intel Wi-Fi, MediaTek and Atheros Wi-Fi.** The drivers are in the image. No real card
    is recorded as working.
 9. **Trash on a stick and drag and drop from Files.** Not done (round 21 notes). Not verified.
+
+## 15. Login, root, passwords and the firewall (round 23)
+
+**"I cannot log in as root."** Correct for the live ISO and the released images: root is locked (`!` in
+`/etc/shadow`) and no root login is allowed over the serial port (`/etc/securetty` lists tty1 to tty6 only). On the live
+system, work as `tester`: the actions that need administrator rights open the password dialog (flauth), and on the live
+system the empty-password `tester` is not asked. On an installed system, the account's own password does the same. In a
+terminal, `su` works for members of group `wheel` only (the installer's user is one). A development image (built with
+`FLFS_DEV_ROOT=1`, its `/etc/issue` says "Development image") has an empty root password and root may log in on ttyS0.
+
+**The installer asks for two passwords, or the Next button stays grey.** The account step wants the password twice, at
+least **8 characters** (it was 4). The check box "Use the same password for the administrator (root)" is on by default.
+Untick it to give root its own password (a second pair of fields). When the install starts, a password dialog may open
+(on the live system the `tester` has no password and is not asked; on any other account it is, every time, and a wrong or
+cancelled password stops the install before the disk is touched).
+
+**"flauth: this account has no password; set one first" (exit 4).** An empty password is accepted only for the live
+session's `tester` while `/run/live` exists. Anywhere else, give the account a password with `passwd`.
+
+**`dmesg` says "Operation not permitted".** `kernel.dmesg_restrict = 1` (`/etc/sysctl.d/10-freelfs-hardening.conf`).
+Run `dmesg` as root (`su`, for a member of `wheel`), or lower the setting for the session with
+`sysctl kernel.dmesg_restrict=0` as root. The report tool (flreport) leaves the dmesg part empty for a normal user.
+
+**A server I run is not reachable from another computer.** The firewall drops unsolicited inbound traffic
+(`/etc/nftables.conf`, service `firewall`). Add a line such as `tcp dport 8080 accept` to the chain `input` and run
+`nft -f /etc/nftables.conf` as root. `nft list ruleset` shows what is active. Outbound traffic (browser, Flatpak,
+downloads, Wi-Fi) is not filtered. To switch the firewall off: `FIREWALL=0` in `/etc/rc.conf`, or `!firewall` in `SERVICES`.
+Printers found by name need mDNS: the firewall opens UDP 5353 only while avahi runs (it starts with the first print request).
+An installed system made before round 23 keeps its old `/etc/rc.conf`: add `firewall` first in `SERVICES` there.
+
+**`gdb -p PID` or `strace -p PID` fails.** `kernel.yama.ptrace_scope = 1`: a process can be traced by its parent only.
+Start the program under gdb/strace, or run the tool as root.
+
+**`ping` or `traceroute` fails for a user.** `ping` uses an ICMP datagram socket (`net.ipv4.ping_group_range`). `traceroute` is
+setuid for group `seat` only. Both work for the installed user and for `tester`.

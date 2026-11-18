@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 7. FreeLFS package app: installed list, search, install and remove
+Version 0.1, release 8. FreeLFS package app: installed list, search, install and remove
 
 - License: MIT; URL: none
 - Groups: none

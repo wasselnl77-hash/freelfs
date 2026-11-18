@@ -241,9 +241,11 @@ static void setup(void)
 	setpath(C.cp, "/usr/bin/cp");
 	setpath(C.rm, "/usr/bin/rm");
 	if (C.elevated) {
-		/* the caller is not trusted: nothing from the environment, and root for the children */
+		/* the caller is not trusted: nothing from the environment, no descriptors, and root for the children */
 		clearenv();
 		setenv("PATH", "/usr/bin:/usr/sbin:/bin:/sbin", 1);
+		for (int fd = 3; fd < 256; fd++)
+			close(fd);
 		if (setuid(0) < 0)
 			die("cannot become root");
 	} else {
@@ -690,7 +692,10 @@ static int cmd_create(int argc, char **argv)
 	if (write_info(C.dir, n, reason, pk) < 0)
 		warn("cannot write the information file of snapshot #%ld", n);
 	free(pk);
-	prune(C.keep);
+	/* the oldest ones go only for the system's own callers (the hooks, root); a person's create just adds, and
+	 * deleting needs the password (rm, prune) */
+	if (!C.elevated)
+		prune(C.keep);
 	write_boot_list();
 	printf("snapshot #%ld taken\n", n);
 	return 0;
@@ -885,36 +890,21 @@ static void usage(FILE *f)
 
 int main(int argc, char **argv)
 {
+	int tried = getenv("FLAUTH_TRIED") != NULL; /* read before the environment is cleared */
 	if (argc < 2 || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
 		usage(argc < 2 ? stderr : stdout);
 		return argc < 2 ? 2 : 0;
 	}
-	/* going back to a snapshot, deleting and pruning ask for the person's password (flauth); the others
-	 * (create, list, show, status) do not */
+	/* going back to a snapshot and deleting ask for the person's password every time (flauth: rollback and
+	 * delete are one-shot); create, list, show and status do not. An elevated caller's create never prunes. */
 	if (getuid() != geteuid() && (!strcmp(argv[1], "rollback") || !strcmp(argv[1], "delete") ||
-				      !strcmp(argv[1], "rm") || !strcmp(argv[1], "prune")) && !flauth_ok(getuid())) {
-		uid_t u = getuid();
-		gid_t g = getgid();
-		if (getenv("FLAUTH_TRIED") || setresgid(g, g, g) < 0 || setresuid(u, u, u) < 0) {
+				      !strcmp(argv[1], "rm") || !strcmp(argv[1], "prune"))) {
+		int rb = !strcmp(argv[1], "rollback");
+		const char *reason = rb ? "Make the computer start from an earlier state." : "Delete system snapshots.";
+		if (!flauth_gate(tried, rb ? "snap-rollback" : "snap-delete", reason, "/usr/bin/flsnap", argc, argv)) {
 			fputs("flsnap: your password is needed (flauth)\n", stderr);
 			return 77;
 		}
-		setenv("FLAUTH_TRIED", "1", 1);
-		const char *reason = !strcmp(argv[1], "rollback") ? "Make the computer start from an earlier state."
-				     : "Delete system snapshots.";
-		char *args[64];
-		int k = 0;
-		args[k++] = "flauth";
-		args[k++] = "--reason";
-		args[k++] = (char *)reason;
-		args[k++] = "--";
-		args[k++] = "/usr/bin/flsnap";
-		for (int i = 1; i < argc && k < 62; i++)
-			args[k++] = argv[i];
-		args[k] = NULL;
-		execv("/usr/bin/flauth", args);
-		fputs("flsnap: your password is needed, and flauth is not installed\n", stderr);
-		return 77;
 	}
 	setup();
 	const char *c = argv[1];

@@ -103,8 +103,13 @@ static const char *check_password(const char *user, const char *pw)
 	const char *hash = sp->sp_pwdp;
 	if (sp->sp_expire >= 0 && (long)(time(NULL) / 86400) > sp->sp_expire)
 		return "This account has expired.";
-	if (hash[0] == 0)
-		return NULL;
+	if (hash[0] == 0) {
+		/* an empty password logs in only as the live session's tester, and only on the live system (/run/live);
+		 * anywhere else it is refused, so a broken shadow edit never opens an account */
+		if (!strcmp(user, "tester") && access("/run/live", F_OK) == 0)
+			return NULL;
+		return "This account has no password and cannot log in. Set one first.";
+	}
 	if (hash[0] == '!' || hash[0] == '*')
 		return "This account is locked.";
 	struct crypt_data *cd = calloc(1, sizeof *cd);

@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 2.4.20, release 3. CUPS print server for driverless (IPP Everywhere) printers, started on demand
+Version 2.4.20, release 4. CUPS print server for driverless (IPP Everywhere) printers, started on demand
 
 - License: Apache-2.0; URL: https://openprinting.github.io/cups/
 - Groups: [[docs/graph/groups/desktop|desktop]]

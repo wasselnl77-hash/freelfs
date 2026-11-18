@@ -77,10 +77,10 @@ the FreeLFS package manager
 
 ## Recent changes
 
+- `a38b8f5` Code/docs graph for Obsidian, per-package build jobs, release links
 - `b469866` Round 22: flpkg one command for every source, signed online repo, fixes, new docs
 - `1e1c899` Round 18: shutdown hardening, visible launch errors, honest tests, manual, website
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 - `b0715e7` Round 13: compositor animations, Themes app (fltheme), light scheme
-- `6a1e3de` Round 12: RAM trim, live store, desktop icons, small fixes, security ops
 
 See also: [01-introduction](../../manual/01-introduction.md) · [03-installing](../../manual/03-installing.md) · [06-apps](../../manual/06-apps.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

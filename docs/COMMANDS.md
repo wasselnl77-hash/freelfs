@@ -11,7 +11,7 @@ Each entry has these parts:
 - **Usage** is the line the program prints when it is called wrongly. It is copied from the source, so it is exact.
 - **Options** lists every flag and subcommand with a one-line explanation.
 - **Examples** shows one to three typical calls.
-- **Needs** says what the command asks for. *Nothing* means any user can run it. *Group seat* means it runs as root for a person in group `seat`, with no password. *Password* means it asks the person's password first (through `flauth`). *Root* means it has to be run as root.
+- **Needs** says what the command asks for. *Nothing* means any user can run it. *Group seat* means it runs as root for a person in group `seat`; whether it also asks the password depends on the action (manual chapter 15.4: removable drives, power and the lock screen do not, packages, time, snapshots, internal disks and the installer do). *Password* means it asks the person's password first (through `flauth`). *Root* means it has to be run as root.
 - **Logs** says where its output or messages go. "Terminal" means the output is only printed.
 
 Where the source did not show something, the entry says *not yet verified*.
@@ -217,7 +217,7 @@ The helper behind the Store and the Packages app. It is installed setuid root fo
   usage: flpkg-seat install|remove NAME... | flpkg-seat upgrade
   ```
 - **Options:** `install NAME...` (up to many names), `remove NAME...`, `upgrade`. Names must be valid package names.
-- **Needs:** Group seat, then Password (through flauth). Not meant to be typed by hand.
+- **Needs:** Group seat, then Password (through flauth, class `pkg`, reused for two minutes by the same program). Not meant to be typed by hand.
 - **Examples:** The desktop calls it. By hand: `flpkg-seat upgrade`.
 - **Logs:** Terminal, with the native flpkg's output.
 
@@ -291,22 +291,23 @@ The clock client. It asks time servers over SNTP and sets the clock. The `ntp` s
 
 ### flauth
 
-The password prompt for root actions. It checks your password against `/etc/shadow` (with `crypt()`), shows a small window, and then either exits or runs a command for you. Successful checks are remembered for five minutes in `/run/flauth/ok-UID`, so a few actions in a row ask only once.
+The password prompt for root actions. It checks your password against `/etc/shadow` (with `crypt()`), shows a small window, and then either exits or runs a command for you. A right password gives a stamp for one action class (`--class`) and for the program that asked, valid two minutes (`/run/flauth/ok-UID.CLASS`). Destructive classes (`disk-write`, `persist-create`, `snap-rollback`, `snap-delete`) are one-shot. An empty password is refused, except for the live session's `tester` on the live system. See `docs/SECURITY.md` section 5.
 
 - **Usage:**
   ```
-  usage: flauth [--reason TEXT] [-- CMD ARGS...]
+  usage: flauth --class CLASS [--reason TEXT] [-- CMD ARGS...]
   ```
 - **Options:**
+  - `--class CLASS` (required): the kind of action the stamp is for: `pkg`, `time`, `splash`, `mount-internal` (reused for two minutes by the same program), or `disk-write`, `persist-create`, `snap-rollback`, `snap-delete` (one-shot).
   - `--reason TEXT`: the sentence the dialog shows. Default: "This needs your permission."
   - `--` followed by `CMD ARGS...`: run that command as you, after the password is right.
-- **Exit codes:** 0 right (or the command ran), 1 wrong password three times, 2 cancelled, 3 locked out for a while (three wrong passwords in a row lock flauth for 30 s, then longer, up to 10 minutes) or broken, 4 no password can unlock this account.
+- **Exit codes:** 0 right (or the command ran), 1 wrong password, 2 cancelled, 3 locked out for a while (three wrong passwords in a row lock flauth for 30 s, then longer, up to 10 minutes), broken or misused, 4 no password can unlock this account, or the account has no password (set one first).
 - **Examples:**
   ```
-  flauth --reason "Install a printer." -- /usr/sbin/lpadmin -h
-  flauth -- /usr/bin/flsnap list
+  flauth --class pkg --reason "Install a printer." -- /usr/sbin/lpadmin -h
+  flauth --class snap-rollback --reason "Start an earlier state." -- /usr/bin/flsnap rollback 3
   ```
-- **Needs:** Nothing (it is setuid root for group seat, mode 4750). An account with an empty password (the live tester) gets no dialog.
+- **Needs:** Nothing (it is setuid root for group seat, mode 4750). The live session's tester (empty password, `/run/live` present) gets no dialog. An empty password anywhere else is refused.
 - **Logs:** None written. The stamp is in `/run/flauth`.
 
 ### flboot
@@ -405,7 +406,7 @@ Mounts, unmounts and ejects removable drives, and mounts them under `/drives`. T
   flmount mount /dev/sdb1
   flmount eject /dev/sdb
   ```
-- **Needs:** Group seat (setuid root, mode 4750). No password.
+- **Needs:** Group seat (setuid root, mode 4750). No password for removable drives and the live boot stick; an internal disk (`--internal`) asks for the password every time (flauth class `mount-internal`).
 - **Logs:** Terminal, and desktop notices through `flnotify`. Not yet verified for a log file.
 - **See also:** manual [07](manual/07-files-drives-usb.md).
 
@@ -430,7 +431,7 @@ Makes a persistence image on a live USB stick, so the live system keeps your fil
   flpersist status
   flpersist create 4G --btrfs
   ```
-- **Needs:** Group seat (setuid root, mode 4750), and a live session. No password.
+- **Needs:** Group seat (setuid root, mode 4750), and a live session. The password every time (flauth class `persist-create`, one-shot); the live `tester` is not asked.
 - **Logs:** Terminal.
 - **See also:** manual [07](manual/07-files-drives-usb.md), [02](manual/02-getting-started.md).
 
@@ -490,7 +491,7 @@ Btrfs snapshots of the root file system. Before each package change, flpkg takes
   flauth -- /usr/bin/flsnap rollback 12
   ```
   (Calling `flsnap rollback 12` directly asks for the password on its own, through `flauth`.)
-- **Needs:** Group seat. `create`, `list`, `show`, `status` need nothing else. `rollback`, `delete`, `prune` need the password (through `flauth`).
+- **Needs:** Group seat. `create`, `list`, `show`, `status` need nothing else. `rollback` and `delete`/`rm` need the password every time (one-shot), `prune` is for root only.
 - **Logs:** Terminal. Each snapshot has an information file in `/.snapshots` (exact name not yet verified). Settings > Snapshots shows the same list.
 - **See also:** manual [09](manual/09-troubleshooting.md) ("Going back to an earlier state"), [flsnap-notice](#flsnap-notice).
 
@@ -583,7 +584,7 @@ The few privileged time actions that Settings does: time zone, NTP on or off, sy
   fltime-set zone Europe/Amsterdam
   fltime-set ntp on
   ```
-- **Needs:** Group seat (setuid root, mode 4750). No password.
+- **Needs:** Group seat (setuid root, mode 4750). The password for every command (flauth class `time`, reused for two minutes); the live `tester` is not asked.
 - **Logs:** Terminal, and `/run/fltime.status` for NTP.
 
 ---

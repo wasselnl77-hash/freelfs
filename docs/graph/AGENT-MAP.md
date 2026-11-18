@@ -24,12 +24,12 @@ flarchive [ARCHIVE] browse an archive flarchive --extract-here ARCHIVE... extrac
 - manual: 01-introduction, 05-keyboard-shortcuts, 06-apps, 10-architecture (+5)
 ### flauth [app]
 the password prompt for root actions (setuid helper + flui dialog)
-- key files: flauth.c, flauth-dialog.c, flauth-check.h
+- key files: flauth.c, flauth-check.h, flauth-dialog.c
 - uses: flui (hdr, pkg); libs: xkbcommon
-- used-by: flpackages (cli), flsnap (cli), flsplash (cli)
+- used-by: flinstall (cli)
 - talks-to: none found
 - recipe: recipes/flauth/recipe (pkg flauth)
-- manual: 06-apps, 10-architecture, 12-filesystem-layout, 15-users-security (+4)
+- manual: 03-installing, 06-apps, 07-files-drives-usb, 10-architecture (+6)
 ### flboot [system]
 flboot lives on the EFI system partition (ESP), which FreeLFS mounts at /boot, as EFI/BOOT/BOOTX64.EFI (BOOTAA64.EFI on aarch64): the file UEFI firmware starts by default, so no boot variables are nee
 - key files: menu.c, conf.c, efi.h, other.c, lib.c, fs.c (+5)
@@ -104,10 +104,10 @@ flinitrd -- init of the FreeLFS live initramfs (src/flinitrd)
 - manual: 02-getting-started, 07-files-drives-usb, 10-architecture, 11-boot-process (+7)
 ### flinstall [system]
 Two programs, C17, MIT.
-- key files: helper.c, flinstall.c, common.h
+- key files: helper.c, flinstall.c, flauth-check.h, common.h
 - uses: flsettings (hdr); flui (hdr, pkg); libs: dbus-1
 - used-by: flstore (cli)
-- talks-to: none found
+- talks-to: cli flauth
 - recipe: recipes/flinstall/recipe (pkg flinstall)
 - manual: 06-apps, 10-architecture, 11-boot-process, 12-filesystem-layout (+6)
 ### fllock [app]
@@ -120,7 +120,7 @@ A big clock, the date, your name and a password field on a plain screen. Super+L
 - manual: 01-introduction, 05-keyboard-shortcuts, 06-apps, 10-architecture (+7)
 ### flmount [system]
 (no description)
-- key files: flmount.c, flpersist.c
+- key files: flmount.c, flauth-check.h, flpersist.c
 - uses: none in repo; libs: none
 - used-by: flfiles (cli)
 - talks-to: none found
@@ -136,10 +136,10 @@ flmusic [--tab albums|artists|songs] [--search TEXT] [FOLDER | FILE...] flmusic 
 - manual: 01-introduction, 05-keyboard-shortcuts, 06-apps, 10-architecture (+6)
 ### flpackages [system]
 A window like flfiles: Installed and Available tabs, a search field, the package list, details with Install and Remove, a log strip with flpkg's output while a change runs, and a status bar.
-- key files: flpackages.c, flpkg-seat.c, flauth-check.h
+- key files: flpackages.c, flauth-check.h, flpkg-seat.c
 - uses: flui (hdr, pkg); libs: none
 - used-by: nothing in repo
-- talks-to: cli flauth
+- talks-to: none found
 - recipe: recipes/flpackages/recipe (pkg flpackages)
 - manual: 06-apps, 10-architecture, 13-packages-flpkg, 15-users-security (+6)
 ### flpanel [system]
@@ -211,7 +211,7 @@ flsnap keeps read-only snapshots of @ (the root subvolume) in @snapshots, which 
 - key files: flsnap.c, flauth-check.h
 - uses: none in repo; libs: none
 - used-by: nothing in repo
-- talks-to: cli flauth
+- talks-to: none found
 - recipe: recipes/flsnap/recipe (pkg flsnap)
 - manual: 01-introduction, 06-apps, 08-settings-reference, 09-troubleshooting (+10)
 ### flsocketd [system]
@@ -232,10 +232,10 @@ flsound NAME login, notification, error, tick (volume step), screenshot flsound 
 - manual: 06-apps, 10-architecture, 17-hardware-drivers, 19-admin-reference (+4)
 ### flsplash [system]
 flsplash -- the FreeLFS boot screen
-- key files: flsplash.c, genart.c, flsplash-set.c, flauth-check.h
+- key files: flsplash.c, genart.c, flauth-check.h, flsplash-set.c
 - uses: none in repo; libs: freetype2
 - used-by: flgreet (cli), fltheme (cli)
-- talks-to: cli flauth
+- talks-to: none found
 - recipe: recipes/flsplash/recipe (pkg flsplash)
 - manual: 01-introduction, 02-getting-started, 03-installing, 06-apps (+5)
 ### flstore [app]
@@ -264,7 +264,7 @@ One window for everything about how the desktop looks. Each control writes ~/.co
 - manual: 05-keyboard-shortcuts, 06-apps, 08-settings-reference, 10-architecture (+7)
 ### fltime [system]
 Two small programs for Settings > Date & time. C17, MIT.
-- key files: fltime-set.c, fl-sntp.c
+- key files: fltime-set.c, fl-sntp.c, flauth-check.h
 - uses: none in repo; libs: none
 - used-by: nothing in repo
 - talks-to: none found

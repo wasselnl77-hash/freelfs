@@ -5,11 +5,11 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/fltime|fltime]] -- 283 lines
+Component: [[docs/graph/components/fltime|fltime]] -- 303 lines
 
 ## Includes
 
-- none in the repo
+- [[docs/graph/files/fltime/flauth-check.h|src/fltime/flauth-check.h]]
 - 11 system or external headers (not linked)
 
 ## Functions (best effort)

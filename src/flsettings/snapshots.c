@@ -203,7 +203,7 @@ static void do_flsnap(struct snapshots *s, char *const args[], const char *done)
 		say(s, 1, "The snapshot tool flsnap is not installed.");
 	} else {
 		char *m = strstr(out, "flsnap: ");
-		say(s, 1, m ? m + 8 : "It did not work.");
+		say(s, 1, m ? m + 8 : rc == 2 ? "Cancelled. Nothing was changed." : rc == 1 ? "Not changed: the password was wrong." : "It did not work.");
 	}
 	reload(s);
 	if (s->win)

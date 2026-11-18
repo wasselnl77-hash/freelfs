@@ -9,9 +9,9 @@ the password prompt for root actions (setuid helper + flui dialog)
 
 ## Source files
 
-- [[docs/graph/files/flauth/flauth-check.h|src/flauth/flauth-check.h]] -- 39 lines -- 1 fn
+- [[docs/graph/files/flauth/flauth-check.h|src/flauth/flauth-check.h]] -- 248 lines -- 12 fn
 - [[docs/graph/files/flauth/flauth-dialog.c|src/flauth/flauth-dialog.c]] -- 146 lines -- 4 fn
-- [[docs/graph/files/flauth/flauth.c|src/flauth/flauth.c]] -- 272 lines -- 9 fn
+- [[docs/graph/files/flauth/flauth.c|src/flauth/flauth.c]] -- 291 lines -- 8 fn
 
 ## Uses
 
@@ -24,9 +24,7 @@ the password prompt for root actions (setuid helper + flui dialog)
 
 ## Used by
 
-- [[docs/graph/components/flpackages|flpackages]] (cli)
-- [[docs/graph/components/flsnap|flsnap]] (cli)
-- [[docs/graph/components/flsplash|flsplash]] (cli)
+- [[docs/graph/components/flinstall|flinstall]] (cli)
 
 ## Installed by
 
@@ -34,7 +32,9 @@ the password prompt for root actions (setuid helper + flui dialog)
 
 ## Docs
 
+- [[docs/manual/03-installing|03-installing]]
 - [[docs/manual/06-apps|06-apps]]
+- [[docs/manual/07-files-drives-usb|07-files-drives-usb]]
 - [[docs/manual/10-architecture|10-architecture]]
 - [[docs/manual/12-filesystem-layout|12-filesystem-layout]]
 - [[docs/manual/15-users-security|15-users-security]]
@@ -47,4 +47,4 @@ the password prompt for root actions (setuid helper + flui dialog)
 
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 
-See also: [06-apps](../../manual/06-apps.md) · [10-architecture](../../manual/10-architecture.md) · [12-filesystem-layout](../../manual/12-filesystem-layout.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)
+See also: [03-installing](../../manual/03-installing.md) · [06-apps](../../manual/06-apps.md) · [07-files-drives-usb](../../manual/07-files-drives-usb.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

@@ -7,6 +7,7 @@ install -d -m 755 /run/cups
 if [ -x /usr/sbin/avahi-daemon ] && ! [ -e /run/avahi-daemon/pid ]; then
 	/usr/sbin/avahi-daemon --no-chroot --no-rlimits < /dev/null > /dev/null 2>&1 &
 	avahi=$!
+	/usr/libexec/fl-firewall-mdns on 2> /dev/null # the firewall lets mDNS in only while avahi runs
 fi
 # cupsd should leave after IdleExitTimeout of its own, but on this build it stayed (events keep its
 # timer short), so this script ends it: nothing queued in the spool (control files c*), no client
@@ -25,4 +26,5 @@ done
 wait "$cupsd"
 rc=$?
 [ -n "$avahi" ] && kill "$avahi" 2> /dev/null && wait "$avahi" 2> /dev/null
+[ -n "$avahi" ] && /usr/libexec/fl-firewall-mdns off 2> /dev/null
 exit $rc

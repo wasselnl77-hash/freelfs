@@ -9,7 +9,7 @@
 # no package, so upgrades never drop users.
 pkgname=base-files
 version=0.1
-release=5
+release=6
 summary="FreeLFS file system layout, system accounts and basic /etc files"
 license=(MIT)
 arch=(any)
@@ -56,7 +56,7 @@ package() {
 	ln -s /proc/self/mounts etc/mtab
 	install -d -m 0700 .snapshots
 	install -d -m 1777 tmp var/tmp
-	install -m644 "$etc"/{fstab,hostname,hosts,inputrc,issue,os-release,profile,shells} etc/
+	install -m644 "$etc"/{fstab,hostname,hosts,inputrc,issue,os-release,profile,securetty,shells} etc/
 	# New users get lowercase folders (useradd copies skel)
 	install -d etc/skel/{desktop,documents,downloads,music,pictures,videos,.config}
 	cat > etc/skel/.config/user-dirs.dirs <<-'EOF'

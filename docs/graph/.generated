@@ -129,12 +129,14 @@ files/flgreet/flgreet-ui.c.md
 files/flgreet/flgreet.c.md
 files/flinitrd/flinitrd.c.md
 files/flinstall/common.h.md
+files/flinstall/flauth-check.h.md
 files/flinstall/flinstall.c.md
 files/flinstall/helper.c.md
 files/fllock/fl-shell-client-protocol.h.md
 files/fllock/fl-shell-protocol.c.md
 files/fllock/fllock-check.c.md
 files/fllock/fllock.c.md
+files/flmount/flauth-check.h.md
 files/flmount/flmount.c.md
 files/flmount/flpersist.c.md
 files/flmusic/flmusic.c.md
@@ -262,6 +264,7 @@ files/fltheme/fltheme.h.md
 files/fltheme/hints.c.md
 files/fltheme/presets.c.md
 files/fltime/fl-sntp.c.md
+files/fltime/flauth-check.h.md
 files/fltime/fltime-set.c.md
 files/flui/conf.c.md
 files/flui/flpalette.h.md
@@ -482,6 +485,8 @@ packages/libisoburn.md
 packages/libisofs.md
 packages/libjpeg-turbo.md
 packages/libksba.md
+packages/libmnl.md
+packages/libnftnl.md
 packages/libogg.md
 packages/libpipeline.md
 packages/libplacebo.md
@@ -532,6 +537,7 @@ packages/mtools.md
 packages/mupdf.md
 packages/nasm.md
 packages/ncurses.md
+packages/nftables.md
 packages/nghttp2.md
 packages/ninja.md
 packages/npth.md

@@ -1,6 +1,6 @@
 /* flpkg-seat -- install or remove packages for the person at the machine.
  * Installed setuid root, runnable only by the group seat (mode 4750), so the
- * Packages app can change the system without a password. It does exactly two
+ * Packages app can change the system after the person's password (flauth). It does exactly two
  * things:
  *
  *	flpkg-seat install NAME...
@@ -64,40 +64,26 @@ int main(int argc, char **argv)
 		}
 	}
 #ifndef FLPKG_SEAT_TEST
+	int tried = getenv("FLAUTH_TRIED") != NULL; /* read before the environment is cleared */
 	if (geteuid() != 0) {
 		fputs("flpkg-seat: not installed setuid root\n", stderr);
 		return 1;
 	}
-	/* Changing the system asks for the person's password (flauth; no question on the live system's
-	 * passwordless tester). Without a fresh stamp this program starts itself again through flauth, as
-	 * the person, which finds the stamp the second time; FLAUTH_TRIED stops a loop. */
-	if (!flauth_ok(getuid())) {
-		uid_t u = getuid();
-		gid_t g = getgid();
-		if (getenv("FLAUTH_TRIED") || setresgid(g, g, g) < 0 || setresuid(u, u, u) < 0) {
-			fputs("flpkg-seat: your password is needed (flauth)\n", stderr);
-			return 77;
-		}
-		setenv("FLAUTH_TRIED", "1", 1);
+	/* Changing the system asks for the person's password every time (class pkg: flauth reuses its stamp for
+	 * 2 minutes, for this program only, so several changes in one session need one password). The live
+	 * tester (empty password, live system only) needs none. Otherwise flauth runs and this program runs
+	 * again. */
+	{
 		char reason[256];
 		if (upgrade)
 			snprintf(reason, sizeof reason, "Update all installed packages.");
 		else
 			snprintf(reason, sizeof reason, "%s the package%s %s%s.", !strcmp(argv[1], "install") ? "Install" : "Remove",
 				 argc > 3 ? "s" : "", argv[2], argc > 3 ? " and more" : "");
-		char *args[MAX_NAMES + 10];
-		int k = 0;
-		args[k++] = "flauth";
-		args[k++] = "--reason";
-		args[k++] = reason;
-		args[k++] = "--";
-		args[k++] = "/usr/bin/flpkg-seat";
-		for (int i = 1; i < argc; i++)
-			args[k++] = argv[i];
-		args[k] = NULL;
-		execv("/usr/bin/flauth", args);
-		fputs("flpkg-seat: your password is needed, and flauth is not installed\n", stderr);
-		return 77;
+		if (!flauth_gate(tried, "pkg", reason, "/usr/bin/flpkg-seat", argc, argv)) {
+			fputs("flpkg-seat: your password is needed, but the password dialog (flauth) could not be started. Nothing was changed\n", stderr);
+			return 77;
+		}
 	}
 	/* real ids to root too, and none of the caller's groups */
 	if (setgroups(0, NULL) < 0 || setgid(0) < 0 || setuid(0) < 0) {

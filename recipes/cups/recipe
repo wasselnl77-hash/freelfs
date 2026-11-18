@@ -1,6 +1,6 @@
 pkgname=cups
 version=2.4.20
-release=3
+release=4
 summary="CUPS print server for driverless (IPP Everywhere) printers, started on demand"
 url=https://openprinting.github.io/cups/
 license=(Apache-2.0)

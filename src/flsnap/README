@@ -45,7 +45,8 @@ Privilege: flsnap is installed setuid root for the group seat (recipe owner=, li
 fltime-set), so Settings can run it. When it runs with more rights than its caller it
 clears the environment, uses compiled-in paths and reads no file the caller names.
 Arguments are validated: snapshot numbers are plain integers, reasons are cut to one
-printable line.
+printable line. rollback and rm/delete ask for the password every time (flauth classes snap-rollback and
+snap-delete are one-shot); prune is root-only; a person's create never prunes.
 
 Tests: `make check` runs tests/test-flsnap.sh on a mock backend (FLSNAP_MOCK=DIR:
 directories instead of subvolumes; FLSNAP_FLPKG a stand-in for flpkg list; both

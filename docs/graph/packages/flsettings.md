@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 14. FreeLFS settings: theme, accent colour, wallpaper, sounds, panel labels, display, mouse and touchpad, keyboard, date and time, Wi-Fi
+Version 0.1, release 15. FreeLFS settings: theme, accent colour, wallpaper, sounds, panel labels, display, mouse and touchpad, keyboard, date and time, Wi-Fi
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

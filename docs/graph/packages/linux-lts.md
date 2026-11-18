@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 6.18.63, release 4. The Linux 6.18 LTS kernel and its modules (fallback next to the newest kernel)
+Version 6.18.63, release 5. The Linux 6.18 LTS kernel and its modules (fallback next to the newest kernel)
 
 - License: GPL-2.0-only; URL: https://www.kernel.org/
 - Groups: [[docs/graph/groups/lts|lts]]

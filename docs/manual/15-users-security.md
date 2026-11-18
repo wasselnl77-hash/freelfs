@@ -18,6 +18,7 @@ Status: round 17 (2026-11-14). Everything here was tested in QEMU and headless. 
 10. [Secure Boot](#1510-secure-boot)
 11. [Development and install defaults](#1511-development-and-install-defaults)
 12. [Known issues](#1512-known-issues)
+13. [Root, where it may log in, kernel hardening and the firewall](#1513-root-where-it-may-log-in-kernel-hardening-and-the-firewall)
 
 ## 15.1 Accounts and groups
 
@@ -44,7 +45,7 @@ A new account gets the default group `users` (999), the groups `seat,audio,video
 2. `flgreet-ui` (root, inside that compositor) draws the screen: the accounts, a password field, **Log in**, and **Shut down** (a second click within 4 seconds confirms).
 3. flgreet accepts only a name that is in `/etc/passwd` with a UID from **1000 to 59999**. It creates `/run/user/UID` (mode 0700, owned by the user) and runs `login -f NAME`.
 4. The password is checked with `crypt_r` against `/etc/shadow`:
-   - an empty hash logs in without a password;
+   - an empty hash logs in without a password **only for `tester` while `/run/live` exists** (the live session); on any other account or system it is refused ("This account has no password and cannot log in");
    - a hash that starts with `!` or `*` is locked, and that account cannot log in;
    - a wrong password waits one second before the next try.
 5. The password is never printed or logged, and its buffer is wiped after use.
@@ -55,50 +56,68 @@ Programs cannot be started from the login screen: flcomp runs with `--firstboot`
 
 ## 15.3 The password prompt: flauth
 
-`flauth` (`src/flauth`, recipe 0.1 r1) asks the person for their password before a root action. It is setuid root, group `seat` (`4750`), and does not use PAM. The password is checked against `/etc/shadow` with `crypt()`, and the dialog (`flauth-dialog`) runs as the person, never as root.
+`flauth` (`src/flauth`, recipe 0.1 r1) asks the person for their password before a root action. It is setuid root, group `seat` (`4750`), and does not use PAM. The password is checked against `/etc/shadow` with `crypt()`, and the dialog (`flauth-dialog`) runs as the person, never as root. The policy is the same in every helper: the code is `src/flauth/flauth-check.h` (copied into each component that needs it). The policy as a whole is in `docs/SECURITY.md`, section 5.
 
 | Rule | Value |
 |---|---|
 | Wrong passwords in a row | three; then the account is locked out of flauth for **30 s**, then 60 s, and so on up to **10 minutes** |
 | Each wrong password | costs one extra second |
-| Stamp after success | `/run/flauth/ok-UID`, valid **5 minutes** |
-| Account with an empty password (the live `tester`) | no dialog |
-| Exit codes | 0 right (or the command ran), 1 wrong three times, 2 cancelled, 3 locked out or broken, 4 no password can unlock the account |
+| Stamp after success | `/run/flauth/ok-UID.CLASS`, valid **2 minutes**, for that one class and for the program that asked (its executable, resolved through `/proc`) |
+| Stamp of a destructive class | one-shot: the first check that passes uses it up |
+| Empty password | refused on every system (`set a password first`), except the live session's `tester` on the live system (`/run/live` present): no dialog, no stamp needed |
+| Exit codes | 0 right (or the command ran), 1 wrong password, 2 cancelled, 3 locked out, broken or misused, 4 no password can unlock the account, or none is set |
 
-Which helpers ask for the password (grep of the sources):
+The classes (`flauth --class`):
 
-| Program | Asks for the password | Action gated |
+| Class | Used for | Stamp |
 |---|---|---|
-| `flpkg-seat install` and `remove` | yes | install and remove packages |
-| `flsnap rollback`, `delete`, `rm`, `prune` | yes | make a snapshot current, delete snapshots |
-| `flsnap create`, `list`, `show`, `status` | no | |
-| `flpower off`, `restart`, `logout`, `saver` | **no** | group `seat` only |
-| `flmount` | **no** | group `seat` only |
-| `fltime-set` | **no** | group `seat` only |
-| `fllock-check` | (the lock screen asks for the password itself) | |
-| `flinstall-helper` | **no** | group `seat`, and the installer's own checks (see 15.4) |
+| `pkg` | `flpkg-seat` install, remove, upgrade | reused for 2 minutes by the same program (several changes from the Store need one password) |
+| `time` | `fltime-set`, every command | reused for 2 minutes |
+| `splash` | `flsplash-set` | reused for 2 minutes |
+| `mount-internal` | `flmount` on an internal disk (only with `--internal`) | reused for 2 minutes |
+| `disk-write` | `flinstall-helper`, the install itself | one-shot |
+| `persist-create` | `flpersist create` | one-shot |
+| `snap-rollback` | `flsnap rollback` | one-shot |
+| `snap-delete` | `flsnap delete`, `rm`, `prune` | one-shot |
 
-The flauth test hooks (`FLAUTH_SHADOW`, `FLAUTH_DIR`, `FLAUTH_DIALOG`) are ignored by the setuid copy.
+The flauth test hooks (`FLAUTH_SHADOW`, `FLAUTH_DIR`, `FLAUTH_DIALOG`, `FLAUTH_LIVE`, `FLAUTH_USER`) are ignored by the setuid copy. `make -C src/flauth check` runs the policy tests without root.
 
 ## 15.4 Setuid helpers and what each allows
 
-The setuid helpers are programs whose effective user is root. The recipes set their owner and mode (`owner=` in each `recipe`). Each one checks its own input. All but two are `root:seat 4750`: only members of group `seat` can run them at all.
+The setuid helpers are programs whose effective user is root. The recipes set their owner and mode (`owner=` in each `recipe`). Each one checks its own input. All are `root:seat 4750`: only members of group `seat` can run them at all.
+
+Who may do what, and whether it needs the person's password (policy in `docs/SECURITY.md`, section 5):
+
+| Action | Helper | Password |
+|---|---|---|
+| Mount, unmount, eject a removable drive; the live boot stick is mounted without a prompt | `flmount` | **no** |
+| Mount, unmount, eject an internal disk (`--internal`) | `flmount` | **every time**, class `mount-internal` |
+| Power off, restart, log out, power saving | `flpower` | **no** |
+| Check the lock screen's password | `fllock-check` | **no** (it checks the person's own password, one try a second) |
+| Install and remove packages, update all (system) | `flpkg-seat` | **every time** (class `pkg`, reused for 2 minutes) |
+| Write a disk: the installer's install step | `flinstall-helper` | **every time**, one-shot; only when started by `/usr/bin/flinstall` |
+| Create the live session's persistent home file | `flpersist create` | **every time**, one-shot |
+| Make a snapshot current again (rollback) | `flsnap rollback` | **every time**, one-shot |
+| Delete snapshots (`delete`, `rm`, `prune`) | `flsnap` | **every time**, one-shot |
+| Take a snapshot (`create`), list, show, status | `flsnap` | **no**; a person's `create` never removes old snapshots |
+| Date, time zone, automatic time | `fltime-set` | **every time** (class `time`, reused for 2 minutes) |
+| Boot screen style | `flsplash-set` | **every time** (class `splash`, reused for 2 minutes) |
 
 | Program | Recipe | Owner and mode | What it allows | What it refuses |
 |---|---|---|---|---|
 | `/usr/bin/flpower` | `flpanel` | `root:seat 4750` | `off`, `restart`, `logout` (own session only), `saver on`, `saver off` | any other word; the power saving writes only two fixed sysfs files per CPU with values from a fixed list (`src/flpanel/flpower.c`) |
-| `/usr/bin/flpkg-seat` | `flpackages` | `root:seat 4750` | `install NAME...`, `remove NAME...`, after the password (flauth) | file names, options and any name that starts with `-` or ends in `.flpkg`; the environment is cleared |
-| `/usr/bin/fltime-set` | `fltime` | `root:seat 4750` | `zone NAME` (a real zoneinfo file only), `ntp on\|off`, `sync`, `time EPOCH` (only while NTP is off) | any path outside zoneinfo; exit 3 and 4 on refusals |
+| `/usr/bin/flpkg-seat` | `flpackages` | `root:seat 4750` | `install NAME...`, `remove NAME...`, `upgrade`, after the password (class `pkg`) | file names, options and any name that starts with `-` or ends in `.flpkg`; the environment is cleared |
+| `/usr/bin/fltime-set` | `fltime` | `root:seat 4750` | `zone NAME` (a real zoneinfo file only), `ntp on\|off`, `sync`, `time EPOCH` (only while NTP is off), after the password (class `time`) | any path outside zoneinfo; a bad zone name is refused before the question; exit 3 and 4 on refusals |
 | `/usr/libexec/fllock-check` | `fllock` | `root:seat 4750` | reads one password line from stdin and tells the lock screen whether it is right for the person who started it | everything else. Exit 0 right, 1 wrong, 2 no password can unlock the account |
-| `/usr/bin/flsnap` | `flsnap` | `root:seat 4750` | `create`, `list`, `show`, `status`; `rollback`, `delete`, `prune` after the password | any other argument; the environment is discarded when it runs with more rights than the caller |
-| `/usr/bin/flauth` | `flauth` | `root:seat 4750` | the password prompt, then the command given after `--` | a command runs as the person, not as root |
-| `/usr/bin/flmount` | `flmount` | `root:seat 4750` | `list`, `mount DEV`, `unmount DEV`, `eject DEV` for `/dev/NAME` that the kernel lists under `/sys/class/block` (mounts at `/drives/LABEL`, `nosuid,nodev,noexec`) and, for root only, `--hotplug`, `--auto`, `--gone` | any path that the caller names; internal disks unless `--internal` |
-| `/usr/bin/flpersist` | `flmount` | `root:seat 4750` | `create SIZE [--btrfs]` (makes `freelfs-persist.img` on the live stick) and `status` | any other path |
-| `/usr/libexec/flinstall-helper` | `flinstall` | `root:seat 4750` | the installer's steps, only on the live system, only a whole disk that the kernel lists as not the live medium, not read-only and not mounted; the test hooks are refused when the caller is less privileged than the program | everything else. **No password is asked** (see the note below) |
+| `/usr/bin/flsnap` | `flsnap` | `root:seat 4750` | `create`, `list`, `show`, `status` (no password); `rollback`, `delete`, `rm`, `prune` after the password (one-shot) | any other argument; the environment and descriptors are discarded when it runs with more rights than the caller; an elevated `create` does not prune |
+| `/usr/bin/flauth` | `flauth` | `root:seat 4750` | the password prompt, then the command given after `--`; `--class` is required | a command runs as the person, not as root; an empty password other than the live tester |
+| `/usr/bin/flmount` | `flmount` | `root:seat 4750` | `list`, `mount DEV`, `unmount DEV`, `eject DEV` for `/dev/NAME` that the kernel lists under `/sys/class/block` (mounts at `/drives/LABEL`, `nosuid,nodev,noexec`); internal disks only with `--internal` and the password; for root only, `--hotplug`, `--auto`, `--gone` | any path that the caller names |
+| `/usr/bin/flpersist` | `flmount` | `root:seat 4750` | `create SIZE [--btrfs]` (after the password, one-shot; makes `freelfs-persist.img` on the live stick) and `status` | any other path |
+| `/usr/libexec/flinstall-helper` | `flinstall` | `root:seat 4750` | the installer's steps, only on the live system, only a whole disk that the kernel lists as not the live medium, not read-only and not mounted; the disk write needs the password (one-shot) and a parent process that is `/usr/bin/flinstall` | anything else; a start by any other program; the test hooks, when the caller is less privileged than the program |
 | `/usr/libexec/dbus-daemon-launch-helper` | `dbus` | `root:messagebus 4750` | starts D-Bus services for the system bus | - |
 | `/usr/bin/fusermount3` | `fuse3` | `root:root 4755` | FUSE mounts for any user (the standard FUSE helper) | - |
 
-**Note on the installer helper:** `flinstall-helper` runs its disk work without a password. Its protection is group `seat`, the live-system check (its source is `/run/live/rom`, a squashfs, and `/` must be an overlay) and the checks on the disk list (`src/flinstall/helper.c`). On the live system every person at the machine is in `seat`, and the live `tester` has no password, so anyone at the machine can run it. This is a decision, not a bug, but it should be kept in mind. The helper's own header says a real installation needs euid 0 and the live medium; the behaviour on an installed system was not run here.
+**Note on `flinstall-helper`:** the disk write needs the person's password (class `disk-write`, one-shot) like the other destructive actions. The live `tester` has an empty password, so on the live system the install needs no question, as before; the live-only rule means an installed system never takes that path. The installer's window answers a refused install with `NEEDAUTH disk-write` and runs flauth. The helper must also be started by `/usr/bin/flinstall`. The live tester can therefore install without a prompt, and any other program on the live system needs the password for that step.
 
 **Note on `flpower`:** a member of `seat` can power the machine off without a password (`flpower off`), by design: the panel's power menu needs no prompt.
 
@@ -176,20 +195,40 @@ Secure Boot verifies only PE images. The initrd and the command line that flboot
 
 | Where | Root password | Other accounts | Source |
 |---|---|---|---|
-| Development image (the build's target root, `build/60-packages.sh` setup step) | **none**: `passwd -d root`, and `/etc/issue` says "Development image: log in as root, there is no password." | none | `build/60-packages.sh` |
-| Live ISO and USB image | not verified here. The image is built from the same tree; check before publishing | `tester`, no password, group `seat` | `build/53-iso.sh`, `build/52-usb.sh` |
-| Installed system (`flinstall`) | **same password as the first user** (decision: `FI_ROOT_SAME_PASSWORD 1` in `src/flinstall/common.h`; set it to 0 to lock root) | the first user, with groups `seat,audio,video,render` | `src/flinstall/common.h`, `docs/INTEGRATION-TODO.md` |
+| Live ISO, USB image and the released images | **locked** (`!`): nobody logs in as root, on no terminal. The build refuses an image whose root hash is empty | `tester`, **empty password only while `/run/live` exists** (the live session), group `seat` | `build/53-iso.sh`, `build/lib.sh` (`check_root_locked`) |
+| Development / test image (built with `FLFS_DEV_ROOT=1`) | **none** (empty), `ttyS0` allowed in `/etc/securetty`, `/etc/issue` says "Development image: log in as root, there is no password." | `tester` as above | `build/root-lock.sh --dev`, `build/53-iso.sh` |
+| Installed system (`flinstall`) | **your choice in the account step**: the same password as the first user (default), or its own password. Never empty | the first user, with groups `seat,wheel,audio,video,render` | `src/flinstall/` |
 
-A password is at least 4 characters in the installer (`FI_PW_MIN`), up to 128 (`FI_PW_MAX`).
+A password is at least **8** characters in the installer (`FI_PW_MIN`), up to 128 (`FI_PW_MAX`). The installer asks it twice; root's own password, when chosen, twice as well.
 
 ## 15.12 Known issues
 
 | Issue | Status |
 |---|---|
 | Secure Boot not implemented | by design for now; keep it off |
-| The installer's helper does not ask for a password (protected by group `seat` and the live-system checks) | a decision to revisit; not verified against a hostile live user |
-| Passwordless development image root and live `tester` | by design for those images; they must not be installed as they are |
+| The stamp of `pkg`, `time`, `splash`, `mount-internal` is reused for 2 minutes by the same program, so a hostile program that runs as the person and uses that program's executable can reuse it (destructive classes are one-shot) | by design (policy in SECURITY.md section 5); not verified against a hostile local user |
+| The live `tester` has an empty password: on the live system any seat member can install without a question (only through `/usr/bin/flinstall`) | by design for the live session; the installed system refuses empty passwords, and root is locked on the live ISO |
+| No login rate limit beyond three tries per `login` run | open (section 15.13) |
+| Module signing, KEXEC and io_uring removal from the kernel | planned (the sysctls switch kexec and io_uring off) |
+| Development images have an empty root password (`FLFS_DEV_ROOT=1`) | by design for test images only; the release build refuses them |
 | Browser sandbox: not run on the laptop or a real GPU | open |
 | Vulnerability counts are from 2026-11-12 | re-check before each publication (`build/cve-check.py`) |
 | flauth lock-out timing and the stamp on a shared machine | tested in QEMU; not on hardware |
 | Repo index re-signing every 10 days once the repo is hosted | open (see [13](13-packages-flpkg.md)) |
+
+## 15.13 Root, where it may log in, kernel hardening and the firewall
+
+Details and the reasons are in `docs/SECURITY.md` section 6. In short:
+
+- **Root.** The live ISO has root **locked**. On the live system you are `tester` (empty password, only while `/run/live` exists); administrator
+  actions go through the password dialog (flauth) or are not asked on the live system for `tester`. On an installed system root has the first user's password or its own, as chosen
+  in the installer (account step, "Use the same password for the administrator (root)").
+- **Where root may log in.** `/etc/securetty` lists tty1 to tty6: no root login over the serial port. `su` works for group `wheel` only.
+- **Setuid files.** `ping`, `ping6`, `mount`, `umount`, `newuidmap` and `newgidmap` are no longer setuid; `traceroute` is setuid for group `seat` only. SECURITY.md section 6.5 lists every remaining
+  setuid and setgid file and why it stays.
+- **Kernel.** `/etc/sysctl.d/10-freelfs-hardening.conf` is applied at boot: restricted kernel pointers and `dmesg`, no unprivileged BPF, Yama ptrace scope 1, protected links and files,
+  no kexec, no io_uring, network hardening. User namespaces stay on for Flatpak and bubblewrap. `/proc/config.gz` shows the kernel configuration (Yama, lockdown available but off,
+  hardened usercopy, zeroed allocations, fortify, `BPF_UNPRIV_DEFAULT_OFF`).
+- **Firewall.** `nft` and `/etc/nftables.conf`, started first by the rc service `firewall`: inbound traffic is dropped unless it answers something this computer started
+  (loopback, ICMP essentials and DHCP replies are allowed; mDNS only while avahi runs). Outbound traffic is not filtered. Open a port by adding a line to the `input` chain.
+- **Packages.** Only the FreeLFS repo key is trusted in release images.

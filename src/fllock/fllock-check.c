@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	if (!pw)
 		return 3;
 	char name[64];
-	snprintf(name, sizeof name, "%s", pw->pw_name);
+	snprintf(name, sizeof name, "%s", geteuid() != 0 && getenv("FLLOCK_USER") ? getenv("FLLOCK_USER") : pw->pw_name);
 
 	/* the password: one line from stdin, read before any lock is taken */
 	char buf[MAXPW];
@@ -111,7 +111,10 @@ int main(int argc, char **argv)
 	} else if (sp->sp_expire >= 0 && (long)(time(NULL) / 86400) > sp->sp_expire) {
 		rc = 2;
 	} else if (sp->sp_pwdp[0] == 0) {
-		rc = 0; /* an empty password: Enter unlocks, as the login screen lets you in */
+		/* an empty password: Enter unlocks, as the login screen lets you in, but only for the live session's
+		 * tester on the live system (/run/live; tests may name another marker when not setuid) */
+		const char *live = geteuid() != 0 && getenv("FLLOCK_LIVE") ? getenv("FLLOCK_LIVE") : "/run/live";
+		rc = !strcmp(name, "tester") && access(live, F_OK) == 0 ? 0 : 2;
 	} else if (sp->sp_pwdp[0] == '!' || sp->sp_pwdp[0] == '*') {
 		rc = 2;
 	} else {

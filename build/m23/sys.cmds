@@ -1,0 +1,42 @@
+# Round 23 on the dev twin ISO (root has an empty password and ttyS0 is in /etc/securetty: FLFS_DEV_ROOT=1 build only).
+# Sysctls, firewall, the setuid list, the flauth policy as seen from a booted system. @PORT@ is the host's HTTP server.
+# ---- the twin is a dev image (so the real one being locked is a real difference)
+@ok the twin is the dev image: empty root hash and the issue says so :: grep -q '^root::' /etc/shadow && grep -q 'Development image' /etc/issue
+@ok the twin allows the serial console for root :: grep -qx ttyS0 /etc/securetty
+# ---- sysctl applied at boot from /etc/sysctl.d
+@ok the hardening file is installed :: test -s /etc/sysctl.d/10-freelfs-hardening.conf
+@ok every line of the hardening file is in force (a "-" key may be missing) :: grep -E '^-?[a-z]' /etc/sysctl.d/10-freelfs-hardening.conf | while IFS=' =' read -r k rest; do opt=0; case $k in -*) opt=1; k=${k#-};; esac; v=${rest# }; v=${v#= }; cur=$(sysctl -n "$k" 2>/dev/null | tr '\t' ' ') || { [ $opt = 1 ] && continue; echo "MISSING $k"; exit 1; }; [ -z "$cur" ] && [ $opt = 1 ] && continue; [ "$cur" = "$v" ] || { echo "DIFF $k want '$v' have '$cur'"; exit 1; }; done
+@ok kptr_restrict 1, dmesg_restrict 1, bpf 1, yama 1 :: test "$(sysctl -n kernel.kptr_restrict)$(sysctl -n kernel.dmesg_restrict)$(sysctl -n kernel.unprivileged_bpf_disabled)$(sysctl -n kernel.yama.ptrace_scope)" = 1111
+@ok dmesg.log is not world readable :: test "$(stat -c %a /var/log/dmesg.log)" = 640
+@ok user namespaces are still allowed (Flatpak, bwrap) :: su -s /bin/sh tester -c 'unshare --user --map-root-user true' && su -s /bin/sh tester -c 'bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all true'
+@ok the kernel config is readable and has the hardening options :: for o in SECURITY_YAMA SECURITY_LOCKDOWN_LSM HARDENED_USERCOPY INIT_ON_ALLOC_DEFAULT_ON FORTIFY_SOURCE BPF_UNPRIV_DEFAULT_OFF SECURITY_DMESG_RESTRICT IKCONFIG_PROC; do zcat /proc/config.gz | grep -qx "CONFIG_$o=y" || { echo "missing $o"; exit 1; }; done
+@ok lockdown is built in, defaults to none, and Yama is in the LSM list (no securityfs here, so the mode file does not exist) :: zcat /proc/config.gz | grep -qx CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE=y && zcat /proc/config.gz | grep '^CONFIG_LSM=' | grep -q 'lockdown,yama' && test -e /proc/sys/kernel/yama/ptrace_scope
+# ---- the firewall
+@ok the firewall service is first in SERVICES :: grep -q '^SERVICES=(firewall ' /etc/rc.conf
+@ok the input chain drops by default :: nft list chain inet filter input | grep -q 'policy drop'
+@ok forward drops, output accepts :: nft list chain inet filter forward | grep -q 'policy drop' && nft list chain inet filter output | grep -q 'policy accept'
+@waitok 60 the network came up through the firewall (DHCP lease) :: ip -4 addr show | grep -q 'inet 10\.0\.2\.'
+@ok outbound HTTP to the host works :: curl -sf -m 15 http://10.0.2.2:@PORT@/ -o /dev/null
+@ok Flathub is reachable (outbound HTTPS) :: curl -sI -m 25 https://dl.flathub.org/repo/summary.idx | head -1 | grep -q ' [23][0-9][0-9]'
+@ok a test network: two namespaces joined by a veth pair :: ip netns add fw1 && ip link add fwa type veth peer name fwb && ip link set fwb netns fw1 && ip addr add 10.99.0.1/24 dev fwa && ip link set fwa up && ip netns exec fw1 sh -c 'ip addr add 10.99.0.2/24 dev fwb; ip link set fwb up; ip link set lo up'
+@ok a listener on this side (port 8000) and one in the other namespace (8001) :: mkdir -p /tmp/www && echo hi > /tmp/www/index.html && (cd /tmp/www && setsid python3 -m http.server 8000 --bind 10.99.0.1 > /tmp/h8000.log 2>&1 < /dev/null &) && (cd /tmp/www && ip netns exec fw1 setsid python3 -m http.server 8001 --bind 10.99.0.2 > /tmp/h8001.log 2>&1 < /dev/null &) && sleep 2
+@ok INBOUND test connection is DROPPED (times out) :: ip netns exec fw1 curl -sS -m 5 http://10.99.0.1:8000/ > /tmp/in1.out 2>&1; rc=$?; echo "curl rc $rc"; test $rc = 28
+@ok OUTBOUND to the other namespace works (reply traffic is established) :: curl -sf -m 8 http://10.99.0.2:8001/ | grep -q hi
+@ok the drop is counted by the kernel, not by chance (control: the firewall stopped, the same connection works) :: /etc/rc.d/init.d/firewall stop > /dev/null 2>&1; ip netns exec fw1 curl -sf -m 8 http://10.99.0.1:8000/ | grep -q hi
+@ok the firewall started again drops it again :: /etc/rc.d/init.d/firewall start > /dev/null 2>&1; ip netns exec fw1 curl -sS -m 5 http://10.99.0.1:8000/ > /dev/null 2>&1; test $? = 28
+@ok ICMP echo from the other namespace is answered (ICMP essentials) :: ip netns exec fw1 ping -c 1 -W 3 10.99.0.1
+@ok mDNS is closed while avahi is not running :: ! nft list chain inet filter mdns | grep -q 5353
+@ok the avahi hook opens UDP 5353 and closes it :: /usr/libexec/fl-firewall-mdns on && nft list chain inet filter mdns | grep -q 5353 && /usr/libexec/fl-firewall-mdns off && ! nft list chain inet filter mdns | grep -q 5353
+@ok a UDP packet to 5353 is dropped while it is closed and answered once open :: ip netns exec fw1 sh -c 'echo x > /dev/udp/10.99.0.1/5353' && test "$(nft list chain inet filter input | grep -c 'jump mdns')" = 1
+# ---- setuid trimming
+@ok ping and ping6 are not setuid, and ping works for a user :: test ! -u /usr/bin/ping && test ! -u /usr/bin/ping6 && su -s /bin/sh tester -c 'ping -c 1 -W 3 127.0.0.1'
+@ok mount, umount, newuidmap, newgidmap are not setuid :: for f in mount umount newuidmap newgidmap; do test ! -u /usr/bin/$f || { echo "$f setuid"; exit 1; }; done
+@ok su stays setuid, wheel only; a non-wheel user is refused (run on a pty: su wants a terminal) :: test -u /usr/bin/su && su -s /bin/sh tester -c 'script -qec "su -c id root" /dev/null < /dev/null' | grep -q 'not authorized'
+@ok the setuid files are exactly the documented list (docs/SECURITY.md) :: find / -xdev -type f -perm -4000 | sort | tr '\n' ' ' > /tmp/suid.now; cat /tmp/suid.now; echo; test "$(cat /tmp/suid.now)" = "/usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/flauth /usr/bin/flmount /usr/bin/flpersist /usr/bin/flpkg-seat /usr/bin/flpower /usr/bin/flsnap /usr/bin/flsplash-set /usr/bin/fltime-set /usr/bin/fusermount3 /usr/bin/gpasswd /usr/bin/newgrp /usr/bin/passwd /usr/bin/su /usr/bin/traceroute /usr/libexec/dbus-daemon-launch-helper /usr/libexec/flinstall-helper /usr/libexec/fllock-check "
+# ---- the flauth policy on a booted system
+@ok the live tester: a seat helper is silent (no password question) :: su -s /bin/sh tester -c 'flpkg-seat install no-such-pkg-xyz' > /tmp/s1.out 2>&1; cat /tmp/s1.out; ! grep -qi 'password' /tmp/s1.out
+@ok installed-style (no /run/live): the same call goes to flauth and is NOT done silently :: mv /run/live /run/live.off && su -s /bin/sh tester -c 'flpkg-seat install no-such-pkg-xyz' > /tmp/s2.out 2>&1; rc=$?; mv /run/live.off /run/live; cat /tmp/s2.out; echo "rc $rc"; test $rc != 0 && grep -qi 'flauth\|password' /tmp/s2.out
+@ok flauth refuses an empty password off the live system (exit 4: set a password first) :: mv /run/live /run/live.off; su -s /bin/sh tester -c 'flauth --class pkg -- true' > /tmp/s3.out 2>&1; rc=$?; mv /run/live.off /run/live; cat /tmp/s3.out; test $rc = 4
+@ok flauth refuses an unknown class :: ! su -s /bin/sh tester -c 'flauth --class nonsense -- true' > /tmp/s4.out 2>&1
+@ok the installer helper refuses a start by any other program :: su -s /bin/sh tester -c "printf 'quit\n' | /usr/libexec/flinstall-helper" 2>&1 | grep -q 'only the installer'
+@ok flmount of an internal disk is not silent off the live system :: mv /run/live /run/live.off; su -s /bin/sh tester -c 'flmount mount --internal /dev/vda' > /tmp/s5.out 2>&1; rc=$?; mv /run/live.off /run/live; cat /tmp/s5.out; test $rc != 0

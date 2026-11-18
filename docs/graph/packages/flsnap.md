@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 3. Btrfs snapshots of the system before updates, and going back to one
+Version 0.1, release 4. Btrfs snapshots of the system before updates, and going back to one
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/base|base]]

@@ -46,6 +46,10 @@ if [ -z "${FLFS_IN_CHROOT:-}" ]; then
 	[ -x "$FLFS_IMAGE_ROOT/usr/bin/bash" ] || die "no system in $FLFS_IMAGE_ROOT (run ./build/60-packages.sh)"
 	mkdir -p "$FLFS_BOOTSTRAP/live"
 	printf '%s\n' "$extra" > "$FLFS_BOOTSTRAP/live/cmdline.extra"
+	# round 23: release ISOs have root locked and refuse a root with an empty hash. FLFS_DEV_ROOT=1 builds a
+	# test ISO (the serial-console tests log in as root); its issue says so
+	check_root_locked "$FLFS_IMAGE_ROOT/etc/shadow"
+	printf '%s\n' "${FLFS_DEV_ROOT:-0}" > "$FLFS_BOOTSTRAP/live/dev-root"
 	"$FLFS_TOP/build/chroot.sh" /bin/bash --noprofile --norc \
 		/.bootstrap/freelfs/build/53-iso.sh --in-chroot --level "$level"
 	mv -f "$FLFS_BOOTSTRAP/live/freelfs-live.iso" "$FLFS_WORK/freelfs-live.iso"
@@ -93,6 +97,7 @@ mkdir -p "$W"/{iso/live,iso/EFI/BOOT,stage,up,wk}
 squash_step() {
 	unshare --mount --propagation unchanged /bin/bash -euo pipefail -c '
 		root=$1 w=$2 level=$3 jobs=$4
+		devroot=$(cat "$w/dev-root" 2>/dev/null || echo 0)
 		mount -t overlay overlay \
 			-o "lowerdir=$root,upperdir=$w/up,workdir=$w/wk" "$w/stage"
 		settings=$(readlink -f "$w/stage/etc") data=$(readlink -f "$w/stage/var")
@@ -104,6 +109,25 @@ squash_step() {
 		[ -n "$grp" ] || { echo "no group users" >&2; exit 1; }
 		echo "tester:x:1000:$grp:Tester:/home/tester:/usr/bin/flsh" >> "$settings/passwd"
 		echo "tester::20454:0:99999:7:::" >> "$settings/shadow"
+		# round 23: the root account. Release: locked ("!"), bootstrap.pub dropped (only the repo key is trusted).
+		# Dev (FLFS_DEV_ROOT=1): empty, for the serial-console test harnesses. The build FAILS on an empty root
+		# hash unless it is the dev build, whatever the root underneath said.
+		if [ "$devroot" = 1 ]; then
+			sed -i "s/^root:[^:]*:/root::/" "$settings/shadow"
+			grep -qx ttyS0 "$settings/securetty" || echo ttyS0 >> "$settings/securetty" # the serial harness logs in as root
+			grep -q "^Development image" "$settings/issue" ||
+				sed -i "/^FreeLFS/a Development image: log in as root, there is no password." "$settings/issue"
+		else
+			sed -i "s/^root:[^:]*:/root:!:/" "$settings/shadow"
+			sed -i "/^ttyS/d;/^console/d" "$settings/securetty" # no root login over a serial port
+			sed -i "/^Development image:/d" "$settings/issue"
+			rm -f "$settings/flpkg/keys/bootstrap.pub"
+		fi
+		rh=$(awk -F: "\$1 == \"root\" {print \$2}" "$settings/shadow")
+		if [ "$devroot" != 1 ] && { [ -z "$rh" ] || [ "${rh#[!*]}" = "$rh" ]; }; then
+			echo "release ISO: root is not locked (hash \"$rh\")" >&2; exit 1
+		fi
+		[ "$devroot" = 1 ] || ! grep -q "^root::" "$settings/shadow" || { echo "release ISO: root has an empty hash" >&2; exit 1; }
 		python3 -I - "$settings/group" "$settings/gshadow" <<-"PY"
 		import sys
 		for path in sys.argv[1:]:

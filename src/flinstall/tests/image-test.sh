@@ -102,7 +102,7 @@ request() { # image, helper args; MODE, OPS, USERNAME, NOINSTALL from the enviro
 	local image=$1; shift
 	{
 		printf '%s\n' "set mode ${MODE:-whole}" "set disk $image" "set user ${USERNAME-anna}" "set fullname Anna Test" \
-			"set password secret1" "set lang de_DE.UTF-8" "set keyboard de" "set tz Europe/Berlin"
+			"set password ${PASSWORD-secret123}" "set rootmode $([ -n "${ROOTPW:-}" ] && echo own || echo same)" "set rootpassword ${ROOTPW-}" "set lang de_DE.UTF-8" "set keyboard de" "set tz Europe/Berlin"
 		[ -z "${OPS:-}" ] || printf '%s\n' "$OPS"
 		echo check
 		[ "${NOINSTALL:-0}" = 1 ] || echo install
@@ -133,7 +133,7 @@ extract_subvol "$img" 513 7679 "$scratch/out-root" 258
 S=$scratch/out-root/etc
 check "user anna in passwd, uid 1000"       grep -q '^anna:x:1000:999:Anna Test:/home/anna:' "$S/passwd"
 check "live user tester removed everywhere"  bash -c "! grep -q tester '$S/passwd' '$S/shadow' '$S/group' '$S/gshadow'"
-check "password stored as a sha512 hash"     bash -c "grep '^anna:' '$S/shadow' | grep -q '^anna:[$]6[$]' && ! grep -q secret1 '$S/shadow'"
+check "password stored as a sha512 hash"     bash -c "grep '^anna:' '$S/shadow' | grep -q '^anna:[$]6[$]' && ! grep -q secret123 '$S/shadow'"
 check "root has the same password as anna"   bash -c "[ \"\$(grep ^root: '$S/shadow' | cut -d: -f2)\" = \"\$(grep ^anna: '$S/shadow' | cut -d: -f2)\" ]"
 check "anna in seat and wheel"               bash -c "grep -q '^seat:.*anna' '$S/group' && grep -q '^wheel:.*anna' '$S/group'"
 check "keyboard.conf has LAYOUT=de"          grep -qx 'LAYOUT=de' "$S/keyboard.conf"
@@ -168,6 +168,21 @@ r=$(USERNAME=tester9 NOINSTALL=1 MODE=whole request "$img" --dry-run 2>&1 | grep
 [ -z "$r" ] && ok "a fine name is accepted" || bad "tester9 refused: $r"
 r=$(printf "check\n" | "$helper" --image /dev/null --dry-run 2>&1 | head -1 || true)
 case $r in *"regular file"*) ok "--image refuses a device: $r" ;; *) bad "--image /dev/null: $r" ;; esac
+
+echo "-- password rules and a separate root password"
+r=$(PASSWORD=short12 NOINSTALL=1 MODE=whole request "$img" --dry-run 2>&1 | grep '^ERR' | tail -1 || true)
+[ -n "$r" ] && ok "a 7-character password is refused: ${r#ERR	}" || bad "a 7-character password was accepted"
+r=$(ROOTPW=short12 NOINSTALL=1 MODE=whole request "$img" --dry-run 2>&1 | grep '^ERR' | tail -1 || true)
+[ -n "$r" ] && ok "a 7-character root password is refused: ${r#ERR	}" || bad "a short root password was accepted"
+img2=$scratch/disk2.img
+rm -f "$img2"; truncate -s 8G "$img2"
+ROOTPW=rootpass99 MODE=whole request "$img2" > "$scratch/run2.txt" 2>&1 || true
+grep -q '^DONE' "$scratch/run2.txt" && ok "install with a separate root password reported DONE" || bad "install with a separate root password did not finish"
+extract_subvol "$img2" 513 7679 "$scratch/out-root2" 258
+S=$scratch/out-root2/etc
+check "root has its own sha512 hash"         bash -c "grep '^root:' '$S/shadow' | grep -q '^root:[$]6[$]' && ! grep -q rootpass99 '$S/shadow'"
+check "root hash differs from anna's"        bash -c "[ \"\$(grep ^root: '$S/shadow' | cut -d: -f2)\" != \"\$(grep ^anna: '$S/shadow' | cut -d: -f2)\" ]"
+rm -f "$img2"
 
 # ---- 3: next to existing partitions (free space only) ----------------------------------------------------
 echo "== 3. install next to existing partitions"

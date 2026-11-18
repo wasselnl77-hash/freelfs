@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 5. Mount, unmount and eject USB drives; automount on plug-in; live persistence
+Version 0.1, release 6. Mount, unmount and eject USB drives; automount on plug-in; live persistence
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/desktop|desktop]]

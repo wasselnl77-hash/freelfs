@@ -5,11 +5,11 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flmount|flmount]] -- 167 lines
+Component: [[docs/graph/components/flmount|flmount]] -- 179 lines
 
 ## Includes
 
-- none in the repo
+- [[docs/graph/files/flmount/flauth-check.h|src/flmount/flauth-check.h]]
 - 13 system or external headers (not linked)
 
 ## Functions (best effort)

@@ -148,8 +148,11 @@ static int helper(const char *a1, const char *a2, char *err, size_t cap)
 	case 0: return 0;
 	case 126: snprintf(err, cap, "Needs administrator rights: the account has to be in the group seat."); break;
 	case 127: snprintf(err, cap, "The helper fltime-set is not installed."); break;
-	case 4: snprintf(err, cap, "Turn off automatic time first."); break;
-	case 3: snprintf(err, cap, "That was not accepted."); break;
+	case 1: snprintf(err, cap, "Not changed: the password was wrong, or the change failed."); break;
+	case 2: snprintf(err, cap, "Cancelled. Nothing was changed."); break;
+	case 4: snprintf(err, cap, "Turn off automatic time first. (If it is already off: this account has no password, so nothing can be confirmed.)"); break;
+	case 3: snprintf(err, cap, "That was not accepted, or the password prompt is locked for a minute after wrong tries."); break;
+	case 77: snprintf(err, cap, "Your password is needed, but the password dialog (flauth) could not be started. Nothing was changed."); break;
 	default: snprintf(err, cap, "It did not work (the helper says no)."); break;
 	}
 	return -1;

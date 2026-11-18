@@ -162,5 +162,6 @@ login_records() {
 	[ -e /var/log/btmp ] || install -m 600 /dev/null /var/log/btmp
 	[ -e /var/log/faillog ] || install -m 644 /dev/null /var/log/faillog
 	dmesg > /var/log/dmesg.log
+	chmod 640 /var/log/dmesg.log; chgrp adm /var/log/dmesg.log # kernel.dmesg_restrict: not world readable either
 }
 step "Setting up login records" login_records

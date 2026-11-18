@@ -17,7 +17,9 @@ stratum 1-15, not "alarm"; of three tries the quickest is used.
 
 fltime-set (/usr/bin) is the one privileged part. It is installed setuid root for the
 group seat (recipe owner= "/usr/bin/fltime-set 0 98 4750", the same pattern as flpower
-and flpkg-seat) and does exactly four things, nothing else:
+and flpkg-seat) and does exactly four things, nothing else. Each of them asks for the person's
+password first (flauth, class "time"; a stamp of the same calling program is reused for 120 s). Exit 77:
+the password dialog could not be started. Only the live session's tester (empty password, /run/live) is not asked:
 
 	fltime-set zone NAME     /etc/localtime -> /usr/share/zoneinfo/NAME, /etc/timezone
 	fltime-set ntp on|off    NTP= in /etc/fltime.conf, then restart/stop the ntp service

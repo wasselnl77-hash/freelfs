@@ -5,7 +5,7 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flsnap|flsnap]] -- 939 lines
+Component: [[docs/graph/components/flsnap|flsnap]] -- 929 lines
 
 ## Includes
 

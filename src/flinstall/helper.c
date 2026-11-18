@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "flauth-check.h"
 
 /* ---- state --------------------------------------------------------------------------------- */
 
@@ -60,6 +61,7 @@ static char iwd_arg[PATH_MAX];
 static char work_arg[PATH_MAX];
 static char fake_dir[PATH_MAX];
 static int real_mode;      /* writes to a real disk */
+static uid_t caller_uid;   /* the real uid of the person who started us, read before setuid(0) */
 
 #define MAXDISK 16
 #define MAXPART 128
@@ -95,6 +97,8 @@ static struct {
 	char mode[8];        /* whole free manual */
 	char disk[256];
 	char user[40], fullname[80], password[FI_PW_MAX + 4];
+	int root_own;        /* 1: root gets rootpw, 0: root gets the user's password */
+	char rootpw[FI_PW_MAX + 4];
 	char lang[40], keyboard[8], tz[56];
 } cfg;
 
@@ -1109,6 +1113,10 @@ static int check_config(char *why, size_t cap)
 		snprintf(why, cap, "Password: %s", e);
 		return -1;
 	}
+	if (cfg.root_own && (e = fi_password_error(cfg.rootpw))) {
+		snprintf(why, cap, "Administrator password: %s", e);
+		return -1;
+	}
 	if (!fi_keyboard_ok(cfg.keyboard)) {
 		snprintf(why, cap, "Keyboard layout not set.");
 		return -1;
@@ -1572,17 +1580,22 @@ static int customise(void)
 		}
 	}
 	/* accounts */
-	char hash[256];
+	char hash[256], rhash[256] = "";
 	crypt_pw(cfg.password, hash, sizeof hash);
 	if (!hash[0] && !dry)
 		return err("cannot hash the password"), -1;
+	if (cfg.root_own) {
+		crypt_pw(cfg.rootpw, rhash, sizeof rhash);
+		if (!rhash[0] && !dry)
+			return err("cannot hash the administrator password"), -1;
+	}
 	new_uid = (uid_t)first_free_uid();
 	new_gid = (gid_t)group_gid("users", 999);
 	char line[600];
 	const char *shell = "/usr/bin/flsh";
 	cmdf("# edit /etc/passwd /etc/shadow /etc/group /etc/gshadow: remove the live user, add %s (uid %u), "
 	     "%s",
-	     cfg.user, (unsigned)new_uid, FI_ROOT_SAME_PASSWORD ? "root gets the same password" : "root is locked");
+	     cfg.user, (unsigned)new_uid, cfg.root_own ? "root gets its own password" : "root gets the same password");
 	if (!dry) {
 		char hp[PATH_MAX];
 		if (rpath(stage_at, "/usr/bin/flsh", hp, sizeof hp) || access(hp, X_OK))
@@ -1597,7 +1610,7 @@ static int customise(void)
 		if (edit_accounts("/etc/passwd", line, NULL, 0) < 0)
 			return err("cannot edit /etc/passwd"), -1;
 		snprintf(line, sizeof line, "%s:%s:%ld:0:99999:7:::\n", cfg.user, hash, (long)(time(NULL) / 86400));
-		if (edit_accounts("/etc/shadow", line, FI_ROOT_SAME_PASSWORD ? hash : "!", 0) < 0)
+		if (edit_accounts("/etc/shadow", line, cfg.root_own ? rhash : hash, 0) < 0)
 			return err("cannot edit /etc/shadow"), -1;
 		if (edit_accounts("/etc/group", NULL, NULL, 1) < 0)
 			return err("cannot edit /etc/group"), -1;
@@ -1605,6 +1618,7 @@ static int customise(void)
 			return err("cannot edit /etc/gshadow"), -1;
 	}
 	explicit_bzero(hash, sizeof hash);
+	explicit_bzero(rhash, sizeof rhash);
 	/* the home (in @home, which is /home) */
 	cmdf("# make /home/%s from /etc/skel, owned by uid %u", cfg.user, (unsigned)new_uid);
 	if (!dry) {
@@ -2195,6 +2209,7 @@ static void do_install(void)
 			waitpid(pid, NULL, 0);
 	}
 	explicit_bzero(cfg.password, sizeof cfg.password);
+	explicit_bzero(cfg.rootpw, sizeof cfg.rootpw);
 	if (bad)
 		out("FAIL\tThe installation stopped. The messages above say where.");
 	else
@@ -2242,6 +2257,10 @@ static void setcfg(char *key, char *val)
 		snprintf(cfg.fullname, sizeof cfg.fullname, "%s", val);
 	else if (!strcmp(key, "password"))
 		snprintf(cfg.password, sizeof cfg.password, "%s", val);
+	else if (!strcmp(key, "rootmode"))
+		cfg.root_own = !strcmp(val, "own");
+	else if (!strcmp(key, "rootpassword"))
+		snprintf(cfg.rootpw, sizeof cfg.rootpw, "%s", val);
 	else if (!strcmp(key, "lang"))
 		snprintf(cfg.lang, sizeof cfg.lang, "%s", val);
 	else if (!strcmp(key, "keyboard"))
@@ -2310,6 +2329,27 @@ static void usage(void)
 	        "Reads commands on stdin (see /usr/share/doc/flinstall/README), answers on stdout.\n");
 }
 
+/* the installer's disk writes (a real install, not a dry run and not a test image) need the person's password
+ * every time: flauth, class disk-write, one-shot. The live tester (empty password, live system only) needs none. */
+static int install_allowed(void)
+{
+	if (!elevated || !real_mode || dry)
+		return 1;
+	return flauth_allowed(caller_uid, "disk-write");
+}
+
+/* a setuid start is for the installer only: its parent process must be /usr/bin/flinstall (resolved) */
+static int caller_is_installer(void)
+{
+	char p[64], exe[PATH_MAX];
+	snprintf(p, sizeof p, "/proc/%ld/exe", (long)getppid());
+	ssize_t n = readlink(p, exe, sizeof exe - 1);
+	if (n <= 0)
+		return 0;
+	exe[n] = 0;
+	return !strcmp(exe, "/usr/bin/flinstall");
+}
+
 static int live_system(void)
 {
 	FILE *f = fopen("/proc/mounts", "r");
@@ -2329,6 +2369,7 @@ static int live_system(void)
 
 int main(int argc, char **argv)
 {
+	caller_uid = getuid();
 	elevated = geteuid() != getuid();
 	if (elevated) {
 		/* a clean world: nothing the caller set is trusted */
@@ -2385,6 +2426,10 @@ int main(int argc, char **argv)
 		}
 	}
 	real_mode = !image_path[0] && !fake_dir[0];
+	if (elevated && real_mode && !caller_is_installer()) {
+		fprintf(stderr, "flinstall-helper: only the installer (/usr/bin/flinstall) may start it\n");
+		return 1;
+	}
 	if (real_mode && !dry) {
 		if (geteuid() != 0) {
 			fprintf(stderr, "flinstall-helper: must run as root (it is installed setuid root for the group seat)\n");
@@ -2418,6 +2463,13 @@ int main(int argc, char **argv)
 				out("FAIL\tThis is not the live system.");
 				continue;
 			}
+			/* the window answers NEEDAUTH by running flauth (class disk-write) and sends install again;
+			 * this session is kept, so the settings it sent are still here */
+			if (!install_allowed()) {
+				out("NEEDAUTH\tdisk-write");
+				out("FAIL\tYour password is needed to install (flauth). Nothing was changed.");
+				continue;
+			}
 			do_install();
 			break;
 		} else if (!strcmp(line, "quit"))
@@ -2426,6 +2478,7 @@ int main(int argc, char **argv)
 			err("unknown command");
 	}
 	explicit_bzero(cfg.password, sizeof cfg.password);
+	explicit_bzero(cfg.rootpw, sizeof cfg.rootpw);
 	explicit_bzero(line, sizeof line);
 	return 0;
 }

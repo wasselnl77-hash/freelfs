@@ -6,8 +6,8 @@
  * and writes /etc/freelfs/splash.conf (splash=flat or splash=legacy) after the person's password
  * (flauth). Every check is here:
  *	- exactly one argument, and it is "flat" or "legacy";
- *	- the caller must be allowed (flauth_ok: root, an empty password, or a fresh flauth stamp);
- *	  without it the program starts itself again through flauth, as the person, once;
+ *	- the caller must be allowed (flauth-check.h: root, the live tester, or a fresh flauth stamp for
+ *	  class splash); without it the program starts itself again through flauth, as the person, once;
  *	- /etc/freelfs is a root-owned directory, not writable by others (made 0755 when missing);
  *	- the file is written as a new file (O_EXCL, no symlink followed) and renamed over the old one;
  *	  a symlink or other non-regular file at the place is refused.
@@ -105,26 +105,19 @@ int main(int argc, char **argv)
 		return 2;
 	}
 #ifndef FLSPLASH_SET_TEST
+	int tried = getenv("FLAUTH_TRIED") != NULL; /* read before the environment is cleared */
 	if (geteuid() != 0) {
 		fputs("flsplash-set: not installed setuid root\n", stderr);
 		return 1;
 	}
-	/* Changing the boot screen asks for the person's password (flauth). Without a fresh stamp this
-	 * program starts itself again through flauth, as the person; FLAUTH_TRIED stops a loop. */
-	if (!flauth_ok(getuid())) {
-		uid_t u = getuid();
-		gid_t g = getgid();
-		if (getenv("FLAUTH_TRIED") || setresgid(g, g, g) < 0 || setresuid(u, u, u) < 0) {
+	/* Changing the boot screen asks for the person's password (class splash, flauth). */
+	{
+		char reason[128];
+		snprintf(reason, sizeof reason, "Change the boot screen to %s.", argv[1]);
+		if (!flauth_gate(tried, "splash", reason, "/usr/bin/flsplash-set", argc, argv)) {
 			fputs("flsplash-set: your password is needed (flauth)\n", stderr);
 			return 77;
 		}
-		setenv("FLAUTH_TRIED", "1", 1);
-		char reason[128];
-		snprintf(reason, sizeof reason, "Change the boot screen to %s.", argv[1]);
-		char *args[] = {"flauth", "--reason", reason, "--", "/usr/bin/flsplash-set", argv[1], NULL};
-		execv("/usr/bin/flauth", args);
-		fputs("flsplash-set: your password is needed, and flauth is not installed\n", stderr);
-		return 77;
 	}
 	/* real ids to root too, and none of the caller's groups */
 	if (setgroups(0, NULL) < 0 || setgid(0) < 0 || setuid(0) < 0) {
@@ -133,6 +126,8 @@ int main(int argc, char **argv)
 	}
 	if (clearenv() != 0 || setenv("PATH", "/usr/sbin:/usr/bin", 1) != 0)
 		return 1;
+	for (int fd = 3; fd < 256; fd++)	/* the caller's descriptors must not reach the children we start */
+		close(fd);
 	umask(022);
 #endif
 	return write_conf(argv[1]);

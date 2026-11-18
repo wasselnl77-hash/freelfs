@@ -5,7 +5,7 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flinstall|flinstall]] -- 160 lines
+Component: [[docs/graph/components/flinstall|flinstall]] -- 154 lines
 
 ## Includes
 

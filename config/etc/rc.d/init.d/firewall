@@ -1,0 +1,34 @@
+#!/bin/bash
+# /etc/rc.d/init.d/firewall -- the default firewall (nftables, /etc/nftables.conf)
+#
+# Drops unsolicited inbound traffic, allows everything outbound. Starts first, before the network, so no
+# interface is ever up without it. FIREWALL=0 in /etc/rc.conf, or "!firewall" in SERVICES, turns it off.
+# `firewall status` lists the rules. See /etc/nftables.conf.
+
+. /etc/rc.d/functions
+
+FIREWALL=1
+[ -r /etc/rc.conf ] && . /etc/rc.conf
+
+NFT=${NFT:-/usr/sbin/nft}
+CONF=${NFTABLES_CONF:-/etc/nftables.conf}
+
+start_firewall() {
+	[ -x "$NFT" ] && [ -r "$CONF" ] || return 1
+	"$NFT" -f "$CONF"
+}
+
+stop_firewall() {
+	[ -x "$NFT" ] || return 0
+	"$NFT" flush ruleset
+}
+
+case $1 in
+	start)
+		[ "$FIREWALL" = 0 ] && exit 0
+		step "Starting the firewall" start_firewall ;;
+	stop) step "Stopping the firewall" stop_firewall ;;
+	restart) "$0" stop; "$0" start ;;
+	status) "$NFT" list ruleset ;;
+	*) echo "usage: $0 {start|stop|restart|status}" >&2; exit 2 ;;
+esac

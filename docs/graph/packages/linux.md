@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 7.3.4, release 4. The Linux kernel (newest stable) and its modules
+Version 7.3.4, release 5. The Linux kernel (newest stable) and its modules
 
 - License: GPL-2.0-only; URL: https://www.kernel.org/
 - Groups: [[docs/graph/groups/base|base]]

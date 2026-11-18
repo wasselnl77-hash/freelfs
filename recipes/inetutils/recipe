@@ -1,6 +1,6 @@
 pkgname=inetutils
 version=2.8
-release=1
+release=2
 summary="Network programs: ping, ftp, telnet, hostname, ..."
 url=https://www.gnu.org/software/inetutils/
 license=(GPL-3.0-or-later)
@@ -10,6 +10,10 @@ depends=(glibc readline ncurses libxcrypt)
 source=(https://ftpmirror.gnu.org/inetutils/inetutils-$version.tar.gz)
 sha256=(57b3cf4f77555992881e5ba2a09a63b05aa2c56342a60ed4305b5f45938390b5)
 build_style=autotools
+# round 23: ping and ping6 lose setuid (net.ipv4.ping_group_range in /etc/sysctl.d/10-freelfs-hardening.conf lets
+# everybody open ICMP datagram sockets). traceroute needs raw sockets and flpkg has no file capabilities, so it keeps
+# setuid but only for group seat (docs/SECURITY.md lists every setuid file).
+owner=("/usr/bin/ping 0 0 0755" "/usr/bin/ping6 0 0 0755" "/usr/bin/traceroute 0 98 4750")
 configure_args=(--bindir=/usr/bin --localstatedir=/var --disable-logger --disable-whois
 	--disable-rcp --disable-rexec --disable-rlogin --disable-rsh --disable-servers)
 

@@ -9,7 +9,7 @@ inittab runs /usr/sbin/flgreet on tty1 instead of agetty.
 
 ## Source files
 
-- [[docs/graph/files/flgreet/flgreet-ui.c|src/flgreet/flgreet-ui.c]] -- 678 lines -- 20 fn
+- [[docs/graph/files/flgreet/flgreet-ui.c|src/flgreet/flgreet-ui.c]] -- 683 lines -- 20 fn
 - [[docs/graph/files/flgreet/flgreet.c|src/flgreet/flgreet.c]] -- 234 lines -- 8 fn
 
 ## Uses

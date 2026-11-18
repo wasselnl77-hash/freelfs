@@ -135,7 +135,7 @@ There are two sources:
 | **FreeLFS** | The project's own packages (the ones the system is built from) | A package repository set up in `/etc/flpkg.conf`, and an index synced |
 
 Installing a FreeLFS package asks for your password (through flauth), because it
-changes the system. The password is asked again after five minutes.
+changes the system. The password is asked again after two minutes (and each time for the same program only).
 
 Tips:
 

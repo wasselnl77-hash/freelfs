@@ -1,0 +1,10 @@
+# /etc/securetty -- the terminals root may log in on (CONSOLE in /etc/login.defs points here).
+# Only the text consoles of the machine. No serial port: a release image has no root login over ttyS0.
+# (Test images built with FLFS_DEV_ROOT=1 add ttyS0 here.) Other people use su (group wheel) or the
+# password dialog (flauth); the installed user is in wheel.
+tty1
+tty2
+tty3
+tty4
+tty5
+tty6

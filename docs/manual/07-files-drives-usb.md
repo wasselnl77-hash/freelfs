@@ -115,7 +115,7 @@ flmount eject sdb       # unmounts every partition and powers the disk off
 
 Names are the kernel's device names, such as `sdb1`, not `/dev/sdb1`. Only
 removable and boot partitions are listed by default. Internal disks need `--internal`,
-and Files does not use that option. Be careful with internal disks: they hold your system.
+and Files does not use that option. Be careful with internal disks: they hold your system. Mounting an internal disk asks for your password (flauth); removable media and the boot stick do not.
 
 ## Copy, move and paste
 

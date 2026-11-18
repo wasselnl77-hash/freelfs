@@ -2,7 +2,7 @@
 
 What is protected today, how the signing key is kept, how to rotate it, how known
 vulnerabilities are tracked, the browser sandbox, and what Secure Boot would take.
-Written 2026-11-11, updated 2026-11-12 (security update round). Nothing here is audited by anyone but the authors.
+Written 2026-11-11, updated 2026-11-12 (security update round), 2026-11-18 (password policy for the setuid helpers). Nothing here is audited by anyone but the authors.
 
 Short list of what exists:
 
@@ -13,6 +13,7 @@ Short list of what exists:
 | Release model | rolling: updates follow fixed upstream releases (section 0) |
 | CVE tracking | `build/cve-check.py` + `build/cve-names.conf`, report in `docs/CVE-REPORT.md`; kernel triage against the config: `build/cve-kernel.py`, `docs/CVE-KERNEL.md` |
 | Browser | WebKit's bubblewrap sandbox for the web processes (section 3; WPE WebKit 2.54.2) |
+| Local root actions | setuid helpers in group `seat`; a password per destructive action, purpose-bound two-minute stamps, one-shot for disk writes and snapshot rollback/delete (section 5) |
 | Boot | not signed: Secure Boot must be off |
 
 ---
@@ -327,3 +328,193 @@ EFI stub with the initrd named on the command line. Realistic options, in order 
 
 Recommendation: keep "Secure Boot off" in the release notes now; do option 1 first (it also builds the signing
 infrastructure option 2 needs); decide on option 2 once there is a second tester with a locked-down laptop.
+
+---
+
+## 5. Local root actions: the password policy
+
+The setuid helpers (`root:seat 4750`) run root actions for everybody in group `seat`, which is every person at
+the machine. Any program that runs as the person (a browser renderer, a document parser) can start them. So each
+helper that changes the system asks for the person's password before it acts, unless the action is harmless
+(the same idea as the polkit defaults on desktops). The policy is in code, in `src/flauth/flauth-check.h`,
+and in each helper's `flauth_gate` or `flauth_allowed` call.
+
+### 5.1 The policy
+
+| Action | Helper | Password | Class (`flauth --class`) | Reuse |
+|---|---|---|---|---|
+| Mount, unmount, eject a removable drive, the live boot stick | `flmount` | none | - | - |
+| Mount, unmount, eject an internal disk (`--internal`) | `flmount` | every time | `mount-internal` | 2 min, same program |
+| Power off, restart, log out, power saving | `flpower` | none | - | - |
+| Lock screen password check | `fllock-check` | none (checks the person's own password, one try a second) | - | - |
+| Install, remove, upgrade system packages | `flpkg-seat` | every time | `pkg` | 2 min, same program |
+| Install (disk write, format, partition) | `flinstall-helper` | every time; only when started by `/usr/bin/flinstall` | `disk-write` | one-shot |
+| Create the persistent home file | `flpersist create` | every time | `persist-create` | one-shot |
+| Snapshot rollback | `flsnap rollback` | every time | `snap-rollback` | one-shot |
+| Snapshot delete, rm, prune | `flsnap` | every time | `snap-delete` | one-shot |
+| Snapshot create, list, show, status | `flsnap` | none; an elevated create never prunes | - | - |
+| Date, time zone, automatic time | `fltime-set` | every time | `time` | 2 min, same program |
+| Boot screen style | `flsplash-set` | every time | `splash` | 2 min, same program |
+
+"Every time" means: no password is asked again while a stamp of that class is fresh for the same program.
+
+### 5.2 The stamp
+
+`flauth --class CLASS ...` checks the password, then writes `/run/flauth/ok-UID.CLASS` (root owned, mode 0600, in
+a root owned 0700 directory) with three lines: the class, the executable of the program that started flauth
+(resolved through `/proc/PPID/exe`), and the time. A helper accepts the stamp only when all of these hold:
+
+- the class is the one the helper asks for (the file name and the content both);
+- the executable of the program that started the helper is the one the stamp names (the same program, so a stamp of
+  the Store cannot be used by another program);
+- the stamp is at most 120 seconds old and not from the future;
+- the file is private: owned by root, mode 0600, one link, in a private directory.
+
+Reusable classes (`pkg`, `time`, `splash`, `mount-internal`) keep the stamp for those 120 seconds. One-shot classes
+(`disk-write`, `persist-create`, `snap-rollback`, `snap-delete`) remove it as the check passes, so the next
+destructive action asks for the password again. A check that fails does not use the stamp up.
+
+### 5.3 The live tester and empty passwords
+
+An empty password never passes on an installed system: flauth says `set a password first`, and the helpers
+refuse. The one exception is the live session's `tester` account, and only while `/run/live` exists (the live
+system). On that account no question is asked for any class, including the installer's disk write. That is the
+behaviour the live session needs; the installed system is not affected.
+
+### 5.4 Other arguments and environment
+
+- `flauth` closes every descriptor it inherits, and the helpers that run children close theirs (`fltime-set`,
+  `flsplash-set`, `flsnap` when it runs with more rights, `flmount`, `flpersist`, `flpower`). The environment is cleared
+  before anything runs as root (`flpersist`'s child, `flpkg-seat`, `flsplash-set`, `fltime-set`, `flsnap`, `flmount`).
+- Package names, zone names, boot-screen words, snapshot numbers and disk names are checked before any action. A zone
+  name that is not a zoneinfo file is refused before anybody is asked for a password.
+- `flinstall-helper`: its start is refused unless its parent is `/usr/bin/flinstall` (resolved). Its disk write needs the
+  stamp. A refused install answers `NEEDAUTH disk-write` and the window asks the person to authenticate
+  (`src/flinstall/README`).
+- `flsnap create` by a person does not prune old snapshots any more. Removing them is `rm` or `prune`, which need the password.
+  The hooks run as root and keep the old retention.
+
+### 5.5 Tests
+
+- `make -C src/flauth check` (no root): `src/flauth/tests/policy.sh` checks the stamp class and caller, the
+  reuse window, one-shot consumption, stale and mis-moded stamps, wrong passwords, and the live-only empty-password rule.
+  Each rule was also broken on purpose to confirm the test fails.
+- `src/flpackages/tests/seat.sh`, `src/fltime/tests/test.sh`, `FLSPLASH_SET_TEST` (`src/flsplash`): the existing
+  helper tests still pass with the gates compiled in.
+- The root paths (a real setuid start, a real install, a real rollback) are not run here: they need root and disks.
+  They were compiled and read, not run.
+- `src/flsnap/tests/test-flsnap.sh` already fails 39 checks on the committed version as well; that is not from this change.
+
+### 5.6 What this does not protect against
+
+- A program the person runs can reuse a `pkg`, `time`, `splash` or `mount-internal` stamp for two minutes if it is the same
+  executable as the one that asked. Destructive actions still need a fresh password each time.
+- The stamp is bound to the calling program's executable, not to the window. A program that can run the same
+  executable (a second copy of the Store, for instance) inherits the two minutes.
+- `fllock-check` remains a one-try-a-second oracle for the person's own password, as before.
+- On the live system the `tester` account needs no password, so any seat member there can run the installer's disk write
+  through `/usr/bin/flinstall` without a question. This is the live session's design, not a fix.
+- Nothing here has been run as root on hardware.
+
+
+## 6. The root account, login, kernel hardening, firewall and setuid files (round 23)
+
+Source of the findings: `docs/bugscan-2026-11-18/security-audit.md`. Decisions below are the user's (root accounts) or the
+audit's with the changes named. Every statement here says how it was checked; section 6.8 lists what was not done.
+
+### 6.1 The root account
+
+| Image | Root | How |
+|---|---|---|
+| Live ISO (released) | **locked** (`!` in `/etc/shadow`), no login on any terminal | `build/53-iso.sh` sets the hash and the build **fails** if the root hash is empty or not locked; `build/50-image.sh` and `53-iso.sh` call `check_root_locked` (`build/lib.sh`) first |
+| Live user `tester` | empty password, group `seat`, **only on `/run/live`**: flauth, the setuid helpers, the greeter (`flgreet-ui`) and the lock screen (`fllock-check`) accept the empty hash for exactly this account while the live marker exists; anywhere else an empty hash opens nothing | section 5.3; `src/flgreet/flgreet-ui.c`, `src/fllock/fllock-check.c` |
+| Installed system | **your choice in the installer's account step**: "Use the same password for the administrator (root)" (default, as before), or a second password with confirmation. Root is never installed empty. Minimum length is **8** characters (was 4) | `src/flinstall/` (`set rootmode same|own`, `set rootpassword`) |
+| Dev / test images | empty root hash, `ttyS0` in `/etc/securetty`, `/etc/issue` says "Development image", and `bootstrap.pub` stays trusted | **only** with `FLFS_DEV_ROOT=1` (`build/root-lock.sh --dev`, `build/53-iso.sh`): the serial-console test harnesses log in as root |
+
+`build/60-packages.sh` now locks root by default (`passwd -l root`; `FLFS_DEV_ROOT=1` keeps the old empty root). `build/root-lock.sh`
+switches the build root between the two states without rebuilding packages. `build/40-system-config.sh` follows the same flag.
+
+### 6.2 Where root may log in
+
+- `/etc/securetty` (package `base-files`) lists tty1 to tty6. `CONFIG` in `/etc/login.defs` is `CONSOLE /etc/securetty`, so `login` refuses root on
+  any other terminal, the serial port included. The installed system gets this file from the same package. (The agetty on the serial port is
+  started only when a UART exists, `rc.d/serial-getty`, round 22.)
+- `su` is setuid but for group `wheel` only (`SU_WHEEL_ONLY yes`; the installer puts the first user in `wheel`). `LOGIN_RETRIES` is 3.
+- The graphical greeter lists accounts from uid 1000 up, so root never appears there.
+- There is no faillock: each `login` run has three tries, and agetty restarts it. This is **not** a rate limit (section 6.8).
+
+### 6.3 Kernel and sysctl hardening
+
+`/etc/sysctl.d/10-freelfs-hardening.conf` (package `initscripts`) is applied by `rc.sysinit` (`sysctl -q --system`):
+
+| Setting | Value | Why |
+|---|---|---|
+| `kernel.kptr_restrict` | 1 | kernel addresses hidden from users |
+| `kernel.dmesg_restrict` | 1 | `dmesg` for root only (`/var/log/dmesg.log` is now 0640 root:adm) |
+| `kernel.unprivileged_bpf_disabled` | 1 | no BPF for users |
+| `net.core.bpf_jit_harden` | 2 | |
+| `kernel.yama.ptrace_scope` | 1 | children only |
+| `fs.protected_symlinks`, `protected_hardlinks`, `protected_fifos`, `protected_regular` | 1, 1, 2, 2 | |
+| `fs.suid_dumpable` | 0 | |
+| `kernel.kexec_load_disabled` | 1 | no new kernel at run time (the kernel keeps KEXEC built: planned) |
+| `kernel.io_uring_disabled` | 2 | io_uring off at run time (stays built; `0` turns it back on) |
+| `net.ipv4.conf.*.rp_filter`, `accept_redirects`, `send_redirects`, `accept_source_route`, `secure_redirects`, IPv6 redirects and source route, `tcp_syncookies`, `icmp_echo_ignore_broadcasts` | strict / off / on | |
+| `net.ipv4.ping_group_range` | `0 2147483647` | `ping` without setuid |
+
+User namespaces stay **on** (Flatpak, bubblewrap and the browser sandbox need them; `user.max_user_namespaces` is not touched).
+
+Kernel config (`config/kernel/freelfs.config`, both `linux` 7.3.4 and `linux-lts` 6.18.63 build with it; the recipe fails if a line is not applied):
+`SECURITY`, `SECURITY_YAMA`, `SECURITY_LOCKDOWN_LSM` (+`_EARLY`, `LOCK_DOWN_KERNEL_FORCE_NONE`: available, mode **none** until the command line says
+`lockdown=`), `SECURITY_DMESG_RESTRICT`, `HARDENED_USERCOPY`, `INIT_ON_ALLOC_DEFAULT_ON`, `FORTIFY_SOURCE`, `BPF_UNPRIV_DEFAULT_OFF`,
+`SLAB_FREELIST_RANDOM`, `SLAB_FREELIST_HARDENED`, `RANDOMIZE_KSTACK_OFFSET_DEFAULT`. `IKCONFIG` and `IKCONFIG_PROC` were already on: `/proc/config.gz`
+shows the real configuration. securityfs is not built in this kernel, so `/sys/kernel/security/lockdown` does not exist; the lockdown mode is `none` by config (`LOCK_DOWN_KERNEL_FORCE_NONE`), and `lockdown=integrity` on the command line would still apply. The offline check (defconfig + fragment + olddefconfig on both source trees) applied every line.
+
+### 6.4 The firewall
+
+Package `nftables` 1.1.7 (GPL-2.0-only; with `libmnl` 1.0.5 LGPL-2.1+ and `libnftnl` 1.3.2 GPL-2.0+; the three add about 1 MB to the root, no CLI
+shell, no JSON, no Python). `/etc/nftables.conf` (package `initscripts`) is applied by the rc service `firewall`, **first** in `SERVICES`, before the network:
+
+- inbound: drop invalid; accept established/related, loopback, ICMP errors and echo, ICMPv6 errors, echo and neighbour discovery, DHCP and DHCPv6 replies;
+  **mDNS (UDP 5353) only while avahi runs**: the chain `mdns` is empty, and `flcupsd` fills it (`/usr/libexec/fl-firewall-mdns on`) when it starts avahi and empties it when avahi ends
+- forward: drop. Outbound: accept (the browser, Flatpak, downloads and Wi-Fi are outbound).
+- `FIREWALL=0` in `/etc/rc.conf` turns it off. A system installed before round 23 keeps its `rc.conf`: add `firewall` to `SERVICES` there.
+
+### 6.5 Setuid and setgid files, every one
+
+After this round (list checked by `build/m23/sys.cmds` against the booted system, and `build/m23-static.sh` against the ISO):
+
+| File | Mode, owner | Why it stays |
+|---|---|---|
+| `/usr/bin/passwd`, `chage`, `chfn`, `chsh`, `gpasswd`, `newgrp` | 4755 root | shadow-utils: a user changes their own password and groups |
+| `/usr/bin/su` | 4755 root | `su` for group `wheel` only (`SU_WHEEL_ONLY yes`): the terminal way to become root on an installed system |
+| `/usr/bin/fusermount3` | 4755 root | FUSE mounts for users (`user_allow_other` stays off) |
+| `/usr/bin/traceroute` | 4750 root:seat | needs raw sockets and `flpkg` has no file capabilities (xattrs) yet; only group seat can run it |
+| `/usr/bin/flauth`, `flpower`, `flmount`, `flpersist`, `fltime-set`, `flsplash-set`, `flpkg-seat`, `flsnap`, `/usr/libexec/flinstall-helper`, `fllock-check` | 4750 root:seat | section 5 and 15.4 |
+| `/usr/libexec/dbus-daemon-launch-helper` | 4750 root:messagebus | system bus service activation |
+| `/usr/bin/wall`, `write` | 2755 root:tty (setgid) | writing to terminals |
+
+**Removed** this round: `ping`, `ping6` (now 0755; `net.ipv4.ping_group_range`), `mount`, `umount` (0755; `flmount` mounts for group seat),
+`newuidmap`, `newgidmap` (0755: `/etc/subuid` and `/etc/subgid` are empty and no rootless container tool is shipped; put the bit back, `chmod 4755`, when one is).
+
+### 6.6 Package trust
+
+`bootstrap.pub` (the build repo's key) is **not** installed in release images: only `freelfs-repo.pub` is trusted (`build/60-packages.sh`, `53-iso.sh`
+remove it; dev images keep it). The private bootstrap key never was in an image.
+
+### 6.7 Tests (round 23)
+
+`build/m23-all.sh` (table in the round 23 report): `build/m23-static.sh` (the ISO's files), `build/m23-real.py` (the real ISO: root refused on the serial port,
+tester checks), `build/m23/sys.cmds` (the dev twin: sysctls, firewall with a namespace pair, setuid list, flauth behaviour),
+`src/flauth/tests/policy.sh` (policy), `src/fllock/tests/check.sh`, `src/flinstall/tests/image-test.sh` (same password and a separate root password,
+the 8-character rule).
+
+### 6.8 Not done (audit items still open)
+
+- **Module signing** (`MODULE_SIG`, `MODULE_SIG_FORCE`): needs a key decision (where the key lives, how drivers built later are signed). Planned.
+- `KEXEC` and `IO_URING` stay built in; the sysctls switch them off. Removing them from the kernel is planned.
+- No faillock or login rate limit (`login` has three tries, then agetty restarts it).
+- The browser's network process is not sandboxed (M2), adblock lists are fetched unsigned (M5), the persistence image is plaintext (M6),
+  the bluez Agent interfaces are open to every local process (M8), cups.sock is mode 0666 (L3), `/run` in the installed fstab (L1), test secrets in
+  the repo (L2), the repo signing key has no passphrase (M1), `flpkg` has no file capabilities (so `traceroute` stays setuid).
+- The installer hashes with SHA-512 crypt while `login.defs` says yescrypt: both work; not unified.
+- Nothing here has been run on the laptop.

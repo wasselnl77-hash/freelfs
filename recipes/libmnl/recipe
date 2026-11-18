@@ -1,0 +1,15 @@
+pkgname=libmnl
+version=1.0.5
+release=1
+summary="Minimalistic Netlink library (used by libnftnl and nftables)"
+url=https://www.netfilter.org/projects/libmnl/
+license=(LGPL-2.1-or-later)
+arch=(x86_64)
+groups=(base desktop)
+depends=(glibc)
+source=(https://www.netfilter.org/pub/libmnl/libmnl-$version.tar.bz2)
+sha256=(274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525)
+build_style=autotools
+configure_args=(--disable-static)
+
+check() { :; }

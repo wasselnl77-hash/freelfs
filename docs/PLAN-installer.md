@@ -88,3 +88,11 @@ Round 21 only adds a plain title tooltip; the previews come in round 22.
 - A small FreeLFS camera app, "flcam": live view, take a photo, record video (GStreamer, already used by flmusic), saved to ~/Pictures and ~/Videos.
 - Privacy: a tray indicator while the camera is in use, and an off switch in Settings > Privacy.
 - Tests: QEMU with an emulated USB webcam if available (otherwise v4l2loopback as a fake camera).
+
+## flde, Themes 2.0, optional desktops (planned 2026-11-18)
+- **Name:** the FreeLFS desktop (flcomp, flpanel, flui apps) is called **flde**. Check that the name isn't taken by another notable project before public use.
+- **Themes 2.0:**
+  - styles: Flat (default), Glass (translucency plus background blur in flcomp, optional, auto-off on weak hardware since compositing is CPU-only), Rounded, Classic
+  - user theme files (colours, radius, transparency, blur, fonts, icon theme) that can be shared, and later offered in the Store
+- **Panel customization:** position (top, bottom, left, right), size, items, widgets; custom shortcuts; window rules
+- **Optional other desktops** (later): XFCE or LXQt first (light, no systemd), KDE Plasma once the NucBox can build Qt/KF6 comfortably. flde stays the default.

@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 5. FreeLFS file system layout, system accounts and basic /etc files
+Version 0.1, release 6. FreeLFS file system layout, system accounts and basic /etc files
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/base|base]]

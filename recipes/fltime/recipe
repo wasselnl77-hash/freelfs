@@ -3,7 +3,7 @@
 # time and a hand-set clock).
 pkgname=fltime
 version=0.1
-release=1
+release=2
 summary="Automatic time (SNTP client) and the time zone helper for Settings"
 license=(MIT)
 arch=(x86_64)

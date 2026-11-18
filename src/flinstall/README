@@ -77,6 +77,11 @@ The protocol (stdin/stdout, one line each, fields separated by TAB)
                      create START SIZE esp|root|swap|data (bytes) | format ID FS LABEL |
                      mount ID MOUNTPOINT | check | install | quit
                      New partitions are called new1, new2 ... in the order of the create lines.
+  helper -> window   NEEDAUTH disk-write, then FAIL: install was refused until the person has given
+                     her password. The window runs `flauth --class disk-write --reason TEXT` (no CMD: it only
+                     stamps; the helper accepts the stamp when flauth's parent is this window, /usr/bin/flinstall)
+                     and sends install again. The settings sent before stay in the session.
+                     A real install is refused (not started) unless the caller is /usr/bin/flinstall.
   helper -> window   HELLO MODE, DISK/PART/FREE ... END, OK, ERR text, PLAN lines + OK for a
                      check, then for install STEP n total text, PROGRESS pct, CMD text (a
                      command run or, in a dry run, that would be run), LOG text, DONE | FAIL.
@@ -110,5 +115,8 @@ booting what it made, the kernel re-reading the partition table, the restart.
 Not supported (decided): dual boot with Windows, other boot loaders, BIOS boot, encryption,
 LVM/RAID, an own swap file.
 
-The root account: FI_ROOT_SAME_PASSWORD in common.h is the one-line switch. 1 (now): root gets the first
-user's password; 0: root is locked (shadow field "!"); the window's note follows.
+The root account (account step, runtime choice): the box "Use the same password for the administrator
+(root)" is checked by default: root gets the first user's password. Unchecked, the window asks for a second
+password (with confirmation) and sends "set rootmode own" and "set rootpassword PW"; root then has its own
+hash. Root is never installed empty or locked by the installer. Passwords need 8 characters (FI_PW_MIN).
+The window also takes rootpw= in FLINSTALL_TEST for a separate root password.

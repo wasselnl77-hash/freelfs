@@ -10,7 +10,8 @@ Two small programs for Settings > Date & time. C17, MIT.
 ## Source files
 
 - [[docs/graph/files/fltime/fl-sntp.c|src/fltime/fl-sntp.c]] -- 263 lines -- 11 fn
-- [[docs/graph/files/fltime/fltime-set.c|src/fltime/fltime-set.c]] -- 283 lines -- 11 fn
+- [[docs/graph/files/fltime/flauth-check.h|src/fltime/flauth-check.h]] -- 248 lines -- 12 fn
+- [[docs/graph/files/fltime/fltime-set.c|src/fltime/fltime-set.c]] -- 303 lines -- 11 fn
 
 ## Uses
 

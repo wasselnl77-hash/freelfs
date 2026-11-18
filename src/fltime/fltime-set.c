@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: MIT
  *
  * Installed setuid root and runnable only by the group seat (mode 4750), like
- * flpower, so the Settings app can do this without a password. It accepts
+ * flpower, so the Settings app can do this after the person's password (flauth). It accepts
  * exactly four commands and checks every argument:
  *
  *   fltime-set zone NAME      /etc/localtime -> /usr/share/zoneinfo/NAME and
@@ -13,10 +13,14 @@
  *   fltime-set sync           asks the ntp service to synchronise now
  *   fltime-set time EPOCH     sets the clock, only while ntp is off
  *
- * The environment is thrown away; all paths are fixed at build time (the tests
- * build a copy with other paths). Exit status: 0 done, 2 usage, 3 refused
- * argument, 4 refused (ntp is on), 1 failed.
+ * Every command asks for the person's password (flauth, class time; a fresh stamp of
+ * the same calling program is reused for two minutes). The environment is thrown away;
+ * all paths are fixed at build time (the tests build a copy with other paths). Exit
+ * status: 0 done, 2 usage, 3 refused argument, 4 refused (ntp is on), 1 failed, 77 the
+ * password is needed and flauth is not available.
  */
+#include "flauth-check.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -263,6 +267,20 @@ int main(int argc, char **argv)
 		return 2;
 	}
 #ifndef FLTIME_TEST
+	int tried = getenv("FLAUTH_TRIED") != NULL; /* read before the environment is cleared */
+	if (geteuid() != 0) {
+		fputs("fltime-set: not installed setuid root\n", stderr);
+		return 1;
+	}
+	/* a bad zone name is refused before anybody is asked for a password */
+	if (argc == 3 && !strcmp(argv[1], "zone") && !name_ok(argv[2]))
+		return fail(3, "not a zone name");
+	if (!flauth_gate(tried, "time", "Change the date, the time zone or the automatic time.", "/usr/bin/fltime-set",
+	                 argc, argv)) {
+		fputs("fltime-set: your password is needed, but the password dialog (flauth) could not be started. Nothing was changed\n", stderr);
+		return 77;
+	}
+	/* root for real: the gate above read the caller's real uid, so this comes after it */
 	if (setuid(0) < 0) {
 		perror("fltime-set");
 		return 1;
@@ -270,6 +288,8 @@ int main(int argc, char **argv)
 #endif
 	clearenv();
 	setenv("PATH", "/usr/sbin:/usr/bin", 1);
+	for (int fd = 3; fd < 256; fd++)	/* the caller's descriptors must not reach the children we start */
+		close(fd);
 	if (argc == 3 && !strcmp(argv[1], "zone"))
 		return cmd_zone(argv[2]);
 	if (argc == 3 && !strcmp(argv[1], "ntp"))

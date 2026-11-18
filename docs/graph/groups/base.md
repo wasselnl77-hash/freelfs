@@ -5,7 +5,7 @@ tags: [package-group]
 
 #package-group
 
-97 packages:
+100 packages:
 
 - [[docs/graph/packages/acl|pkg/acl]]
 - [[docs/graph/packages/attr|pkg/attr]]
@@ -56,6 +56,8 @@ tags: [package-group]
 - [[docs/graph/packages/libcap|pkg/libcap]]
 - [[docs/graph/packages/libelf|pkg/libelf]]
 - [[docs/graph/packages/libffi|pkg/libffi]]
+- [[docs/graph/packages/libmnl|pkg/libmnl]]
+- [[docs/graph/packages/libnftnl|pkg/libnftnl]]
 - [[docs/graph/packages/libpipeline|pkg/libpipeline]]
 - [[docs/graph/packages/libtool|pkg/libtool]]
 - [[docs/graph/packages/libxcrypt|pkg/libxcrypt]]
@@ -74,6 +76,7 @@ tags: [package-group]
 - [[docs/graph/packages/mpfr|pkg/mpfr]]
 - [[docs/graph/packages/mtools|pkg/mtools]]
 - [[docs/graph/packages/ncurses|pkg/ncurses]]
+- [[docs/graph/packages/nftables|pkg/nftables]]
 - [[docs/graph/packages/ninja|pkg/ninja]]
 - [[docs/graph/packages/openssl|pkg/openssl]]
 - [[docs/graph/packages/packaging|pkg/packaging]]
