@@ -2,7 +2,7 @@
 
 Website: https://wasselnl77-hash.github.io/freelfs/
 
-Download: https://github.com/wasselnl77-hash/freelfs/releases/tag/prealpha-20261118 (pre-alpha, not for real use)
+Download: https://github.com/wasselnl77-hash/freelfs/releases/tag/prealpha-20261118b (pre-alpha, not for real use)
 
 Support: https://buymeacoffee.com/wassel
 
