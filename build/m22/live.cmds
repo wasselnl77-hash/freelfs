@@ -1,0 +1,69 @@
+# Round 22 in QEMU, booted FROM the virtual Ventoy stick (exFAT + FAT), 1 GB, as the live user tester.
+# Parts: the serial getty, the container kernel options and user namespaces, the flpkg front end and the online repo
+# (a local HTTP server stands in for GitHub Releases: @PORT@), the Store's Updates tab, and files copied or saved to the
+# exFAT stick (fsync before the name appears or before a move removes the source).
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+@waitok 40 flmount bound the stick under /drives :: grep -q '^/dev/sda1 /drives/' /proc/mounts
+# ---- init: the serial getty is only started when the UART exists
+@ok inittab starts the S0 getty through rc.d/serial-getty :: grep -q '^S0:2345:respawn:/etc/rc.d/serial-getty$' /etc/inittab
+@ok on this machine ttyS0 is a real UART (type 4) and the getty runs on it :: test "$(cat /sys/class/tty/ttyS0/type)" != 0 && ps -t ttyS0 -o pid= | grep -q .
+@ok no "respawning too fast" for S0 in the console log :: ! dmesg | grep -q 'S0 respawning too fast'
+@ok a port the kernel made up but no UART (sysfs type 0) gets no getty :: mkdir -p /tmp/fs/ttyS9 && echo 0 > /tmp/fs/ttyS9/type && test "$(FLSERIAL_TEST=1 FLSERIAL_SYS=/tmp/fs/ttyS9 FLSERIAL_DEV=/dev/ttyS0 /etc/rc.d/serial-getty)" = none
+# ---- kernel: containers and user namespaces
+@ok an unprivileged user creates a user namespace (what Firefox's sandbox and bwrap need) :: su -s /bin/sh tester -c 'unshare --user --map-root-user true'
+@ok bubblewrap runs for the user :: su -s /bin/sh tester -c 'bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all true'
+@ok nested: a user namespace inside a user namespace :: su -s /bin/sh tester -c 'unshare -Ur unshare -Ur true'
+@ok cgroup v2 has the memory and pids controllers (Podman limits) :: grep -q memory /sys/fs/cgroup/cgroup.controllers && grep -q pids /sys/fs/cgroup/cgroup.controllers
+@ok /dev/net/tun exists (rootless networking, pasta) :: test -c /dev/net/tun
+@ok veth and bridge devices can be made (netavark) :: ip link add fl-v0 type veth peer name fl-v1 && ip link add fl-br0 type bridge && ip link del fl-v0 && ip link del fl-br0
+@ok nf_tables with NAT and masquerade is in the kernel :: grep -q ' nf_tables_newtable$' /proc/kallsyms && grep -q ' nft_masq_init$' /proc/kallsyms
+@ok overlayfs is in the kernel :: grep -qw overlay /proc/filesystems
+# ---- flpkg front end
+@ok flpkg hands install/remove/upgrade to the sources script :: test -x /usr/lib/flpkg/sources.sh && grep -q sources /usr/lib/flpkg/sources.sh
+@ok removing something that is not installed fails clearly :: ! flpkg remove --from=freelfs not-a-package 2> /tmp/rm.err; grep -q 'is not installed' /tmp/rm.err
+@ok --from with an unknown source is an error :: ! flpkg install --from=bogus x 2> /tmp/fr.err; grep -q 'unknown source' /tmp/fr.err
+# ---- the online repo: a tampered index is refused
+@ok the image trusts the FreeLFS repo key and points at the GitHub release :: ls /etc/flpkg/keys/freelfs-repo.pub && grep -q '^repo freelfs https://github.com/wasselnl77-hash/freelfs/releases/download/repo-x86_64$' /etc/flpkg.conf && grep -q '^signatures = required' /etc/flpkg.conf
+@ok test image: the repo URL points at the host's HTTP server :: cp /etc/flpkg.conf /tmp/flpkg.conf.orig && sed -i 's|^repo freelfs .*|repo freelfs http://10.0.2.2:@PORT@/tampered|' /etc/flpkg.conf && grep -q 10.0.2.2 /etc/flpkg.conf
+@ok sync of an index with a flipped byte is REFUSED :: ! flpkg sync > /tmp/sync-bad.log 2>&1; grep -q 'BAD SIGNATURE' /tmp/sync-bad.log
+@ok nothing was installed or changed by the refused sync :: ! test -s /var/cache/flpkg/repos/freelfs/index.zst
+@ok back to the good repo :: sed -i 's|^repo freelfs .*|repo freelfs http://10.0.2.2:@PORT@/repo-x86_64|' /etc/flpkg.conf && flpkg sync > /tmp/sync-good.log 2>&1 && grep -q 'freelfs: ' /tmp/sync-good.log
+@ok the bumped package is offered (check-updates, what the Store reads) :: flpkg check-updates | cut -f1 | grep -qx flreport
+@ok flreport is at the old release now :: flpkg list | grep -qx 'flreport @OLDV@'
+@ok a terminal search looks at every source (FreeLFS answers, Flathub part may be empty) :: FLPKG_ASSUME_TTY=1 flpkg search flreport < /dev/null | grep -q '^freelfs/flreport'
+@ok a search into a pipe is the plain FreeLFS output (what the Store reads) :: flpkg search flreport | cat | head -1 | grep -q '^freelfs/flreport'
+# ---- the Store's Updates tab
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flstore --updates </dev/null >/tmp/store.log 2>&1 &'
+@waitok 40 the Store runs :: pgrep -u tester -x flstore
+@wait 12
+@shot @OUT@/lv-1-store-updates.ppm
+@shotcolors @OUT@/lv-1-store-updates.ppm 40
+# ---- upgrade through the front end: the person's command, one flauth prompt (none for tester), no -y
+@ok flpkg upgrade --sync as the live user installs the new flreport :: su -s /bin/sh tester -c 'flpkg upgrade --sync' > /tmp/upg.log 2>&1; flpkg list | grep -qx 'flreport @NEWV@'
+@ok the same command a second time has nothing to do :: su -s /bin/sh tester -c 'flpkg upgrade' > /tmp/upg2.log 2>&1; grep -qi 'up to date' /tmp/upg2.log
+@ok the flpkg database says so :: flpkg info flreport | grep -q 'Version *: @NEWV@'
+# ---- exFAT: a screenshot saved to the stick, and files copied to it
+@ok the stick is exFAT and writable for tester :: grep '^/dev/sda1 /drives/' /proc/mounts | grep -q exfat && su -s /bin/sh tester -c 'touch /drives/Ventoy/.w && rm /drives/Ventoy/.w'
+@ok no background writeback for the next checks (so only an fsync can have put data on the stick) :: sync; echo 0 > /proc/sys/vm/dirty_writeback_centisecs; echo 600000 > /proc/sys/vm/dirty_expire_centisecs; echo 60 > /proc/sys/vm/dirty_ratio; echo 50 > /proc/sys/vm/dirty_background_ratio
+@ok CONTROL: a plain write without fsync to the stick leaves its data dirty (the check can see a missing flush) :: sync; d0=$(awk '/^Dirty:/ {print $2}' /proc/meminfo); head -c 6000000 /dev/urandom > /drives/Ventoy/ctl.bin; d1=$(awk '/^Dirty:/ {print $2}' /proc/meminfo); echo "dirty $d0 -> $d1 KB"; test $((d1 - d0)) -gt 4000; sync; rm -f /drives/Ventoy/ctl.bin; sync
+@ok snappel saves a screenshot straight onto the exFAT stick :: sync; d0=$(awk '/^Dirty:/ {print $2}' /proc/meminfo); su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; snappel --full --output /drives/Ventoy/shot-direct.png'; d1=$(awk '/^Dirty:/ {print $2}' /proc/meminfo); echo "$d0 $d1" > /tmp/snap.dirty; test -s /drives/Ventoy/shot-direct.png
+@ok ... it is a PNG with content, not 0 bytes :: test "$(stat -c %s /drives/Ventoy/shot-direct.png)" -gt 10000 && head -c4 /drives/Ventoy/shot-direct.png | tail -c3 | grep -q PNG
+@ok ... snappel flushed the data to the stick before returning (Dirty grew by less than half of the file) :: read d0 d1 < /tmp/snap.dirty; sz=$(( $(stat -c %s /drives/Ventoy/shot-direct.png) / 1024 )); echo "dirty $d0 -> $d1 KB, file $sz KB"; test $((d1 - d0)) -lt $((sz / 2 + 1))
+@ok a folder with a screenshot and a 6 MB file to copy :: su -s /bin/sh tester -c 'mkdir -p ~/cp-src && cp /drives/Ventoy/shot-direct.png ~/cp-src/shot-copy.png && head -c 6000000 /dev/urandom > ~/cp-src/big.bin' && ls ~/../tester/cp-src > /dev/null 2>&1 || ls /home/tester/cp-src
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles /home/tester/cp-src </dev/null >/tmp/files-a.log 2>&1 &'
+@wait 5
+@key ctrl-a
+@key ctrl-c
+@wait 1
+@ok Dirty before the paste :: sync; awk '/^Dirty:/ {print $2}' /proc/meminfo > /tmp/paste.d0
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles /drives/Ventoy </dev/null >/tmp/files-b.log 2>&1 &'
+@wait 6
+@shot @OUT@/lv-2-files-before-paste.ppm
+@key ctrl-v
+@wait 8
+@shot @OUT@/lv-3-files-after-paste.ppm
+@waitok 30 Files copied the screenshot to the exFAT stick :: test -s /drives/Ventoy/shot-copy.png
+@ok ... with the same size as the source, not 0 bytes :: test "$(stat -c %s /drives/Ventoy/shot-copy.png)" = "$(stat -c %s /home/tester/cp-src/shot-copy.png)" && test "$(stat -c %s /drives/Ventoy/big.bin)" = 6000000
+@ok ... and the same content :: cmp /drives/Ventoy/big.bin /home/tester/cp-src/big.bin && cmp /drives/Ventoy/shot-copy.png /home/tester/cp-src/shot-copy.png
+@ok Files flushed each copied file (Dirty after the paste is small next to the 6 MB copied) :: sleep 2; d1=$(awk '/^Dirty:/ {print $2}' /proc/meminfo); read d0 < /tmp/paste.d0; echo "dirty $d0 -> $d1 KB"; test $((d1 - d0)) -lt 1500

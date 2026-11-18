@@ -1312,6 +1312,7 @@ static void draw(fl_ui *ui, void *ud)
 	fl_canvas *cv = &ui->cv;
 	fl_rect c = fl_win_content(g->win);
 	fl_fill_rect(cv, c, fl_th.bg);
+	g->tip_why = 0; /* a page that wants a tip sets it again this frame */
 
 	/* window-wide keys */
 	if (ui->key && (ui->mods & FL_MOD_CTRL)) {
@@ -1381,6 +1382,7 @@ static void draw(fl_ui *ui, void *ud)
 	}
 	cv->clip = save;
 	draw_status(ui, g, fl_r(c.x, c.y + c.h - STATUS_H, c.w, STATUS_H));
+	perf_tip(ui, g, c); /* last: over the sidebar, the pages and the status bar */
 }
 
 /* ---- timers and main ---------------------------------------------------------------------------- */

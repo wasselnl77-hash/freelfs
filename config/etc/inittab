@@ -31,4 +31,5 @@ s1:1:respawn:/sbin/sulogin
 6:2345:respawn:/sbin/agetty tty6 38400 linux
 
 # Serial console (QEMU, servers)
-S0:2345:respawn:/sbin/agetty --keep-baud 115200,38400,9600 ttyS0 vt220
+# (only when the UART exists: laptops have none, see rc.d/serial-getty)
+S0:2345:respawn:/etc/rc.d/serial-getty

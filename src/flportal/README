@@ -58,3 +58,15 @@ the rows never saw a click: no selection, no double click, no Enter on a folder.
 the old picture stayed until the next event. Every pass that consumed input now asks for one more. Not tested: files handed to a
 sandboxed app through the document portal (needs a Flatpak app; the dialog answers file:// URIs and xdg-desktop-portal registers
 them for a Flatpak caller), files on /drives (same code path as the home folder; the Places list has them).
+
+Round 22: the state log. A dialog that never shows left nothing behind: D-Bus activation throws stderr away, and
+the window line of flcomp.log comes only with the first picture. flportal now always appends to
+~/.local/state/freelfs/log/flportal.log (flreport collects it; moved to flportal.log.1 at 256 KB): the start
+with its WAYLAND_DISPLAY / XDG_RUNTIME_DIR / bus address, every call (interface, method, sender; the option
+keys, not their values), refusals with the reason (GetNameOwner failed or another owner), the request
+replies, a failed compositor connection (fl_app_new), a failed window, a closed window, a folder that could
+not be read, and "first frame" when the dialog drew. A missing "first frame" after a call means the
+compositor never sent the window its configure. If WAYLAND_DISPLAY or XDG_RUNTIME_DIR is missing in the
+activated environment, flportal finds them itself (/run/user/UID, wayland-0) and says so in the log.
+make check sets FLPORTAL_ANY_SENDER=1 (the scenarios call the impl interfaces directly) and XDG_STATE_HOME
+in its scratch directory.

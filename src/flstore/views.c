@@ -1013,6 +1013,32 @@ static void draw_side(fl_ui *ui, struct St *s, fl_rect side)
 	}
 }
 
+/* The live-install warning: drawn last, over the whole window. Install anyway starts the install (A_LIVE_GO),
+ * Cancel or Escape drops it (A_LIVE_STOP). */
+static void live_warn_dialog(fl_ui *ui, struct St *s, fl_rect c)
+{
+	fl_canvas *cv = &ui->cv;
+	fl_fill_rect(cv, c, (fl_th.bg & 0x00ffffffu) | 0xa8000000u);
+	int bw = c.w - 48 < 520 ? c.w - 48 : 520, bh = 200;
+	fl_rect b = fl_r(c.x + (c.w - bw) / 2, c.y + (c.h - bh) / 2, bw, bh);
+	fl_fill_rect(cv, b, fl_th.panel);
+	fl_stroke_rect(cv, b, 1, fl_th.line);
+	int x = b.x + 20, w = b.w - 40, y = b.y + 18;
+	fl_text_in(cv, ui->f_med, fl_r(x, y, w, 26), FL_LEFT, 0, fl_th.text, "Install on a live system?");
+	char ram[64] = "", t[360];
+	long mb = free_ram_mb();
+	if (mb >= 0)
+		snprintf(ram, sizeof ram, " You have %.1f GB free RAM.", (double)mb / 1024.0);
+	snprintf(t, sizeof t, "This is a live system. %s and what it needs (%s) will be stored in RAM and lost at "
+	         "shutdown.%s", s->live_name, s->live_size, ram);
+	text_block(ui, s->small, x, y + 36, w, fl_th.dim, t, 4);
+	int by = b.y + bh - 54;
+	if (fl_button(ui, ID_LIVE_GO, fl_r(x, by, 160, 34), "Install anyway", FL_BTN_ACCENT))
+		queue(s, A_LIVE_GO, 0);
+	if (fl_button(ui, ID_LIVE_STOP, fl_r(x + 172, by, 110, 34), "Cancel", FL_BTN_OUTLINE))
+		queue(s, A_LIVE_STOP, 0);
+}
+
 void draw(fl_ui *ui, void *ud)
 {
 	struct St *s = ud;
@@ -1027,6 +1053,10 @@ void draw(fl_ui *ui, void *ud)
 		ui->focus = ID_SEARCH;
 		ui->key = 0;
 	}
+	if (s->live_ask && ui->key == XKB_KEY_Escape) {
+		queue(s, A_LIVE_STOP, 0);
+		ui->key = 0;
+	}
 	if (ui->key == XKB_KEY_Escape) {
 		if (ui->focus == ID_SEARCH && s->query[0]) {
 			s->query[0] = 0;
@@ -1037,6 +1067,20 @@ void draw(fl_ui *ui, void *ud)
 		ui->key = 0;
 	}
 	fl_fill_rect(cv, c, fl_th.bg);
+	/* the live-install warning is modal: while it is up, the window under it gets no pointer or key events
+	 * (a click on "Remove" beside the box used to go through), and the dialog gets them after */
+	int sv_press = ui->press, sv_release = ui->release, sv_clicks = ui->clicks, sv_wheel = ui->wheel,
+	    sv_mx = ui->mx, sv_my = ui->my, sv_held = ui->btn_held;
+	uint32_t sv_key = ui->key;
+	char sv_text[sizeof ui->text];
+	memcpy(sv_text, ui->text, sizeof sv_text);
+	if (s->live_ask) {
+		ui->press = ui->release = ui->clicks = ui->wheel = 0;
+		ui->mx = ui->my = -10000;
+		ui->btn_held = 0;
+		ui->key = 0;
+		ui->text[0] = 0;
+	}
 	fl_rect area = c;
 	fl_rect top = fl_cut_top(&area, TOP_H);
 	fl_rect bar = fl_cut_bottom(&area, bar_height(s));
@@ -1055,5 +1099,11 @@ void draw(fl_ui *ui, void *ud)
 	if (s->bar_visible)
 		draw_bar(ui, s, bar);
 	draw_top(ui, s, top);
+	if (s->live_ask) {
+		ui->press = sv_press, ui->release = sv_release, ui->clicks = sv_clicks, ui->wheel = sv_wheel;
+		ui->mx = sv_mx, ui->my = sv_my, ui->btn_held = sv_held, ui->key = sv_key;
+		memcpy(ui->text, sv_text, sizeof sv_text);
+		live_warn_dialog(ui, s, c);
+	}
 	frame_end(s);
 }

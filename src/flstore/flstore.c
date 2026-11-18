@@ -667,6 +667,36 @@ static long mono_ms(void)
 }
 
 /* free megabytes where the person's Flatpak data lives (the home folder), -1 when unknown */
+/* RAM the system can still give out (MemAvailable), in MB; -1 if unknown */
+long free_ram_mb(void)
+{
+	char line[256];
+	long mb = -1;
+	FILE *f = fopen("/proc/meminfo", "r");
+	while (f && fgets(line, sizeof line, f))
+		if (!strncmp(line, "MemAvailable:", 13)) {
+			mb = strtol(line + 13, NULL, 10) / 1024;
+			break;
+		}
+	if (f)
+		fclose(f);
+	return mb;
+}
+
+/* is a mount point listed (persistence: /run/live/persist, the same test as flpersist status) */
+int mount_listed(const char *dir)
+{
+	char line[4300], mp[PATH_MAX];
+	int hit = 0;
+	FILE *f = fopen("/proc/self/mounts", "r");
+	while (f && !hit && fgets(line, sizeof line, f))
+		if (sscanf(line, "%*s %511s", mp) == 1 && !strcmp(mp, dir))
+			hit = 1;
+	if (f)
+		fclose(f);
+	return hit;
+}
+
 long free_mb_home(void)
 {
 	const char *h = getenv("HOME");
@@ -1084,9 +1114,13 @@ static void pk_parse_search(struct St *s, const char *buf)
 				const char *vend = memchr(ver, ' ', len - (size_t)(ver - p));
 				size_t vl = vend ? (size_t)(vend - ver) : len - (size_t)(ver - p);
 				int state = ST_AVAIL;
-				if (vend && strstr(vend, "[installed: older]"))
+				/* the tag is looked for in THIS line only: strstr() ran on to the end of the whole output, so
+				 * one "[installed: older]" further down made every installed package before it an update
+				 * (the Updates tab listed 60 packages "2.4.0-1 to 2.4.0-1") */
+				size_t rest = vend ? len - (size_t)(vend - p) : 0;
+				if (vend && memmem(vend, rest, "[installed: older]", 18))
 					state = ST_OLDER;
-				else if (vend && strstr(vend, "[installed]"))
+				else if (vend && memmem(vend, rest, "[installed]", 11))
 					state = ST_INST;
 				const char *next = e ? e + 1 : NULL, *sum = "";
 				size_t sl = 0;
@@ -1862,6 +1896,54 @@ static void search_run(struct St *s)
 	view_rebuild(s);
 }
 
+/* The install itself: flpkg or flatpak through the change queue (CK_*). act is A_INSTALL or A_UPDATE. */
+static void install_now(struct St *s, int act)
+{
+	struct rview v;
+	rview(s, s->cur.app, &v);
+	if (v.src == SRC_FH || v.src == SRC_FI)
+		chg_add(s, act == A_UPDATE || v.state == ST_OLDER ? CK_FUPDATE : CK_FINSTALL, v.id, v.name);
+	else if (valid_name(v.id))
+		chg_add(s, CK_PKINSTALL, v.id, v.name);
+}
+
+/* The call point for installs: on a live system without persistence, what is installed is kept in RAM and
+ * lost at shutdown, so the warning comes first (views.c draws it); otherwise the install starts at once. */
+static void install_request(struct St *s, int act)
+{
+	struct rview v;
+	rview(s, s->cur.app, &v);
+	if (!s->live || s->live_persist) {
+		install_now(s, act);
+		return;
+	}
+	/* info_parse stores the sizes under "Installed" and "Download" (flatpak's and flpkg's own keys are renamed) */
+	const char *sz = kv_get(s, "Installed", NULL);
+	if (!sz)
+		sz = kv_get(s, "Download", NULL);
+	snprintf(s->live_name, sizeof s->live_name, "%s", v.name);
+	snprintf(s->live_size, sizeof s->live_size, "%s", "a few GB");
+	if (sz) {
+		/* "1.2 GB" or "345 MB" as flatpak prints it */
+		char *end = NULL;
+		double n = strtod(sz, &end);
+		if (n > 0 && end) {
+			while (*end == ' ')
+				end++;
+			if (!strncmp(end, "GB", 2))
+				snprintf(s->live_size, sizeof s->live_size, "~%.1f GB", n);
+			else if (!strncmp(end, "MB", 2) || !strncmp(end, "MiB", 3))
+				snprintf(s->live_size, sizeof s->live_size, "~%.0f MB", n);
+			else if (!strncmp(end, "KiB", 3) || !strncmp(end, "kB", 2) || !strncmp(end, "KB", 2) || !strncmp(end, "B", 1))
+				snprintf(s->live_size, sizeof s->live_size, "under 1 MB");
+			else if (!strncmp(end, "GiB", 3))
+				snprintf(s->live_size, sizeof s->live_size, "~%.1f GB", n);
+		}
+	}
+	s->live_act = act;
+	s->live_ask = 1;
+}
+
 static void run_action(struct St *s)
 {
 	int act = s->act, arg = s->act_arg;
@@ -1928,15 +2010,14 @@ static void run_action(struct St *s)
 		break;
 	}
 	case A_INSTALL:
-	case A_UPDATE: {
-		struct rview v;
-		rview(s, s->cur.app, &v);
-		if (v.src == SRC_FH || v.src == SRC_FI)
-			chg_add(s, act == A_UPDATE || v.state == ST_OLDER ? CK_FUPDATE : CK_FINSTALL, v.id, v.name);
-		else if (valid_name(v.id))
-			chg_add(s, CK_PKINSTALL, v.id, v.name);
+	case A_UPDATE:
+		install_request(s, act);
 		break;
-	}
+	case A_LIVE_GO:
+		s->live_ask = 0;
+		install_now(s, s->live_act);
+		break;
+	case A_LIVE_STOP: s->live_ask = 0; break;
 	case A_ASK_REMOVE: s->ask_remove = 1; break;
 	case A_CANCEL: s->ask_remove = 0; break;
 	case A_REMOVE: {
@@ -2229,6 +2310,7 @@ int main(int argc, char **argv)
 	/* The live system keeps everything in memory: no catalog download (11 MB packed, 100 MB or more
 	 * unpacked and indexed) and no Flathub unless the person asks for it on the notice (A_LIVE_TRY). */
 	s->live = access(getenv("FLSTORE_LIVE_DIR") ? getenv("FLSTORE_LIVE_DIR") : "/run/live", F_OK) == 0;
+	s->live_persist = s->live && mount_listed("/run/live/persist");
 	if (!s->live)
 		cat_start(s);
 	fl_load_remote(s);

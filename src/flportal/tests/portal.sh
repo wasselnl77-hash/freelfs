@@ -101,6 +101,8 @@ export HOME=$T/home XDG_CONFIG_HOME=$T/cfg XDG_DATA_HOME=$T/data XDG_CACHE_HOME=
 export XDG_DATA_DIRS=$T/share:$R/usr/share XDG_DESKTOP_PORTAL_DIR=$T/share/xdg-desktop-portal/portals
 export XDG_CURRENT_DESKTOP=FreeLFS FLUI_CONF=$T/desktop.conf FONTCONFIG_FILE=$T/fonts.conf
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$T/bus FLPORTAL_VERBOSE=1
+# the state log (flportal.log) goes to the scratch dir, never to the host's ~/.local/state
+export XDG_STATE_HOME=$T/state
 export TEST_TMP=$T LD_FOR_TEST="$LD"
 
 # a few programs for the app chooser: the repo's own .desktop files, FreeBWS handling https
@@ -117,7 +119,9 @@ for p in fledit flfiles flterm freebws; do printf '#!/bin/sh\n' >"$T/appbin/$p";
 want=("$@")
 [ ${#want[@]} -eq 0 ] && want=(settings notification shots overlay-confirm overlay-popup overlay-prompt open-multiple save-file save-files open-folder appchooser screenshot screenshot-none access-deny)
 for sc in "${want[@]}"; do
-	env_extra=(FLPORTAL_SHOT="$T/shots/$sc")
+	# the scenarios call the impl interfaces directly (not through the frontend): the sender check is for
+	# real callers only, so the test turns it off
+	env_extra=(FLPORTAL_SHOT="$T/shots/$sc" FLPORTAL_ANY_SENDER=1)
 	case $sc in
 	open-multiple) env_extra+=(FLPORTAL_TEST_ACCEPT=1 FLPORTAL_TEST_SELECT=notes.txt,todo.md) ;;
 	save-file) env_extra+=(FLPORTAL_TEST_ACCEPT=1 FLPORTAL_TEST_NAME=minutes.txt) ;;

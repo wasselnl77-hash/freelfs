@@ -2,7 +2,7 @@
 # scripts. They come from config/etc in the FreeLFS tree.
 pkgname=initscripts
 version=0.1
-release=12
+release=13
 summary="FreeLFS boot scripts: rc.sysinit, rc, rc.shutdown and services"
 license=(MIT)
 arch=(any)
@@ -16,7 +16,7 @@ package() {
 	install -Dm644 "$etc/inittab" "$pkgdir/etc/inittab"
 	install -Dm644 "$etc/rc.conf" "$pkgdir/etc/rc.conf"
 	install -Dm644 "$etc/rc.d/functions" "$pkgdir/etc/rc.d/functions"
-	install -m755 "$etc"/rc.d/{rc,rc.sysinit,rc.shutdown} "$pkgdir/etc/rc.d/"
+	install -m755 "$etc"/rc.d/{rc,rc.sysinit,rc.shutdown,serial-getty} "$pkgdir/etc/rc.d/"
 	install -d "$pkgdir/etc/rc.d/init.d"
 	install -m755 "$etc"/rc.d/init.d/* "$pkgdir/etc/rc.d/init.d/"
 }

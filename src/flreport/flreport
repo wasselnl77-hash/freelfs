@@ -133,6 +133,13 @@ done
 for f in "$state"/freelfs/*/*.log "$state"/freelfs/*.log; do
 	[ -f "$f" ] && grab "$f" logs state-
 done
+# the file chooser portal's own log (flportal.log, .1 when rotated) and the compositor's window
+# events (configure, ack, maximize requests: "flcomp: win" lines of flcomp.log) in one file
+for f in "$state"/freelfs/log/flportal.log "$state"/freelfs/log/flportal.log.1; do
+	[ -f "$f" ] && [ ! -e "$r/logs/flportal-$(basename "$f")" ] && grab "$f" logs flportal-
+done
+grep -h "^flcomp: win " "$rt"/flcomp.log.1 "$rt"/flcomp.log 2>/dev/null | tail -n 2000 >"$r/logs/flcomp-windows.txt"
+[ -s "$r/logs/flcomp-windows.txt" ] || rm -f "$r/logs/flcomp-windows.txt"
 for f in /var/log/*; do
 	case ${f##*/} in btmp* | wtmp* | lastlog* | faillog*) continue ;; esac
 	[ -f "$f" ] && grab "$f" logs var-log-

@@ -21,6 +21,10 @@ typedef uint64_t u64;
 #ifndef LIVE_MARK
 #define LIVE_MARK "/run/live"
 #endif
+/* the two tmpfs mounts of a Load-into-RAM live system: the system image (root.sfs copy) and what
+ * is installed or saved on top of it (the overlay upper layer) */
+#define LIVE_RAM LIVE_MARK "/ram"
+#define LIVE_RW LIVE_MARK "/rw"
 
 /* ---- history (60 one-second samples, oldest first) ---------------------------------- */
 
@@ -103,6 +107,8 @@ struct sys {
 	u64 mem_total, mem_avail, mem_free, mem_cached, mem_buffers, mem_slab, mem_shmem;
 	u64 mem_unrec, mem_pt, mem_kstack; /* SUnreclaim, PageTables, KernelStack */
 	int live;
+	u64 live_ram_kb, live_rw_kb; /* used on the two live tmpfs mounts, kB (0: not mounted) */
+	double live_t;               /* when they were last read (every ~2 s) */
 	u64 swap_total, swap_free, commit, commit_limit;
 	struct hist h_mem;
 	int nproc, nthreads;
@@ -203,9 +209,11 @@ void rdr_set_timeout(double seconds);           /* tests: default 3 s */
 
 /* ---- memory in use, split (sys.c) ------------------------------------------------------ */
 
-/* All in kB. The parts add up to used exactly (other is what is left). */
+/* All in kB. The parts add up to used exactly (other is what is left), and cache and free add up
+ * to the rest of MemTotal: used + cache + free == MemTotal. */
 struct memsplit {
-	u64 used, apps, files, graphics, system, other;
+	u64 used, apps, sysimg, changes, files, graphics, system, other;
+	u64 cache, free;
 };
 
 void mem_split(struct memsplit *m, const struct sys *s, u64 apps_anon_kb);

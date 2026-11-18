@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/vfs.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -608,6 +609,52 @@ static void sample_cpu(struct sys *s)
 		hist_push(&s->h_ghz, s->ghz);
 }
 
+/* statfs on the live mounts; the tests put a fake one in its place (fake-test.c) */
+#ifdef GM_FAKE_STATFS
+int gm_fake_statfs(const char *path, struct statfs *st);
+#define LIVE_STATFS gm_fake_statfs
+#else
+#define LIVE_STATFS statfs
+#endif
+
+/* How much the two live tmpfs mounts hold. Only a real mount point counts (the mount table says
+ * which paths are mounts), so a plain directory never reads as the host's disk. Read every ~2 s:
+ * it is cheap, but there is no need to do it every sample. */
+static int live_mounted(const char *path)
+{
+	char buf[32768];
+	if (slurp(PROC_DIR "/mounts", buf, sizeof buf) <= 0)
+		return 0;
+	char mp[512];
+	for (char *l = buf; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL)
+		if (sscanf(l, "%*s %511s", mp) == 1 && !strcmp(mp, path))
+			return 1;
+	return 0;
+}
+
+static u64 live_used_kb(const char *path)
+{
+	if (!live_mounted(path))
+		return 0;
+	struct statfs st;
+	if (LIVE_STATFS(path, &st) != 0 || st.f_blocks < st.f_bfree)
+		return 0;
+	u64 fr = st.f_frsize ? st.f_frsize : st.f_bsize;
+	return (u64)(st.f_blocks - st.f_bfree) * fr / 1024;
+}
+
+static void sample_live(struct sys *s)
+{
+	if (!s->live)
+		return;
+	double t = now_s();
+	if (s->live_t > 0 && t - s->live_t < 2.0)
+		return;
+	s->live_t = t;
+	s->live_ram_kb = live_used_kb(LIVE_RAM);
+	s->live_rw_kb = live_used_kb(LIVE_RW);
+}
+
 static void sample_mem(struct sys *s)
 {
 	char buf[4096];
@@ -631,6 +678,7 @@ static void sample_mem(struct sys *s)
 		s->mem_avail = s->mem_free + s->mem_cached + s->mem_buffers;
 	double used = s->mem_total > s->mem_avail ? (double)(s->mem_total - s->mem_avail) : 0;
 	hist_push(&s->h_mem, s->mem_total ? 100.0 * used / (double)s->mem_total : 0);
+	sample_live(s);
 }
 
 static void sample_disk(struct sys *s)
@@ -774,31 +822,48 @@ void sys_sample(struct sys *s)
 /* ---- memory in use, split ---------------------------------------------------------------- */
 
 /* "In use" is MemTotal minus MemAvailable. Its parts: the programs' own memory (the anonymous
- * PSS summed over the processes, apps_anon_kb), shared memory and tmpfs (Shmem: a live system's
- * files and what is installed onto it), GPU memory kept in system RAM (GTT, when the driver
- * reports it; taken out of Shmem so it is not counted twice), unreclaimable kernel memory (slab,
- * page tables, kernel stacks). Other is what is left, so the parts always add up to used. Each
- * part is capped by what is still left, so a number read a moment apart cannot push the sum past
- * used. */
+ * PSS summed over the processes, apps_anon_kb), on a live system the two live tmpfs mounts (the
+ * system image in RAM, and what is installed or saved on top of it), other shared memory and tmpfs
+ * (the rest of Shmem), GPU memory kept in system RAM (GTT, when the driver reports it; taken out of
+ * Shmem so it is not counted twice), unreclaimable kernel memory (slab, page tables, kernel stacks).
+ * Other is what is left, so the parts always add up to used. Each part is capped by what is still
+ * left, so a number read a moment apart cannot push the sum past used.
+ *
+ * Page cache is Cached without Shmem (tmpfs pages are not cache you can drop), plus Buffers. It is
+ * capped by what is not in use, and free is the rest of MemTotal, so used + cache + free adds up to
+ * MemTotal exactly. */
+static u64 take(u64 want, u64 *left)
+{
+	u64 v = want < *left ? want : *left;
+	*left -= v;
+	return v;
+}
+
 void mem_split(struct memsplit *m, const struct sys *s, u64 apps_anon_kb)
 {
-	u64 used = s->mem_total > s->mem_avail ? s->mem_total - s->mem_avail : 0;
+	u64 total = s->mem_total;
+	u64 used = total > s->mem_avail ? total - s->mem_avail : 0;
 	u64 gfx = 0;
 	for (int i = 0; i < s->ngpu; i++)
 		gfx += s->gpu[i].gtt_used / 1024;
 	u64 gfx_in_shm = gfx < s->mem_shmem ? gfx : s->mem_shmem;
+	u64 shm_rest = s->mem_shmem - gfx_in_shm;
+	u64 kern = s->mem_unrec + s->mem_pt + s->mem_kstack;
+	u64 sysimg_w = s->live_ram_kb < shm_rest ? s->live_ram_kb : shm_rest;
+	u64 changes_w = s->live_rw_kb < shm_rest - sysimg_w ? s->live_rw_kb : shm_rest - sysimg_w;
+	u64 files_w = shm_rest - sysimg_w - changes_w;
+	u64 cache_w = s->mem_cached > s->mem_shmem ? s->mem_cached - s->mem_shmem : 0;
+	cache_w += s->mem_buffers;
 	u64 left = used;
 
 	m->used = used;
-	m->apps = apps_anon_kb < left ? apps_anon_kb : left;
-	left -= m->apps;
-	u64 kern = s->mem_unrec + s->mem_pt + s->mem_kstack;
-	m->system = kern < left ? kern : left;
-	left -= m->system;
-	u64 files = s->mem_shmem - gfx_in_shm;
-	m->files = files < left ? files : left;
-	left -= m->files;
-	m->graphics = gfx < left ? gfx : left;
-	left -= m->graphics;
+	m->apps = take(apps_anon_kb, &left);
+	m->system = take(kern, &left);
+	m->sysimg = take(sysimg_w, &left);
+	m->changes = take(changes_w, &left);
+	m->files = take(files_w, &left);
+	m->graphics = take(gfx, &left);
 	m->other = left;
+	m->cache = cache_w < total - used ? cache_w : total - used;
+	m->free = total - used - m->cache;
 }

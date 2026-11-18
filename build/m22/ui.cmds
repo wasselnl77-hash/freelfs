@@ -1,0 +1,68 @@
+# Round 22 UI checks by pictures (QEMU, the real apps, 1280x800): Files' rubber band, General Manager's live-memory rows, and the
+# Software Store's live-install warning (modal: a click beside the box must not reach the page below). Coordinates are those of
+# the screenshots I looked at while writing this (docs/m22 in the scratch dir).
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q WAYLAND_DISPLAY /tmp/sessenv && chmod 644 /tmp/sessenv
+# ---- Files: rubber band
+@ok 14 files in a folder :: su -s /bin/sh tester -c 'mkdir -p ~/band; for i in $(seq 1 14); do echo x > ~/band/file$i.txt; done'
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flfiles /home/tester/band </dev/null >/tmp/f.log 2>&1 &'
+@waitok 20 Files runs :: pgrep -u tester -x flfiles
+@wait 5
+@shot @OUT@/ui-1-files.ppm
+@drag 972 492 492 242 @OUT@/ui-2-band.ppm
+@wait 1
+@shotdiff @OUT@/ui-1-files.ppm @OUT@/ui-2-band.ppm 4000 342 122 1002 562
+@shotpix @OUT@/ui-2-band.ppm 243b32 3000
+@ok close Files :: pkill -u tester -x flfiles; sleep 1; ! pgrep -u tester -x flfiles
+# ---- General Manager: Performance > Memory on the live system
+@key meta_l
+@wait 2
+@type general
+@wait 2
+@key ret
+@wait 6
+@mouse 243 58
+@click
+@wait 3
+@mouse 200 200
+@click
+@wait 4
+@shot @OUT@/ui-3-gm-memory.ppm
+@shotcolors @OUT@/ui-3-gm-memory.ppm 100
+@ok close General Manager :: pkill -u tester -x general-manager; sleep 1; ! pgrep -u tester -x general-manager
+# ---- Store: the live warning
+@ok test repo on the host's server, synced (one update: flreport) :: sed -i 's|^repo freelfs .*|repo freelfs http://10.0.2.2:@PORT@/repo-x86_64|' /etc/flpkg.conf && flpkg sync > /dev/null 2>&1 && flpkg check-updates | cut -f1 | grep -qx flreport
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid flstore --updates </dev/null >/tmp/store.log 2>&1 &'
+@waitok 40 the Store runs :: pgrep -u tester -x flstore
+@wait 12
+@shot @OUT@/ui-4-store-updates.ppm
+@mouse 648 248
+@click
+@wait 3
+@shot @OUT@/ui-5-store-page.ppm
+@mouse 348 257
+@click
+@wait 2
+@shot @OUT@/ui-6-store-warning.ppm
+@shotdiff @OUT@/ui-5-store-page.ppm @OUT@/ui-6-store-warning.ppm 8000 368 284 888 483
+# modal: a click on "Remove" beside the box must not open "Remove flreport?" below it
+@mouse 476 257
+@click
+@wait 2
+@shot @OUT@/ui-7-store-after-click-beside.ppm
+@shotsame @OUT@/ui-6-store-warning.ppm @OUT@/ui-7-store-after-click-beside.ppm 700 285 236 618 278
+@ok nothing was installed or removed meanwhile :: flpkg list | grep -qx 'flreport @OLDV@'
+# Cancel closes the warning and still installs nothing
+@mouse 614 446
+@click
+@wait 2
+@shot @OUT@/ui-8-store-cancelled.ppm
+@shotdiff @OUT@/ui-7-store-after-click-beside.ppm @OUT@/ui-8-store-cancelled.ppm 8000 368 284 888 483
+@ok Cancel installed nothing :: flpkg list | grep -qx 'flreport @OLDV@'
+# Install anyway runs the update (through flpkg-seat)
+@mouse 348 257
+@click
+@wait 2
+@mouse 467 446
+@click
+@waitok 90 Install anyway updated flreport :: flpkg list | grep -qx 'flreport @NEWV@'

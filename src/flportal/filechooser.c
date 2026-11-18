@@ -1295,6 +1295,8 @@ static void draw(fl_ui *ui, void *ud)
 	if (!f->inited) {
 		ui->focus = f->kind == FC_SAVE ? ID_NAME : ID_LIST;
 		f->inited = 1;
+		/* the first picture went to the compositor: with no such line the window never got a configure */
+		portal_log("file chooser: first frame %dx%d in %s", c.w, c.h, f->cwd);
 	}
 	struct inmask im = {0};
 	int modal = f->ov != OV_NONE;
@@ -1550,7 +1552,10 @@ void fc_open(struct req *r, int kind, const char *title, GVariant *options)
 		ok = load_dir(f, "/", 1);
 	g_free(folder);
 	f->msg[0] = 0;
+	portal_log("file chooser: kind %d, folder %s, filters %d, choices %d", kind, f->cwd, f->nfilters,
+	           f->nchoices);
 	if (ok < 0) {
+		portal_log("file chooser: no folder could be read (the folder, the home folder, /): answered 2");
 		portal_reply(r, 2, NULL);
 		fc_destroy(&f->d);
 		return;

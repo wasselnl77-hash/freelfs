@@ -17,6 +17,6 @@ ${CC:-cc} $CFLAGS_T -o "$dir/data-test" tests/data-test.c sys.c proc.c rdr.c sta
 "$dir/data-test" || exit 1
 # the fake tree: PROC_DIR and SYS_DIR are compile-time roots, so the test is built against scratch paths
 mkdir -p "$dir/fake/proc" "$dir/fake/sys"
-${CC:-cc} $CFLAGS_T "-DPROC_DIR=\"$dir/fake/proc\"" "-DSYS_DIR=\"$dir/fake/sys\"" "-DLIVE_MARK=\"$dir/fake/live\"" -o "$dir/fake-test" \
+${CC:-cc} $CFLAGS_T "-DPROC_DIR=\"$dir/fake/proc\"" "-DSYS_DIR=\"$dir/fake/sys\"" "-DLIVE_MARK=\"$dir/fake/live\"" -DGM_FAKE_STATFS -o "$dir/fake-test" \
 	tests/fake-test.c sys.c proc.c rdr.c startup.c -lm -lpthread || exit 1
 "$dir/fake-test"

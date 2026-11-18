@@ -29,6 +29,16 @@ if a and a[0] == "--click":   # --click X Y [left|right]
     qmp([{"type": "abs", "data": {"axis": "x", "value": x * 32767 // (W - 1)}}, {"type": "abs", "data": {"axis": "y", "value": y * 32767 // (Hh - 1)}}]); time.sleep(0.3)
     qmp([{"type": "btn", "data": {"button": b, "down": True}}]); time.sleep(0.1)
     qmp([{"type": "btn", "data": {"button": b, "down": False}}]); sys.exit()
+if a and a[0] == "--drag":    # --drag X1 Y1 X2 Y2: press at 1, move in steps to 2 (button held), release
+    x1, y1, x2, y2 = [int(v) for v in a[1:5]]
+    def ab(x, y): return [{"type": "abs", "data": {"axis": "x", "value": x * 32767 // (W - 1)}}, {"type": "abs", "data": {"axis": "y", "value": y * 32767 // (Hh - 1)}}]
+    qmp(ab(x1, y1)); time.sleep(0.3)
+    qmp([{"type": "btn", "data": {"button": "left", "down": True}}]); time.sleep(0.2)
+    for i in range(1, 9):
+        qmp(ab(x1 + (x2 - x1) * i // 8, y1 + (y2 - y1) * i // 8)); time.sleep(0.15)
+    time.sleep(0.5)
+    if os.environ.get("HOLD"): sys.exit()
+    qmp([{"type": "btn", "data": {"button": "left", "down": False}}]); sys.exit()
 if a and a[0] == "--key": print(mon("sendkey " + " ".join(a[1:]), 0.5)); sys.exit()
 if a and a[0] == "--shot": print(mon("screendump " + a[1], 2.0)); sys.exit()
 if a and a[0] == "--put":   # --put LOCAL REMOTE (mode 755)

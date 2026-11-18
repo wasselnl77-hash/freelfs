@@ -34,6 +34,8 @@ int portal_test_mode(void); /* 1 when FLPORTAL_SHOT is set: render, answer, no w
 struct req *portal_req_find(const char *handle);
 struct dlg *portal_req_dlg(struct req *r);
 void portal_say(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
+/* the state log (~/.local/state/freelfs/log/flportal.log), always on; see main.c */
+void portal_log(const char *fmt, ...) G_GNUC_PRINTF(1, 2);
 
 /* ---- filechooser.c ---- */
 void fc_open(struct req *r, int kind, const char *title, GVariant *options);

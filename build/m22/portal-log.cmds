@@ -1,0 +1,31 @@
+# Round 22: the real portal path, end to end, as an app does it: org.freedesktop.portal.FileChooser on
+# org.freedesktop.portal.Desktop -> xdg-desktop-portal -> flportal (activated by the session bus daemon, NOT started by hand,
+# no FLPORTAL_ANY_SENDER). The dialog must map ("first frame" in flportal.log), flportal got the compositor's environment
+# through dbus-update-activation-environment, and the file chosen comes back.
+@desktop
+@ok session environment copied from the panel :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flpanel | head -1)/environ | grep -E '^[A-Z_]+=[A-Za-z0-9_/:.@,=+-]*$' > /tmp/sessenv && grep -q DBUS_SESSION /tmp/sessenv && chmod 644 /tmp/sessenv
+@ok the session script told the bus daemon where the compositor is :: su -s /bin/sh tester -c 'set -a; . /tmp/sessenv; dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListActivatableNames > /dev/null' && grep -q dbus-update-activation-environment /usr/libexec/flcomp-session /usr/share/flcomp/session /usr/bin/flcomp-session 2> /dev/null || grep -rq dbus-update-activation-environment /usr/libexec /usr/share/flcomp /usr/bin 2> /dev/null
+@ok a folder and a file to choose from :: su -s /bin/sh tester -c 'rm -rf ~/Documents; mkdir -p ~/Documents/Reports ~/Documents/Notes; echo hello > ~/Documents/Reports/inside.txt; echo hi > ~/Documents/top-file.txt'
+@put @OUT@/portal-client /tmp/portal-client
+su -s /bin/sh tester -c 'cd; set -a; . /tmp/sessenv; setsid /tmp/portal-client open > /tmp/pc.out 2>&1 &'
+@waitok 30 the app's request was accepted by xdg-desktop-portal :: grep -q requested /tmp/pc.out
+@waitok 30 flportal was activated by D-Bus :: pgrep -u tester -x flportal
+@ok flportal has WAYLAND_DISPLAY in its environment (the activation environment) :: tr '\0' '\n' < /proc/$(pgrep -u tester -x flportal | head -1)/environ | grep -q '^WAYLAND_DISPLAY='
+@wait 4
+@shot @OUT@/pl-1-open.ppm
+@shotcolors @OUT@/pl-1-open.ppm 40
+@waitok 15 the dialog drew its first frame (flportal.log) :: grep -q 'first frame' /home/tester/.local/state/freelfs/log/flportal.log
+@ok the log also has the request :: grep -q . /home/tester/.local/state/freelfs/log/flportal.log && tail -n 5 /home/tester/.local/state/freelfs/log/flportal.log
+@ok the compositor mapped a window for it (flcomp window log) :: grep -h 'flcomp: win' /run/user/1000/flcomp.log | grep -qi 'flportal\|portal'
+# choose the top file (as build/m21/portal-folder.cmds: open Documents by double click, click the file, Enter)
+@mouse 398 204
+@dclick
+@wait 2
+@mouse 398 204
+@click
+@wait 1
+@key ret
+@wait 3
+@waitok 15 the portal answered with a file URI :: grep -q '^uri file:///home/tester/Documents' /tmp/pc.out
+@ok response 0 (chosen) :: grep -q '^response 0' /tmp/pc.out
+@ok flreport collects flportal.log and the window log :: su -s /bin/sh tester -c 'cd /tmp; set -a; . /tmp/sessenv; rm -f /tmp/freelfs-report-*; flreport -q -o /tmp > /dev/null 2>&1'; tar tzf /tmp/freelfs-report-*.tar.gz | grep -q 'flportal' && tar tzf /tmp/freelfs-report-*.tar.gz | grep -q 'flcomp-windows'

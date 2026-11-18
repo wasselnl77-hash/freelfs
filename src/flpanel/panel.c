@@ -914,8 +914,9 @@ static void draw_panel(fl_ui *ui, void *ud)
 
 	/* windows */
 	int wx = 52 + 6;
-	const char *tip = NULL;	/* the title of the hovered entry, drawn after the last one (icon-only entries show no text) */
+	const char *tip = NULL;	/* the title of the hovered entry (icon-only entries show no text) */
 	int tip_full = 0;
+	fl_rect tip_r = { 0, 0, 0, 0 };	/* where the hovered entry is: the tooltip is centred on it */
 	for (int i = 0; i < p->nwins; i++) {
 		struct win *w = &p->wins[i];
 		int focused = w->focused && !w->minimized && !p->menu_open;
@@ -932,6 +933,7 @@ static void draw_panel(fl_ui *ui, void *ud)
 		int res = fl_widget(ui, ID_WIN + (uint32_t)i, r, FL_FOCUSABLE);
 		if (res & FL_HOVER) {
 			tip = name;
+			tip_r = r;
 			tip_full = labels && 12 + ICON_PX + 8 + fl_text_width(ui->f_reg, name, -1) + 12 <= ew;	/* the whole title shows already */
 		}
 		fl_color fg = focused ? fl_th.text : ((res & FL_HOVER) ? fl_th.text : fl_th.dim);
@@ -980,14 +982,25 @@ static void draw_panel(fl_ui *ui, void *ud)
 		}
 		wx += ew + 2;
 	}
-	/* the tooltip: a flat box with the window's title right after the last entry (the panel is one strip, so it is
-	 * drawn in it instead of in a surface of its own that would take the click away from the entry) */
-	if (tip && tip[0] && !tip_full && limit - wx > 60) {
+	/* the tooltip: a flat box with the hovered window's title, centred on that entry. The panel is one strip, so
+	 * the box is drawn in it (over the neighbours, last) instead of in a surface of its own, which would take the
+	 * click away from the entry. Clamped to the strip: a long title is cut to the screen width, and an entry near
+	 * an edge moves the box in, so it is never cut off and never skipped for lack of room after the last entry. */
+	if (tip && tip[0] && !tip_full) {
 		char fit[200];
-		int avail = limit - wx - 8 - 24;
-		fl_text_fit(ui->f_reg, tip, avail, fit, sizeof fit);
+		int room = W - 8;				/* the screen width less a margin on each side */
+		if (room > 360)
+			room = 360;				/* a title is not a paragraph */
+		fl_text_fit(ui->f_reg, tip, room - 24, fit, sizeof fit);
 		int tw2 = fl_text_width(ui->f_reg, fit, -1) + 24;
-		fl_rect tb = fl_r(wx + 8, 5, tw2, PANEL_H - 10);
+		int tx = tip_r.x + tip_r.w / 2 - tw2 / 2;
+		if (tx < 4)
+			tx = 4;
+		if (tx + tw2 > W - 4)
+			tx = W - 4 - tw2;
+		if (tx < 0)
+			tx = 0;
+		fl_rect tb = fl_r(tx, 5, tw2, PANEL_H - 10);
 		fl_fill_rect(cv, tb, fl_th.raised);
 		fl_stroke_rect(cv, tb, 1, fl_th.line);
 		fl_text_in(cv, ui->f_reg, tb, FL_CENTER, 0, fl_th.text, fit);

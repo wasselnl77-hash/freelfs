@@ -26,3 +26,10 @@ __pycache__/
 /src/flsnap/flsnap
 /src/fltheme/fltheme
 /src/fltheme/tests/contrast
+
+# signing keys never go into the repo (the repo key lives in ~/freelfs-work/repo-key)
+*.key
+repo-key/
+/publish/
+/.obsidian/
+/src/flpkg/flpkg

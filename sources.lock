@@ -252,3 +252,4 @@ e7713409882813991d2269d125e40dad1f54a019a52b78b3962941c1d4a6f86f  pciutils-3.14.
 83f68b59b58547589c00266e82671864627593ab4362d8c807f50eea923cad93  usbutils-018.tar.xz  https://www.kernel.org/pub/linux/utils/usb/usbutils/usbutils-018.tar.xz
 c9edd15f2eeeea63232f3e669a48e992c7be9aff57ee22672ac31f5eca1609a6  efivar-39.tar.gz  https://github.com/rhboot/efivar/archive/refs/tags/39.tar.gz
 442867d12f8525034a404fc8af3036dba8e1fc970998af2486c3b940dfad0874  efibootmgr-18.tar.gz  https://github.com/rhboot/efibootmgr/archive/refs/tags/18.tar.gz
+0c3bc4785ee3be3b89f93abb7cc0a9f60e56989e81319af140a4b60403b18f80  distrobox-1.8.2.5.tar.gz  https://github.com/89luca89/distrobox/archive/refs/tags/1.8.2.5.tar.gz

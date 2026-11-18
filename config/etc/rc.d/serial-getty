@@ -1,0 +1,15 @@
+#!/bin/sh
+# /etc/rc.d/serial-getty -- the getty on ttyS0 (inittab entry S0), only when a UART really exists.
+# Laptops have no serial port, yet the kernel makes /dev/ttyS0..3 for its 8250 driver: they exist but
+# are not ttys ("not a tty"), and init then logged "Id S0 respawning too fast" in a loop. A real
+# port has a type other than 0 in sysfs (4 is a 16550A). Without one this sleeps instead of exiting,
+# so init does not respawn it (a sleeping process is about 0.4 MB, once).
+sys=${FLSERIAL_SYS:-/sys/class/tty/ttyS0}
+dev=${FLSERIAL_DEV:-/dev/ttyS0}
+t=0
+[ -r "$sys/type" ] && read -r t < "$sys/type" 2> /dev/null
+if [ "${t:-0}" != 0 ] && [ -c "$dev" ] && [ -z "$FLSERIAL_TEST" ]; then
+	exec /sbin/agetty --keep-baud 115200,38400,9600 ttyS0 vt220
+fi
+[ -n "$FLSERIAL_TEST" ] && { [ "${t:-0}" != 0 ] && [ -c "$dev" ] && echo getty || echo none; exit 0; }
+exec sleep 2147483647

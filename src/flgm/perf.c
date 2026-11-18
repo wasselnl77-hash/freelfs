@@ -433,7 +433,8 @@ static const char *const why_lines[] = {
 	NULL,
 };
 
-static void why_tip(fl_ui *ui, struct gm *g, int rx, int ty)
+/* drawn by perf_tip, last in the frame: nothing may cover it, and it stays inside the window */
+static void why_tip(fl_ui *ui, struct gm *g, fl_rect win, int rx, int ty)
 {
 	fl_canvas *cv = &ui->cv;
 	int n = 0, wmax = 0;
@@ -443,6 +444,14 @@ static void why_tip(fl_ui *ui, struct gm *g, int rx, int ty)
 			wmax = tw;
 	}
 	fl_rect b = fl_r(rx - wmax - 24, ty, wmax + 24, n * 16 + 16);
+	if (b.x < win.x + 4)
+		b.x = win.x + 4;
+	if (b.x + b.w > win.x + win.w - 4)
+		b.x = win.x + win.w - 4 - b.w;
+	if (b.y + b.h > win.y + win.h - 4)
+		b.y = win.y + win.h - 4 - b.h;
+	if (b.y < win.y + 4)
+		b.y = win.y + 4;
 	fl_fill_rect(cv, b, fl_th.raised);
 	fl_stroke_rect(cv, b, 1, fl_th.line);
 	for (int i = 0; i < n; i++)
@@ -458,14 +467,14 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 	double tot = (double)s->mem_total * 1024;
 	int y = header(ui, g, r, "Memory", fmt_bytes(tot));
 	int stacked = stacked_for(w);
-	double used = (double)(s->mem_total - s->mem_avail) * 1024;
-	double cached = (double)(s->mem_cached + s->mem_buffers) * 1024;
-	double avail = (double)s->mem_avail * 1024;
 	u64 apps_anon = 0;
 	procs_mem(&g->ps, &apps_anon, NULL);
 	struct memsplit sp;
 	mem_split(&sp, s, apps_anon);
-	struct kv big[2], mid[2], kv[9];
+	double used = (double)sp.used * 1024;
+	double cached = (double)sp.cache * 1024;
+	double avail = (double)s->mem_avail * 1024;
+	struct kv big[2], mid[2], kv[12];
 	kvset(&big[0], "In use", "%s", fmt_bytes(used));
 	kvset(&big[1], "Available", "%s", fmt_bytes(avail));
 	kvset(&mid[0], "Cached", "%s", fmt_bytes(cached));
@@ -473,7 +482,12 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 	/* what "in use" is made of; the parts add up to it */
 	int nkv = 0;
 	kvset(&kv[nkv++], "Apps (own memory)", "%s", fmt_bytes((double)sp.apps * 1024));
-	kvset(&kv[nkv++], s->live ? "Live system and tmpfs" : "Shared memory and tmpfs", "%s", fmt_bytes((double)sp.files * 1024));
+	if (s->live) {
+		kvset(&kv[nkv++], "System image in RAM", "%s", fmt_bytes((double)sp.sysimg * 1024));
+		kvset(&kv[nkv++], "Your changes and installs", "%s", fmt_bytes((double)sp.changes * 1024));
+		kvset(&kv[nkv++], "Shared memory, tmpfs", "%s", fmt_bytes((double)sp.files * 1024));
+	} else
+		kvset(&kv[nkv++], "Shared memory and tmpfs", "%s", fmt_bytes((double)sp.files * 1024));
 	if (sp.graphics)
 		kvset(&kv[nkv++], "Graphics buffers", "%s", fmt_bytes((double)sp.graphics * 1024));
 	kvset(&kv[nkv++], "System (kernel)", "%s", fmt_bytes((double)sp.system * 1024));
@@ -492,21 +506,24 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 	snprintf(cap, sizeof cap, "%s", fmt_bytes(tot));
 	y = graph_block(ui, g, x, y, w, gh, "Memory usage", cap, &s->h_mem, NULL, 100, 0);
 
-	/* composition: in use | cached | free */
+	/* composition: in use | cached | free, the three add up to MemTotal (free is what is left) */
 	gm_text(ui, g->f.sm, fl_r(x, y, w, 18), FL_LEFT, fl_th.dim, "Memory composition");
 	fl_rect bar = fl_r(x, y + 22, w, 22);
 	fl_fill_rect(cv, bar, tint(fl_th.accent, 14));
-	double inuse_w = tot > 0 ? (used / tot) * (bar.w - 2) : 0;
-	double cache_w = tot > 0 ? (cached / tot) * (bar.w - 2) : 0;
-	if (inuse_w + cache_w > bar.w - 2)
-		cache_w = bar.w - 2 - inuse_w;
-	fl_fill_rect(cv, fl_r(bar.x + 1, bar.y + 1, (int)inuse_w, bar.h - 2), fl_th.accent);
-	fl_fill_rect(cv, fl_r(bar.x + 1 + (int)inuse_w, bar.y + 1, (int)cache_w, bar.h - 2), gm_alpha(fl_th.accent, 100));
+	int inner = bar.w - 2;
+	int use_px = tot > 0 ? (int)((double)sp.used * inner / (double)s->mem_total) : 0;
+	int cache_px = tot > 0 ? (int)((double)sp.cache * inner / (double)s->mem_total) : 0;
+	if (use_px > inner)
+		use_px = inner;
+	if (cache_px > inner - use_px)
+		cache_px = inner - use_px;
+	fl_fill_rect(cv, fl_r(bar.x + 1, bar.y + 1, use_px, bar.h - 2), fl_th.accent);
+	fl_fill_rect(cv, fl_r(bar.x + 1 + use_px, bar.y + 1, cache_px, bar.h - 2), gm_alpha(fl_th.accent, 100));
 	fl_stroke_rect(cv, bar, 1, tint(fl_th.accent, 110));
 	int lx = x;
 	const struct { const char *name; fl_color c; double v; } leg[3] = {
 		{"In use", fl_th.accent, used}, {"Cached", gm_alpha(fl_th.accent, 100), cached},
-		{"Free", tint(fl_th.accent, 30), (double)s->mem_free * 1024}};
+		{"Free", tint(fl_th.accent, 30), (double)sp.free * 1024}};
 	for (int i = 0; i < 3; i++) {
 		fl_fill_rect(cv, fl_r(lx, y + 52, 10, 10), leg[i].c);
 		fl_stroke_rect(cv, fl_r(lx, y + 52, 10, 10), 1, tint(fl_th.accent, 110));
@@ -525,9 +542,22 @@ static void page_mem(fl_ui *ui, struct gm *g, fl_rect r)
 	int qres = fl_widget(ui, ID_PERF + 95, qb, 0);
 	fl_stroke_rect(cv, qb, 1, (qres & FL_HOVER) ? fl_th.accent : fl_th.line);
 	gm_text(ui, g->f.tiny, qb, FL_CENTER, (qres & FL_HOVER) ? fl_th.strong : fl_th.dim, "?");
+	if (s->live)
+		gm_text(ui, g->f.sm, fl_r(x + w / 2, y, w - w / 2, 18), FL_RIGHT, fl_th.dim,
+		        "On a live system, everything you install or save is kept in RAM.");
 	stats_draw(ui, g, x, y + cap_h, w, big, 2, mid, 2, kv, nkv, stacked);
-	if (qres & FL_HOVER) /* drawn last, over the numbers */
-		why_tip(ui, g, qb.x + qb.w, qb.y + qb.h + 4);
+	if (qres & FL_HOVER) { /* drawn last, over everything: the window draws it after the sidebar and the pages */
+		g->tip_why = 1;
+		g->tip_x = qb.x + qb.w;
+		g->tip_y = qb.y + qb.h + 4;
+	}
+}
+
+void perf_tip(fl_ui *ui, struct gm *g, fl_rect win)
+{
+	if (g->tip_why)
+		why_tip(ui, g, win, g->tip_x, g->tip_y);
+	g->tip_why = 0;
 }
 
 static void page_disk(fl_ui *ui, struct gm *g, fl_rect r, int di)

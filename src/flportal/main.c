@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -69,6 +70,41 @@ void portal_say(const char *fmt, ...)
 	vfprintf(stderr, fmt, ap);
 	fputc('\n', stderr);
 	va_end(ap);
+}
+
+/* The state log, ~/.local/state/freelfs/log/flportal.log, which flreport collects. D-Bus activation
+ * throws stderr away, so everything that matters for a dialog that never shows goes here, always on.
+ * Small: the file is moved to flportal.log.1 at 256 KB. Calls are rare, so open and close per line. */
+#define PLOG_MAX (256 * 1024)
+
+void portal_log(const char *fmt, ...)
+{
+	char *dir = g_build_filename(g_get_user_state_dir(), "freelfs", "log", NULL);
+	char *path = g_build_filename(dir, "flportal.log", NULL);
+	g_mkdir_with_parents(dir, 0755);
+	struct stat st;
+	if (stat(path, &st) == 0 && st.st_size > PLOG_MAX) {
+		char *old = g_strconcat(path, ".1", NULL);
+		rename(path, old);
+		g_free(old);
+	}
+	FILE *f = fopen(path, "a");
+	if (f) {
+		time_t t = time(NULL);
+		struct tm tm;
+		char ts[32] = "?";
+		if (localtime_r(&t, &tm))
+			strftime(ts, sizeof ts, "%F %T", &tm);
+		va_list ap;
+		va_start(ap, fmt);
+		fprintf(f, "%s [%ld] ", ts, (long)getpid());
+		vfprintf(f, fmt, ap);
+		fputc('\n', f);
+		va_end(ap);
+		fclose(f);
+	}
+	g_free(path);
+	g_free(dir);
 }
 
 fl_app *portal_app_get(void) { return app; }
@@ -114,6 +150,7 @@ void portal_reply(struct req *r, unsigned response, GVariant *results)
 		results = g_variant_new("a{sv}", NULL);
 	if (r->inv) {
 		portal_say("reply %s: %u", r->handle, response);
+		portal_log("reply %s: %u", r->handle, response);
 		g_dbus_method_invocation_return_value(r->inv, g_variant_new("(u@a{sv})", response, results));
 		r->inv = NULL;
 	} else {
@@ -129,6 +166,7 @@ static void req_close(GDBusConnection *c, const char *sender, const char *path, 
 	struct req *r = ud;
 	g_dbus_method_invocation_return_value(inv, NULL);
 	portal_say("close %s", r->handle);
+	portal_log("Request.Close %s (the frontend gave up or the caller left)", r->handle);
 	portal_reply(r, 2, NULL);
 }
 
@@ -167,6 +205,31 @@ struct dlg *portal_req_dlg(struct req *r) { return r->dlg; }
 
 /* ---- windows -------------------------------------------------------------------------- */
 
+/* The Wayland connection needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY. A D-Bus activated process gets the
+ * environment of the bus daemon, which flcomp's session starts after it made the socket; if a login
+ * left either out, find them the way libwayland would (the runtime dir, then wayland-0 in it). */
+static void wayland_env(void)
+{
+	const char *rd = getenv("XDG_RUNTIME_DIR");
+	char def[64];
+	if (!rd || !*rd) {
+		snprintf(def, sizeof def, "/run/user/%u", (unsigned)getuid());
+		if (access(def, X_OK) == 0) {
+			setenv("XDG_RUNTIME_DIR", def, 1);
+			rd = def;
+			portal_log("XDG_RUNTIME_DIR was unset: using %s", def);
+		}
+	}
+	if (rd && *rd && !getenv("WAYLAND_DISPLAY")) {
+		char sock[512];
+		snprintf(sock, sizeof sock, "%s/wayland-0", rd);
+		if (access(sock, F_OK) == 0) {
+			setenv("WAYLAND_DISPLAY", "wayland-0", 1);
+			portal_log("WAYLAND_DISPLAY was unset: using wayland-0");
+		}
+	}
+}
+
 static fl_app *ensure_app(void)
 {
 	if (app)
@@ -175,8 +238,12 @@ static fl_app *ensure_app(void)
 		snprintf(shot_path, sizeof shot_path, "%s-%d.ppm", getenv("FLPORTAL_SHOT"), ++shot_n);
 		setenv("FLUI_PPM", shot_path, 1);
 	}
+	wayland_env();
 	app = fl_app_new(NULL, NULL);
-	if (app && !fl_app_ppm(app))
+	if (!app)
+		portal_log("no compositor connection: fl_app_new failed (WAYLAND_DISPLAY=%s XDG_RUNTIME_DIR=%s)",
+		           getenv("WAYLAND_DISPLAY") ?: "(unset)", getenv("XDG_RUNTIME_DIR") ?: "(unset)");
+	else if (!fl_app_ppm(app))
 		fl_app_watch_conf(app, NULL, NULL);
 	return app;
 }
@@ -203,6 +270,7 @@ static void reap(void)
 static void win_closed(fl_win *w, void *ud)
 {
 	struct dlg *d = ud;
+	portal_log("window closed by the compositor (%s)", d->req ? d->req->handle : "answered");
 	if (d->req)
 		portal_reply(d->req, 1, NULL);
 	d->dead = 1;
@@ -218,6 +286,7 @@ int portal_dialog_open(struct req *r, struct dlg *d, const fl_win_opts *o)
 		d->win = fl_win_new(a, &oo);
 	if (!a || !d->win) {
 		fprintf(stderr, "flportal: cannot open a window (no compositor?)\n");
+		portal_log("cannot open the window of %s: %s", r->handle, a ? "fl_win_new failed" : "no compositor");
 		portal_reply(r, 2, NULL);
 		d->destroy(d);
 		reap();
@@ -702,6 +771,26 @@ static const char portal_xml[] =
 	"</interface>"
 	"</node>";
 
+/* The option keys of a call, for the log (not the values: paths and names stay out of it). */
+static const char *opts_summary(GVariant *opts)
+{
+	static char buf[256];
+	GString *s = g_string_new(NULL);
+	GVariantIter it;
+	const char *key;
+	GVariant *val = NULL;
+	g_variant_iter_init(&it, opts);
+	while (g_variant_iter_next(&it, "{&sv}", &key, &val)) {
+		g_string_append_printf(s, "%s%s", s->len ? "," : "", key);
+		g_variant_unref(val);
+	}
+	if (!s->len)
+		g_string_append(s, "(none)");
+	snprintf(buf, sizeof buf, "%s", s->str);
+	g_string_free(s, TRUE);
+	return buf;
+}
+
 /* Only the frontend (the owner of org.freedesktop.portal.Desktop) may call the impl interfaces;
  * FLPORTAL_ANY_SENDER=1 turns the check off for the tests. */
 static gboolean sender_ok(const char *sender)
@@ -709,17 +798,22 @@ static gboolean sender_ok(const char *sender)
 	if (g_getenv("FLPORTAL_ANY_SENDER"))
 		return TRUE;
 	GError *err = NULL;
+	/* 5 s: a 1 s limit refused real calls when the session was busy (a loaded laptop, the first dialog) */
 	GVariant *v = g_dbus_connection_call_sync(conn, "org.freedesktop.DBus", "/org/freedesktop/DBus",
 	                                          "org.freedesktop.DBus", "GetNameOwner",
 	                                          g_variant_new("(s)", "org.freedesktop.portal.Desktop"),
-	                                          G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NONE, 1000, NULL, &err);
+	                                          G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &err);
 	if (!v) {
+		portal_log("refused %s: GetNameOwner of org.freedesktop.portal.Desktop failed: %s", sender,
+		           err->message);
 		g_clear_error(&err);
 		return FALSE;
 	}
 	const char *owner = NULL;
 	g_variant_get(v, "(&s)", &owner);
 	gboolean ok = owner && sender && !strcmp(owner, sender);
+	if (!ok)
+		portal_log("refused %s: the frontend is %s", sender, owner ? owner : "(nobody)");
 	g_variant_unref(v);
 	return ok;
 }
@@ -729,8 +823,10 @@ static void method_call(GDBusConnection *c, const char *sender, const char *path
 {
 	const char *ifn = iface + strlen("org.freedesktop.impl.portal.");
 	portal_say("%s.%s from %s", ifn, method, sender);
+	portal_log("%s.%s from %s", ifn, method, sender);
 	if (!sender_ok(sender)) {
 		portal_say("refused: %s is not xdg-desktop-portal", sender);
+		portal_log("refused %s.%s", ifn, method);
 		g_dbus_method_invocation_return_error_literal(inv, G_DBUS_ERROR, G_DBUS_ERROR_ACCESS_DENIED,
 		                                              "only xdg-desktop-portal may call the impl interfaces");
 		return;
@@ -739,7 +835,11 @@ static void method_call(GDBusConnection *c, const char *sender, const char *path
 		const char *handle, *app_id, *parent, *title;
 		GVariant *opts;
 		g_variant_get(p, "(&o&s&s&s@a{sv})", &handle, &app_id, &parent, &title, &opts);
+		portal_log("  handle=%s app=%s parent=%s title=\"%s\" options: %s", handle, app_id,
+		           parent && *parent ? parent : "(none)", title, opts_summary(opts));
 		struct req *r = req_new(inv, handle);
+		if (!r)
+			portal_log("  %s: the handle could not be exported (answered with an error)", handle);
 		if (r)
 			fc_open(r, !strcmp(method, "OpenFile") ? FC_OPEN : !strcmp(method, "SaveFile") ? FC_SAVE : FC_SAVEFILES,
 			        title, opts);
@@ -847,6 +947,7 @@ static gboolean on_term(gpointer ud)
 static void connection_lost(void)
 {
 	fprintf(stderr, "flportal: the compositor went away\n");
+	portal_log("the compositor connection was lost: open dialogs are answered 2");
 	for (struct dlg *d = dlgs; d; d = d->next)
 		if (d->req)
 			portal_reply(d->req, 2, NULL);
@@ -937,11 +1038,15 @@ int main(int argc, char **argv)
 	if (getenv("FLPORTAL_VERBOSE"))
 		verbose = TRUE;
 	signal(SIGPIPE, SIG_IGN);
+	portal_log("started: WAYLAND_DISPLAY=%s XDG_RUNTIME_DIR=%s XDG_CURRENT_DESKTOP=%s DBUS_SESSION_BUS_ADDRESS=%s",
+	           getenv("WAYLAND_DISPLAY") ?: "(unset)", getenv("XDG_RUNTIME_DIR") ?: "(unset)",
+	           getenv("XDG_CURRENT_DESKTOP") ?: "(unset)", getenv("DBUS_SESSION_BUS_ADDRESS") ?: "(unset)");
 
 	GError *err = NULL;
 	conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
 	if (!conn) {
 		fprintf(stderr, "flportal: no session bus: %s\n", err->message);
+		portal_log("no session bus: %s", err->message);
 		return 1;
 	}
 	g_dbus_connection_set_exit_on_close(conn, TRUE);

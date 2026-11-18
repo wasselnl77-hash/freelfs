@@ -24,7 +24,7 @@ Subcommands, with pacman-style flags as aliases.
 | `flpkg verify [PKG]` | `-Qk` | Check installed files against the database (size, sha256, mode, owner) |
 | `flpkg build [DIR]` | | Build the recipe in DIR into packages |
 | `flpkg repo add REPO PKGFILE...` | | Add packages to a repo and re-sign its index |
-| `flpkg key generate NAME` | | Create a signing key pair |
+| `flpkg key generate PATH` | | Create a signing key pair (PATH.key, PATH.pub) |
 | `flpkg fix-owners [--keep]` | | Apply ownership that a rootless install could not set. Opens the database read-only when nothing is pending; `--keep` (live system) leaves the list in place so the database is never written |
 | `flpkg history` | | Show past transactions |
 
@@ -193,6 +193,35 @@ may be trusted, and a new key can be introduced by the old one (`flpkg key intro
   package). `--count` prints just the number of lines. Exit 0 when the check
   worked, whether or not there are updates; 1 on any error (offline, bad
   signature), 2 on bad usage.
+
+### One command for all software (round 22)
+
+`flpkg install|remove|upgrade|search|list`, typed by a person, goes through `/usr/lib/flpkg/sources.sh` (source:
+`src/flpkg/sources.sh`), which uses the commands above for the FreeLFS repo and adds three more sources, in this order:
+FreeLFS repo, Flathub (`flatpak --user`, no root), Nix (package `nix`, scaffold) and Distrobox containers (Ubuntu apt,
+Arch pacman, Fedora dnf; package `distrobox` plus podman, scaffold).
+
+- `flpkg install NAME`: every source that has NAME is listed ("1) FreeLFS repository (preselected) 2) Flathub ..."); Enter
+  takes the FreeLFS one. `--from=freelfs|flatpak|nix|apt|pacman|dnf` skips the question. Nothing found in the first three:
+  it offers to try apt, pacman or dnf, and creating a container always asks first (with the download size).
+- On a live system without persistence a Flatpak install warns that it goes into RAM, with its size, and asks.
+- `flpkg remove NAME` uses the source that installed it (FreeLFS: flpkg's database; the others:
+  `~/.local/state/flpkg/sources.list`, plus Flatpak apps found by name).
+- `flpkg upgrade` runs each source's own update; the FreeLFS part is `flpkg-seat upgrade` (one flauth prompt, none for the
+  live tester). `flpkg search` and `flpkg list` show every source on a terminal (or with `--all`); into a pipe they stay the
+  plain FreeLFS output the Store and Packages read. Native options (`--cascade`, `--recursive`, `--needed`, `--asdeps`, `--nodeps`,
+  `--unsigned`, `--overwrite GLOB`) are passed on to the FreeLFS source (as root; the password-free route for a person,
+  `flpkg-seat`, takes names only, so a person is told to use root); unknown options are an error. Root with `-y`, `--nodeps`,
+  `--unsigned` or a package file (flpkg-seat, build scripts), `--root`, `--config` or `FLPKG_NO_SOURCES=1` run the native commands.
+
+### Publishing on GitHub Releases (round 22)
+
+`build/70-repo.sh` (with `FLFS_REPO_URL=https://github.com/wasselnl77-hash/freelfs/releases/download/repo-x86_64`, already
+in `config/flpkg/repo-url`) makes and signs the repo; `build/70-publish-repo.sh` stages it as hard links in
+`~/freelfs-work/publish/repo-x86_64/` and writes `publish/upload.sh` (`gh release create` once, then `gh release upload
+--clobber` for the changed files, the index last, stale assets deleted). It uploads nothing. The private key stays in
+`~/freelfs-work/repo-key/` (`.gitignore` covers `*.key` and `repo-key/`; the script refuses to stage a key). The index is
+valid 14 days: run `70-repo.sh`, `70-publish-repo.sh` and `upload.sh` again before it expires.
 
 ### Publishing a repo
 

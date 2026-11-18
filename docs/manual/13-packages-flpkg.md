@@ -57,7 +57,7 @@ From `flpkg help` (`src/flpkg/main.c`):
 | `flpkg verify [PKG]` | `-Qk` | check installed files against the database (size, sha256, mode, owner) |
 | `flpkg build [DIR]` | none | build the recipe in DIR into a package (13.5) |
 | `flpkg repo add REPO FILE...` | none | add packages to a repo and re-sign its index |
-| `flpkg key generate NAME` | none | create a signing key pair (`NAME.key`, `NAME.pub`) |
+| `flpkg key generate PATH` | none | create a signing key pair (`PATH.key`, `PATH.pub`) |
 | `flpkg key introduce --key OLD.key --new NEW.pub DIR` | none | write a key rotation statement (13.7) |
 | `flpkg key list` | none | trusted keys and their retirement dates |
 | `flpkg fix-owners [--keep]` | none | apply ownership that a rootless build could not set; `--keep` leaves the database alone (used on the live system) |
@@ -71,9 +71,9 @@ Global options before the command: `--root DIR` (work on another root, e.g. a ch
 
 | Command | Options |
 |---|---|
-| `install` | `--nodeps` (`-d`), `--yes` (`-y`), `--asdeps` (`-a`, mark as dependency), `--overwrite GLOB` (`-o`), `--needed` (`-n`, skip what is already the same version), `--unsigned` (`-u`, accept a `.flpkg` file without a valid signature) |
-| `remove` | `--cascade` (`-c`, also remove what depends on the target), `--recursive` (`-r`, also remove dependencies nothing else needs), `--nodeps` (`-d`), `--yes` (`-y`) |
-| `upgrade` | `--sync` (`-s`, runs `sync` first; `-Syu` is `upgrade --sync`), `--yes` (`-y`), `--nodeps` (`-d`) |
+| `install` | `--nodeps`, `--yes` (`-y`), `--asdeps` (mark as a dependency), `--overwrite GLOB`, `--needed` (skip what is already the same version), `--unsigned` (accept a `.flpkg` file without a valid signature) |
+| `remove` | `--cascade` (also remove what depends on the target), `--recursive` (also remove dependencies nothing else needs), `--nodeps`, `--yes` (`-y`) |
+| `upgrade` | `--sync` (runs `sync` first; `-Syu` is `upgrade --sync`), `--yes` (`-y`), `--nodeps` |
 | `check-updates` | `--offline` (use the last synced indexes), `--count` (print only the number). Exit 0 = checked, 1 = error (no network, bad signature), 2 = bad usage |
 | `search` | the text to look for, several words allowed |
 | `fix-owners` | `--keep` |

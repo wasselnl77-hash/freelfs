@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 #include "../gm.h"
@@ -46,6 +47,26 @@ static void wr(const char *path, const char *fmt, ...)
 static void dir(const char *path)
 {
 	mkdir(path, 0755);
+}
+
+/* the statfs that sys.c uses for the live mounts: fixed numbers per mount point, in kB used */
+int gm_fake_statfs(const char *path, struct statfs *st)
+{
+	unsigned long long used_kb;
+	memset(st, 0, sizeof *st);
+	if (!strcmp(path, LIVE_RAM))
+		used_kb = 931000;
+	else if (!strcmp(path, LIVE_RW))
+		used_kb = 2600000;
+	else {
+		errno = ENOENT;
+		return -1;
+	}
+	st->f_frsize = 4096;
+	st->f_bsize = 4096;
+	st->f_blocks = 2000000;
+	st->f_bfree = st->f_blocks - used_kb * 1024 / 4096;
+	return 0;
 }
 
 static void proc_entry_pp(int pid, int ppid, const char *comm, unsigned long long start, unsigned long long ticks,
@@ -282,12 +303,48 @@ int main(void)
 	sum = m.apps + m.system + m.files + m.graphics + m.other;
 	CHECK(m.apps == 500000 && m.other == 0 && sum == m.used, "capped split adds up to used");
 	s.gpu[0].gtt_used = 0;
-	/* a live system: the mark file makes sys_init report it */
-	wr(LIVE_MARK, "live\n");
+	/* page cache is Cached without Shmem, plus Buffers; free is what is left of MemTotal */
+	CHECK(m.cache == 61000 && m.free == 439000 && m.used + m.cache + m.free == 1000000,
+	      "cache %lu, free %lu kB: used + cache + free is MemTotal", (unsigned long)m.cache, (unsigned long)m.free);
+
+	/* a live system: the mark directory makes sys_init report it; the two live tmpfs mounts are read from
+	 * the mount table and statfs. Numbers from a real Load-into-RAM laptop (7 GiB, report-5), in kB. */
+	dir(LIVE_MARK);
+	wr(PROC_DIR "/meminfo", "MemTotal: 7340032 kB\nMemFree: 1900000 kB\nMemAvailable: 2940032 kB\nCached: 4246000 kB\n"
+	                        "Buffers: 20000 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\nShmem: 3795000 kB\nSlab: 70000 kB\n"
+	                        "SUnreclaim: 50000 kB\nPageTables: 8000 kB\nKernelStack: 2000 kB\n");
+	wr(PROC_DIR "/mounts", "overlay / overlay rw 0 0\ntmpfs %s tmpfs rw 0 0\ntmpfs %s tmpfs rw 0 0\n", LIVE_RAM, LIVE_RW);
 	static struct sys live;
 	sys_init(&live);
 	CHECK(live.live, "live mark seen by sys_init");
-	unlink(LIVE_MARK);
+	sys_sample(&live);
+	CHECK(live.live_ram_kb == 931000 && live.live_rw_kb == 2600000, "live mounts: image %lu kB, changes %lu kB",
+	      (unsigned long)live.live_ram_kb, (unsigned long)live.live_rw_kb);
+	struct memsplit lm;
+	mem_split(&lm, &live, 131072);
+	sum = lm.apps + lm.sysimg + lm.changes + lm.files + lm.graphics + lm.system + lm.other;
+	CHECK(lm.used == 4400000 && lm.apps == 131072 && lm.system == 60000 && lm.sysimg == 931000 &&
+	          lm.changes == 2600000 && lm.files == 264000 && lm.graphics == 0 && lm.other == 413928 && sum == lm.used,
+	      "live split: image %lu, changes %lu, shm %lu, other %lu kB", (unsigned long)lm.sysimg,
+	      (unsigned long)lm.changes, (unsigned long)lm.files, (unsigned long)lm.other);
+	CHECK(lm.cache == 471000 && lm.free == 2469032 && lm.used + lm.cache + lm.free == 7340032,
+	      "live cache %lu kB, free %lu kB: adds up to MemTotal", (unsigned long)lm.cache, (unsigned long)lm.free);
+	/* the mounts change inside two seconds: the old numbers stay, the read is every ~2 s */
+	wr(PROC_DIR "/mounts", "overlay / overlay rw 0 0\n");
+	sys_sample(&live);
+	CHECK(live.live_ram_kb == 931000, "live mounts read at most every ~2 s");
+	/* not mounted (a plain directory): nothing is counted as the live system */
+	static struct sys plain;
+	sys_init(&plain);
+	sys_sample(&plain);
+	struct memsplit pm;
+	mem_split(&pm, &plain, 131072);
+	sum = pm.apps + pm.sysimg + pm.changes + pm.files + pm.graphics + pm.system + pm.other;
+	CHECK(plain.live_ram_kb == 0 && pm.sysimg == 0 && pm.changes == 0 && pm.files == 3795000 && sum == pm.used &&
+	          pm.used + pm.cache + pm.free == 7340032,
+	      "unmounted live dirs count as nothing (shm %lu kB)", (unsigned long)pm.files);
+	unlink(PROC_DIR "/mounts");
+	rmdir(LIVE_MARK);
 
 	/* the process table: 300 processes plus the odd ones */
 	static struct procs ps;

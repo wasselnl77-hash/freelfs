@@ -4,12 +4,14 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 static void usage(FILE *f)
 {
 	fputs("usage: flpkg [--root DIR] [--config FILE] COMMAND [ARGS]\n\n"
 	      "Packages:\n"
-	      "  install PKG...      (-S)   install packages and their dependencies\n"
+	      "  install PKG...      (-S)   install packages and their dependencies (a terminal user: every source,\n"
+	      "                             FreeLFS first, --from=freelfs|flatpak|nix|apt|pacman|dnf picks one)\n"
 	      "  remove PKG...       (-R)   remove packages\n"
 	      "  upgrade             (-Su)  upgrade all packages\n"
 	      "  sync                (-Sy)  refresh the repo indexes\n"
@@ -24,7 +26,7 @@ static void usage(FILE *f)
 	      "Building:\n"
 	      "  build [DIR]                build the recipe in DIR\n"
 	      "  repo add REPO FILE...      add packages to a repo\n"
-	      "  key generate NAME          create a signing key\n"
+	      "  key generate PATH          create a signing key pair (PATH.key and PATH.pub)\n"
 	      "  key introduce --key OLD.key --new NEW.pub DIR   rotation statement (see docs/SECURITY.md)\n"
 	      "  key list                   the trusted keys and their retirement dates\n"
 	      "System:\n"
@@ -125,6 +127,53 @@ static char **translate(int *argc, char **argv)
 	die("unknown option %s (see 'flpkg help')", argv[0]);
 }
 
+
+/* Round 22: install, remove, upgrade, search and list on the command line of a person go through
+ * the sources front end (lib/flpkg/sources.sh: FreeLFS repo, Flathub, Nix, Distrobox). The native
+ * commands stay for everything else: -y (flpkg-seat, build scripts), --root, package files, a
+ * different config, FLPKG_NO_SOURCES=1. search and list show every source only on a terminal (or
+ * with --all): what other programs read from a pipe stays the plain FreeLFS output. */
+static void maybe_sources(const char *cmd, int argc, char **argv, const char *config, const char *root)
+{
+	static const char *const cmds[] = {"install", "remove", "upgrade", "search", "list"};
+	bool hit = false, all = false;
+	for (size_t i = 0; i < sizeof cmds / sizeof *cmds; i++)
+		hit |= !strcmp(cmd, cmds[i]);
+	if (!hit || root || strcmp(config, "/etc/flpkg.conf") || getenv("FLPKG_NO_SOURCES"))
+		return;
+	const char *script = getenv("FLPKG_SOURCES") ? getenv("FLPKG_SOURCES") : "/usr/lib/flpkg/sources.sh";
+	if (access(script, X_OK) != 0)
+		return;
+	bool priv = !strcmp(cmd, "install") || !strcmp(cmd, "remove") || !strcmp(cmd, "upgrade");
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--all"))
+			all = true;
+		else if (!strcmp(argv[i], "--explicit") || !strcmp(argv[i], "--deps") || !strcmp(argv[i], "--repo"))
+			return; /* native queries */
+		else if (geteuid() == 0 && priv &&
+		         (!strcmp(argv[i], "-y") || !strcmp(argv[i], "--yes") || !strcmp(argv[i], "--nodeps") ||
+		          !strcmp(argv[i], "--unsigned") || has_suffix(argv[i], ".flpkg")))
+			return; /* root with a file or -y: flpkg-seat, build scripts. A person without root goes to the front end,
+			         * which sends it through flpkg-seat (flauth) or says what cannot be done that way */
+	}
+	bool view = !strcmp(cmd, "search") || !strcmp(cmd, "list");
+	if (view && !all && !isatty(1) && !getenv("FLPKG_ASSUME_TTY"))
+		return;
+	if (!strcmp(cmd, "search") && argc == 2 && !argv[1][0])
+		return; /* the Store lists everything with an empty search */
+	char **nv = xcalloc((size_t)argc + 2, sizeof(char *));
+	nv[0] = (char *)script;
+	for (int i = 0; i < argc; i++)
+		nv[i + 1] = argv[i];
+	char self[4096];
+	ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+	if (n > 0 && !getenv("FLPKG_NATIVE")) {
+		self[n] = 0;
+		setenv("FLPKG_NATIVE", self, 1);
+	}
+	execv(script, nv);
+}
+
 int main(int argc, char **argv)
 {
 	const char *config = "/etc/flpkg.conf", *root = NULL;
@@ -155,6 +204,7 @@ int main(int argc, char **argv)
 		argv = translate(&argc, argv);
 
 	const char *cmd = argv[0];
+	maybe_sources(cmd, argc, argv, config, root);
 	if (!strcmp(cmd, "help") || !strcmp(cmd, "--help")) {
 		usage(stdout);
 		return 0;

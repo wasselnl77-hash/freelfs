@@ -27,6 +27,9 @@ grep -qx 'ARGS: install -y -- vim gcc++ lib_x-1.0' "$dir/out" && ok "install pas
 grep -q "SECRET=\|LD_PRELOAD=" "$dir/out" && bad "environment is cleared" || ok "environment is cleared"
 grep -q 'ENV: PATH=/usr/sbin:/usr/bin ' "$dir/out" && ok "only PATH is set" || bad "only PATH is set"
 grep -qx 'CWD: /' "$dir/out" && ok "runs in /" || bad "runs in /"
+"$dir/seat" upgrade > "$dir/out" 2>&1
+grep -qx 'ARGS: upgrade -y --sync' "$dir/out" && ok "upgrade runs flpkg upgrade -y --sync" || bad "upgrade args"
+rejects "upgrade takes no names" upgrade vim
 "$dir/seat" remove vim > "$dir/out" 2>&1
 grep -qx 'ARGS: remove -y -- vim' "$dir/out" && ok "remove args" || bad "remove args"
 rejects "no arguments"

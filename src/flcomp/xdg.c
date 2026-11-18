@@ -14,6 +14,29 @@
 #define EDGE_LEFT 4
 #define EDGE_RIGHT 8
 
+/* The window diagnostics (round 22: Firefox would not stay maximized): one line per event in the flcomp
+ * log, "flcomp: win ...". A few numbers and no allocation, so cheap; FLCOMP_WINLOG=0 turns them off. */
+static bool winlog_on(void)
+{
+	static int on = -1;
+	if (on < 0) {
+		const char *e = getenv("FLCOMP_WINLOG");
+		on = !(e && !strcmp(e, "0"));
+	}
+	return on;
+}
+
+#define WLOG(...)                                                                                                  \
+	do {                                                                                                           \
+		if (winlog_on())                                                                                       \
+			fprintf(stderr, "flcomp: win " __VA_ARGS__);                                                   \
+	} while (0)
+
+static const char *win_name(const struct window *w)
+{
+	return w && w->app_id ? w->app_id : "?";
+}
+
 /* ---- area and configure ----------------------------------------------- */
 
 struct rect work_area(void)
@@ -50,8 +73,13 @@ static void window_configure(struct window *w, int cw, int ch)
 		xwm_window_configure(w, cw, ch);
 		return;
 	}
-	if (!w->xs || !w->res || !w->xs->configured)
+	if (!w->xs || !w->res)
 		return;
+	if (!w->xs->configured) {
+		WLOG("%s configure %dx%d deferred: no first commit yet (max=%d full=%d)\n", win_name(w), cw, ch,
+		     w->maximized, w->fullscreen);
+		return;
+	}
 	struct wl_array st;
 	wl_array_init(&st);
 	uint32_t *p;
@@ -76,6 +104,11 @@ static void window_configure(struct window *w, int cw, int ch)
 	xdg_toplevel_send_configure(w->res, cw, ch, &st);
 	w->xs->serial = wl_display_next_serial(C.dpy);
 	xdg_surface_send_configure(w->xs->res, w->xs->serial);
+	WLOG("%s configure %dx%d serial %u states:%s%s%s%s%s (max=%d full=%d mapped=%d)\n", win_name(w), cw, ch,
+	     w->xs->serial, w->maximized ? " maximized" : "", w->fullscreen ? " fullscreen" : "",
+	     w->resizing ? " resizing" : "", C.focused == w ? " activated" : "",
+	     (w->snap == -1 || w->snap == 1) && !w->maximized && !w->fullscreen ? " tiled" : "", w->maximized,
+	     w->fullscreen, w->mapped);
 	wl_array_release(&st);
 }
 
@@ -1241,6 +1274,7 @@ static void tl_resize(struct wl_client *c, struct wl_resource *r, struct wl_reso
 static void tl_set_max_size(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y)
 {
 	WIN();
+	WLOG("%s set_max_size %dx%d\n", win_name(w), x, y);
 	w->max_w = x;
 	w->max_h = y;
 }
@@ -1248,6 +1282,7 @@ static void tl_set_max_size(struct wl_client *c, struct wl_resource *r, int32_t 
 static void tl_set_min_size(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y)
 {
 	WIN();
+	WLOG("%s set_min_size %dx%d\n", win_name(w), x, y);
 	w->min_w = x;
 	w->min_h = y;
 }
@@ -1255,30 +1290,36 @@ static void tl_set_min_size(struct wl_client *c, struct wl_resource *r, int32_t 
 static void tl_set_maximized(struct wl_client *c, struct wl_resource *r)
 {
 	WIN();
+	WLOG("%s set_maximized (mapped=%d configured=%d was max=%d full=%d)\n", win_name(w), w->mapped,
+	     w->xs ? w->xs->configured : 0, w->maximized, w->fullscreen);
 	window_set_state(w, true, w->fullscreen);
 }
 
 static void tl_unset_maximized(struct wl_client *c, struct wl_resource *r)
 {
 	WIN();
+	WLOG("%s unset_maximized (mapped=%d have_restore=%d)\n", win_name(w), w->mapped, w->have_restore);
 	window_set_state(w, false, w->fullscreen);
 }
 
 static void tl_set_fullscreen(struct wl_client *c, struct wl_resource *r, struct wl_resource *o)
 {
 	WIN();
+	WLOG("%s set_fullscreen (mapped=%d output=%s)\n", win_name(w), w->mapped, o ? "given" : "none");
 	window_set_state(w, w->maximized, true);
 }
 
 static void tl_unset_fullscreen(struct wl_client *c, struct wl_resource *r)
 {
 	WIN();
+	WLOG("%s unset_fullscreen\n", win_name(w));
 	window_set_state(w, w->maximized, false);
 }
 
 static void tl_set_minimized(struct wl_client *c, struct wl_resource *r)
 {
 	WIN();
+	WLOG("%s set_minimized (mapped=%d)\n", win_name(w), w->mapped);
 	window_minimize(w);
 }
 
@@ -1500,12 +1541,15 @@ static void xs_set_geometry(struct wl_client *c, struct wl_resource *r, int32_t 
 		return;
 	xs->p_geom = (struct rect){ x, y, x + w, y + h };
 	xs->p_geom_set = true;
+	WLOG("%s set_window_geometry %d,%d %dx%d\n", win_name(xs->win), x, y, w, h);
 }
 
 static void xs_ack_configure(struct wl_client *c, struct wl_resource *r, uint32_t serial)
 {
 	struct xdg_surf *xs = wl_resource_get_user_data(r);
 	xs->acked = serial;
+	WLOG("%s ack_configure serial %u (last sent %u)%s\n", win_name(xs->win), serial, xs->serial,
+	     serial == xs->serial ? "" : " MISMATCH");
 }
 
 static const struct xdg_surface_interface xdg_surface_impl = {

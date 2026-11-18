@@ -1,0 +1,17 @@
+Scaffold, not built (round 22). Nix on FreeLFS: /nix, a nix-daemon started on demand.
+
+Source (provenance): the official binary tarball of a pinned release from
+  https://releases.nixos.org/nix/nix-VERSION/nix-VERSION-x86_64-linux.tar.xz
+  with the checksum from the same directory's nix-VERSION-x86_64-linux.tar.xz.sha256, copied into the recipe
+  as sha256 (the build then refuses any other bytes). The tarball holds /nix/store paths plus a
+  .reginfo; its install script is NOT run (never curl | sh): the recipe unpacks the store closure
+  into $pkgdir/nix/store and registers it with `nix-store --load-db < .reginfo` at first start.
+Layout: package files /nix/store/*, /usr/bin/nix and nix-daemon -> store paths, /etc/nix/nix.conf
+  (experimental-features = nix-command flakes; build-users-group = nixbld; sandbox = true).
+  sysusers: group nixbld (30000) and 8 users nixbld1..8.
+On demand, like cups: /etc/rc.d/init.d/nix runs flsocketd on /nix/var/nix/daemon-socket/socket and
+  starts nix-daemon at the first connection (idle exit after 60 s), so nothing stays in RAM.
+Multi-user mode needs root for the daemon only; `nix profile install` is per user. /nix on the live
+  system is RAM (overlay): the front end warns like for Flatpak. GUI apps from Nix may need nixGL.
+flpkg side (src/flpkg/sources.sh): search_nix, `nix profile install nixpkgs#ATTR`, remove, upgrade are
+  written and tested against a stand-in; they have never run against a real Nix.

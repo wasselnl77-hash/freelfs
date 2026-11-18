@@ -62,6 +62,7 @@ struct gm {
 	fl_win *win;
 	fl_timer *tick, *quick, *boot;
 	int ready;             /* the machine data is loaded; the window says so until then */
+	int tip_why, tip_x, tip_y; /* the "why the numbers differ" tip: set by the page, drawn last by draw() */
 	struct fonts f;
 	struct sys sys;
 	struct procs ps;
@@ -101,5 +102,6 @@ void gm_chevron(fl_canvas *cv, int cx, int cy, int dir /* 0 right, 1 down, 2 up 
 
 /* perf.c */
 void perf_draw(fl_ui *ui, struct gm *g, fl_rect r);
+void perf_tip(fl_ui *ui, struct gm *g, fl_rect win);   /* after everything else, inside the window */
 
 #endif

@@ -1,0 +1,26 @@
+# Distrobox: Ubuntu, Arch or Fedora containers that share your home, and apps from them in the start menu.
+# Shell scripts only (this is 1.8 MB). `flpkg install --from=apt|pacman|dnf NAME` uses it: it creates the container
+# on first use (after asking) and exports the app with distrobox-export. It needs a container manager:
+# the package podman (rootless, daemonless). Without podman installed the scripts say so.
+# Nothing runs in the background: no daemon, no idle RAM.
+pkgname=distrobox
+version=1.8.2.5
+release=1
+summary="Containers of other distributions with apps exported to the start menu"
+url=https://github.com/89luca89/distrobox
+license=(GPL-3.0-only)
+arch=(any)
+groups=(containers)
+depends=(bash)
+source=(distrobox-$version.tar.gz::https://github.com/89luca89/distrobox/archive/refs/tags/$version.tar.gz)
+sha256=(0c3bc4785ee3be3b89f93abb7cc0a9f60e56989e81319af140a4b60403b18f80)
+
+build() { :; }
+check() { :; }
+
+package() {
+	cd "$srcdir/distrobox-$version"
+	./install --prefix "$pkgdir/usr"
+	# the installer writes absolute paths of the staging directory into nothing, but check
+	! grep -rl "$pkgdir" "$pkgdir/usr/bin" || { echo "staging path in the scripts"; return 1; }
+}

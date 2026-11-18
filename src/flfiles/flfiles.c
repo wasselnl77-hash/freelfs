@@ -166,6 +166,13 @@ struct F {
 	char dr_target[PATH_MAX];
 	fl_rect dr_rect;
 
+	/* rubber band: a drag from empty space in the grid selects the items it touches. band_on: started;
+	 * band_go: moved far enough to be a band, not a click; band_ax/ay: where it started, in grid content
+	 * coordinates (scroll included); band_x/y: where the press was, in window coordinates; band_base: the
+	 * selection it adds to (Ctrl or Shift), else NULL; band_n: the entry count it was made for */
+	int band_on, band_go, band_n, band_x, band_y, band_ax, band_ay;
+	char *band_base;
+
 	/* copy, move, trash, delete and restore: the running job, and the one waiting for clash answers */
 	struct job *job;
 	struct jitem *pend;
@@ -527,6 +534,11 @@ static int copy_tree(const char *src, const char *dst, int depth)
 done:;
 	int e = errno;
 	close(in);
+	/* Flush before reporting success: on a USB stick (exFAT, FAT) the data otherwise sits in the page cache
+	 * while the file already shows in the folder, and a stick pulled soon after, or a move that removes the
+	 * source next, leaves a 0-byte file. The error of a full or failing stick shows up here, too. */
+	if (rc == 0 && fsync(out) < 0 && errno != EROFS && errno != EINVAL)
+		rc = -1, e = errno;
 	if (close(out) < 0 && rc == 0)
 		rc = -1, e = errno;
 	if (rc < 0) {
@@ -3635,6 +3647,83 @@ static void draw_status(fl_ui *ui, struct F *f, fl_rect st)
 		           f->msg_err ? fl_th.err : fl_th.text, f->msg);
 }
 
+/* a press on empty space: Ctrl or Shift keeps the selection and adds to it, else it is cleared (a click
+ * without a drag leaves it so) */
+static void band_start(struct F *f, fl_ui *ui, fl_rect g, int mods)
+{
+	int add = (mods & (FL_MOD_CTRL | FL_MOD_SHIFT)) != 0;
+	free(f->band_base);
+	f->band_base = NULL;
+	if (add) {
+		f->band_base = malloc((size_t)(f->n ? f->n : 1));
+		if (!f->band_base)
+			return;
+		memcpy(f->band_base, f->sel, (size_t)f->n);
+	} else {
+		memset(f->sel, 0, (size_t)f->n);
+		f->cur = -1;
+	}
+	f->band_on = 1;
+	f->band_go = 0;
+	f->band_n = f->n;
+	f->band_x = ui->mx;
+	f->band_y = ui->my;
+	f->band_ax = ui->mx - g.x;
+	f->band_ay = ui->my - g.y + f->scroll;
+}
+
+static void band_end(struct F *f)
+{
+	free(f->band_base);
+	f->band_base = NULL;
+	f->band_on = 0;
+	f->band_go = 0;
+}
+
+/* every frame while the button is held: the band's rect, the items it touches (plus the base), a fill
+ * drawn over this frame's freshly painted background, and autoscroll near the top and bottom edges */
+static void band_update(fl_ui *ui, struct F *f, fl_rect g, int cols, int x0, int max, int held)
+{
+	if (!f->band_on)
+		return;
+	if (!held || f->band_n != f->n) {
+		band_end(f);
+		return;
+	}
+	int dx = ui->mx - f->band_x, dy = ui->my - f->band_y;
+	if (!f->band_go) {
+		if (dx * dx + dy * dy <= 16)
+			return;
+		f->band_go = 1;
+	}
+	int top = g.y + 24, bot = g.y + g.h - 24, step = 0;
+	if (ui->my < top)
+		step = -((top - ui->my) / 2 + 4);
+	else if (ui->my > bot)
+		step = (ui->my - bot) / 2 + 4;
+	if (step) {
+		f->scroll += step;
+		if (f->scroll < 0)
+			f->scroll = 0;
+		if (f->scroll > max)
+			f->scroll = max;
+	}
+	int cx = ui->mx - g.x, cy = ui->my - g.y + f->scroll;
+	int bx0 = f->band_ax < cx ? f->band_ax : cx, bx1 = f->band_ax < cx ? cx : f->band_ax;
+	int by0 = f->band_ay < cy ? f->band_ay : cy, by1 = f->band_ay < cy ? cy : f->band_ay;
+	for (int i = 0; i < f->n; i++) {
+		int ix = x0 - g.x + (i % cols) * CELL_W, iy = 8 + (i / cols) * CELL_H;
+		int touch = ix < bx1 && ix + CELL_W > bx0 && iy < by1 && iy + CELL_H > by0;
+		f->sel[i] = (f->band_base && f->band_base[i]) || touch;
+	}
+	fl_rect br = fl_r(g.x + bx0, g.y + by0 - f->scroll, bx1 - bx0, by1 - by0);
+	if (br.w > 0 && br.h > 0) {
+		fl_color fill = (fl_th.accent & 0x00ffffffu) | 0x38000000u; /* translucent accent */
+		fl_fill_rect(&ui->cv, br, fill);
+		fl_stroke_rect(&ui->cv, br, 1, fl_th.accent);
+	}
+}
+
 static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 {
 	fl_canvas *cv = &ui->cv;
@@ -3763,6 +3852,7 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 				rclick = i;
 		}
 	}
+	band_update(ui, f, g, cols, x0, max, (ui->btn_held & FL_BTN_L) != 0);
 	cv->clip = save;
 	if (grid_active && !ui->active)
 		ui->active = ID_GRID;
@@ -3770,10 +3860,8 @@ static void draw_grid(fl_ui *ui, struct F *f, fl_rect g)
 		join(f->dr_target, sizeof f->dr_target, f->cwd, f->ents[hit].name);
 		f->dr_rect = hit_r;
 	}
-	if (hit < 0 && (res & FL_HOVER) && (ui->press & FL_BTN_L) && !(mods & (FL_MOD_CTRL | FL_MOD_SHIFT))) {
-		memset(f->sel, 0, (size_t)f->n);
-		f->cur = -1;
-	}
+	if (hit < 0 && (res & FL_HOVER) && (ui->press & FL_BTN_L) && ui->active == ID_GRID)
+		band_start(f, ui, g, mods);
 	if (rclick >= 0) {
 		if (!f->sel[rclick])
 			click_select(f, rclick, 0);

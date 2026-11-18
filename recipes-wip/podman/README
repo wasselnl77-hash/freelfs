@@ -1,0 +1,14 @@
+Scaffold, not built (round 22). Rootless, daemonless containers for distrobox.
+
+Needs, none of them packaged yet:
+  podman (Go), conmon (C), crun (C, needs libcap libseccomp yajl), netavark + aardvark-dns (Rust) or
+  just passt/pasta for rootless networking, fuse-overlayfs (C; the kernel's overlayfs works rootless
+  from 5.11 on, so it is optional), shadow's newuidmap/newgidmap (setuid, in the shadow package),
+  slirp4netns (optional with pasta), containers-common config (policy.json, registries.conf).
+Kernel: done in round 22 (config/kernel/freelfs.config): user namespaces, cgroup v2 + memcg + BPF
+device controller, TUN, veth, bridge, nftables with NAT/masquerade, overlayfs, FUSE.
+Sub-IDs: /etc/subuid and /etc/subgid need a range per user (the installer / first login should add
+100000:65536; the live tester too). rc.sysinit/useradd skel: `touch /etc/subuid /etc/subgid` exists.
+Runtime: no daemon; podman starts per command. Idle RAM: unchanged (nothing resident).
+Build order: crun, conmon, passt, podman (needs Go: the Go toolchain is not in the image build yet),
+then flpkg install podman distrobox. The recipe has to set CONTAINERS_CONF paths to /etc/containers.

@@ -38,6 +38,17 @@ case $DBUS_SESSION_BUS_ADDRESS in
 	;;
 esac
 
+# D-Bus activated services (xdg-desktop-portal, flportal) start from the bus daemon, which has the
+# environment it was started with: tell it where the compositor is, or a portal dialog cannot connect
+# and never maps. The socket must exist first.
+i=0
+while [ ! -S "$XDG_RUNTIME_DIR/bus" ] && [ "$i" -lt 30 ]; do
+	sleep 0.1
+	i=$((i + 1))
+done
+command -v dbus-update-activation-environment >/dev/null 2>&1 &&
+	dbus-update-activation-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null
+
 # PipeWire needs its socket before the others can connect
 if [ ! -S "$XDG_RUNTIME_DIR/pipewire-0" ]; then
 	start pipewire

@@ -5,7 +5,7 @@
 # system partition (FAT: no symlinks); flboot finds every vmlinuz-* there.
 pkgname=linux
 version=7.3.4
-release=3
+release=4
 summary="The Linux kernel (newest stable) and its modules"
 url=https://www.kernel.org/
 license=(GPL-2.0-only)

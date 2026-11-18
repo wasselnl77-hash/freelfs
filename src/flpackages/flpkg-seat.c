@@ -5,6 +5,7 @@
  *
  *	flpkg-seat install NAME...
  *	flpkg-seat remove NAME...
+ *	flpkg-seat upgrade            (flpkg upgrade --sync: round 22, for `flpkg upgrade` and the Store's Updates)
  *
  * and runs /usr/bin/flpkg with -y for them. Nothing else gets through: every
  * NAME must be a plain package name, the environment is cleared, and no
@@ -50,9 +51,10 @@ static int valid_name(const char *s)
 
 int main(int argc, char **argv)
 {
-	if (argc < 3 || argc > 2 + MAX_NAMES ||
-	    (strcmp(argv[1], "install") && strcmp(argv[1], "remove"))) {
-		fputs("usage: flpkg-seat install|remove NAME...\n", stderr);
+	int upgrade = argc == 2 && !strcmp(argv[1], "upgrade");
+	if (!upgrade && (argc < 3 || argc > 2 + MAX_NAMES ||
+	    (strcmp(argv[1], "install") && strcmp(argv[1], "remove")))) {
+		fputs("usage: flpkg-seat install|remove NAME... | flpkg-seat upgrade\n", stderr);
 		return 2;
 	}
 	for (int i = 2; i < argc; i++) {
@@ -78,8 +80,11 @@ int main(int argc, char **argv)
 		}
 		setenv("FLAUTH_TRIED", "1", 1);
 		char reason[256];
-		snprintf(reason, sizeof reason, "%s the package%s %s%s.", !strcmp(argv[1], "install") ? "Install" : "Remove",
-			 argc > 3 ? "s" : "", argv[2], argc > 3 ? " and more" : "");
+		if (upgrade)
+			snprintf(reason, sizeof reason, "Update all installed packages.");
+		else
+			snprintf(reason, sizeof reason, "%s the package%s %s%s.", !strcmp(argv[1], "install") ? "Install" : "Remove",
+				 argc > 3 ? "s" : "", argv[2], argc > 3 ? " and more" : "");
 		char *args[MAX_NAMES + 10];
 		int k = 0;
 		args[k++] = "flauth";
@@ -130,7 +135,10 @@ int main(int argc, char **argv)
 	args[n++] = "flpkg";
 	args[n++] = argv[1];
 	args[n++] = "-y";
-	args[n++] = "--";
+	if (upgrade)
+		args[n++] = "--sync";
+	else
+		args[n++] = "--";
 	for (int i = 2; i < argc; i++)
 		args[n++] = argv[i];
 	args[n] = NULL;

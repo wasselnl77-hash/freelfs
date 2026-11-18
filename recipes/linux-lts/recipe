@@ -6,7 +6,7 @@
 # not in the default image: flpkg install linux-lts.
 pkgname=linux-lts
 version=6.18.63
-release=3
+release=4
 summary="The Linux 6.18 LTS kernel and its modules (fallback next to the newest kernel)"
 url=https://www.kernel.org/
 license=(GPL-2.0-only)

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT */
 #include "img.h"
 
+#include <errno.h>
 #include <flui.h>
 #include <math.h>
 #include <png.h>
@@ -85,6 +86,13 @@ int img_save_png(const img_t *im, const char *path)
 	png_write_end(png, info);
 	png_destroy_write_struct(&png, &info);
 	free(row);
+	/* data to the medium before the name appears: a screenshot on a USB stick (exFAT) was left as a
+	 * 0-byte file when the stick was pulled soon after saving */
+	if (fflush(f) != 0 || (fsync(fileno(f)) < 0 && errno != EINVAL && errno != EROFS)) {
+		fclose(f);
+		unlink(tmp);
+		return -1;
+	}
 	if (fclose(f) != 0 || rename(tmp, path) < 0) {
 		unlink(tmp);
 		return -1;
