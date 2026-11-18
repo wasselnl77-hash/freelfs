@@ -8,8 +8,8 @@ Support: https://buymeacoffee.com/wassel
 
 > **Pre-alpha. Do not use this for anything real.**
 >
-> FreeLFS is an experiment in progress. It has been tested almost only in
-> virtual machines (QEMU) and on one real laptop, where it showed serious bugs.
+> FreeLFS is an experiment in progress. It is tested in QEMU and on two real
+> laptops (AMD and Intel); many other machines are untested, and bugs are expected.
 > - **Things will break.** Expect crashes, missing features and incompatible
 >   changes without notice.
 > - **Nothing is stable yet:** not the package format, not the repo, not the

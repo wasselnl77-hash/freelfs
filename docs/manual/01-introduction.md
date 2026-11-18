@@ -52,11 +52,12 @@ FreeLFS is **pre-alpha**. What that means in practice:
   not backwards compatible.
 - **Nothing is stable yet.** Not the package format, not the repository, not the
   configuration files.
-- **It has been tested mostly in virtual machines** (QEMU). It has been run on one
-  real laptop, an AMD Ryzen 5 7520U with a Radeon 610M graphics chip and a Realtek
-  Wi-Fi chip (rtw89). That run found serious bugs. Shutdown and opening media from
-  the Files app failed there in round 17 and are being fixed in round 18. Other
-  hardware (Intel, most AMD machines) has not been tested at all. See
+- **It is tested in QEMU and on real hardware.** QEMU runs an automated test
+  suite. Two real laptops have been tested: an HP 255 G10 (AMD Ryzen 5 7520U,
+  Radeon 610M, Realtek Wi-Fi), booted from a USB stick with Load into RAM, and an
+  older Acer laptop (Intel Ice Lake, Qualcomm Atheros QCA9377 Wi-Fi), where
+  FreeLFS was also installed to the internal disk. Many other machines are
+  untested, and bugs are expected. See
   [09-troubleshooting.md](09-troubleshooting.md) and `docs/HARDWARE.md`.
 - **The installer erases the disk you pick.** Only try it on a spare computer or
   inside a virtual machine. Read [03-installing.md](03-installing.md) first.
