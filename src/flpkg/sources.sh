@@ -37,11 +37,13 @@ box_image() {
 	case $1 in
 		apt) echo docker.io/library/ubuntu:24.04 ;;
 		pacman) echo docker.io/library/archlinux:latest ;;
-		dnf) echo registry.fedoraproject.org/fedora:42 ;;
+		dnf) echo docker.io/library/fedora:45 ;;
 	esac
 }
 box_label() { case $1 in apt) echo "Ubuntu (apt)" ;; pacman) echo "Arch (pacman)" ;; dnf) echo "Fedora (dnf)" ;; esac; }
-box_size() { case $1 in apt) echo "about 80 MB" ;; pacman) echo "about 150 MB" ;; dnf) echo "about 200 MB" ;; esac; }
+# download and size on disk of the image alone (the first start installs a few more tools inside it)
+box_size() { case $1 in apt) echo "about 30 MB download, 150 MB on disk" ;; pacman) echo "about 135 MB download, 450 MB on disk" ;; dnf) echo "about 75 MB download, 250 MB on disk" ;; esac; }
+box_mb() { case $1 in apt) echo 150 ;; pacman) echo 450 ;; dnf) echo 250 ;; esac; }
 label() {
 	case $1 in
 		freelfs) echo "FreeLFS repository" ;; flatpak) echo "Flathub (Flatpak)" ;; nix) echo "Nix (nixpkgs)" ;;
@@ -170,15 +172,8 @@ warn_ram() { # warn_ram NAME SIZE
 	if ! confirm "Install anyway?" n; then die "cancelled"; fi
 }
 
-# ---- Nix ------------------------------------------------------------------------------------
-nix_ok() { have "$NIX"; }
-nixc() { "$NIX" --extra-experimental-features 'nix-command flakes' "$@"; }
-search_nix() {
-	nix_ok || return 0
-	nixc search nixpkgs "$1" --json 2> /dev/null | grep -o '"legacyPackages\.[^"]*":{[^}]*}' | head -n 20 |
-		sed -E 's/^"legacyPackages\.[^.]*\.([^"]*)":\{.*"version":"([^"]*)".*"description":"([^"]*)".*/nix\t\1\t\2\t\3/' |
-		grep -P '^nix\t' | exact_first_col "$1"
-}
+# ---- Nix: nix_ok, nixc, search_nix (round 24b: src/flpkg/sources-nix.sh) ---------------------
+. "${BASH_SOURCE[0]%/*}/sources-nix.sh"
 exact_first_col() { # like exact_first, for lines already starting with the backend
 	local t=$1 all ex
 	all=$(cat)
@@ -207,35 +202,73 @@ search_box() { # search_box BACKEND TERM -> "backend<TAB>name<TAB><TAB>summary" 
 		b == "dnf" && /^[A-Za-z0-9._+-]+\.[a-z0-9_]+ *:/ { split($1, p, "."); print b "\t" p[1] "\t\t" substr($0, index($0, ":") + 2) }' |
 		sed -E 's/\t +/\t/' | exact_first_col "$2"
 }
+# The kernel's overlayfs cannot sit on another overlayfs. The live system's home is one (squashfs + RAM), so there
+# podman gets fuse-overlayfs through a per-user storage.conf; an installed system (btrfs home) needs nothing.
+box_storage() {
+	local h=${HOME:-/tmp} c
+	c=${XDG_CONFIG_HOME:-$h/.config}/containers/storage.conf
+	mkdir -p "$h/.local/share/containers" 2> /dev/null || return 0
+	[ "$(stat -f -c %T "$h/.local/share/containers" 2> /dev/null)" = overlayfs ] || return 0
+	[ ! -e "$c" ] && [ -x /usr/bin/fuse-overlayfs ] || return 0
+	mkdir -p "${c%/*}" && cat > "$c" <<-'EOF'
+		# written by flpkg: this home is on overlayfs, so podman uses fuse-overlayfs
+		[storage]
+		driver = "overlay"
+		[storage.options.overlay]
+		mount_program = "/usr/bin/fuse-overlayfs"
+	EOF
+}
 box_create() { # box_create BACKEND: asks first
 	local b=$1 img
 	box_exists "$b" && return 0
-	dbx_ok || die "$(label "$b") needs the package distrobox (flpkg install distrobox) and podman"
+	dbx_ok || die "$(label "$b") needs the packages distrobox and podman (flpkg install distrobox)"
+	[ -n "${FLPKG_DISTROBOX:-}" ] || have podman || die "$(label "$b") needs podman (flpkg install podman)"
 	img=$(box_image "$b")
-	say "no $(label "$b") container yet. Creating one downloads $img ($(box_size "$b")) and sets it up inside your home."
+	say "no $(label "$b") container yet. Creating one downloads $img ($(box_size "$b")) and keeps it in your home (~/.local/share/containers)."
+	if live_ram; then
+		say "this is a live system without persistence: the container (about $(box_mb "$b") MB plus what you install in it) lives in RAM and is gone at shutdown."
+		say "free RAM now: $(awk '/MemAvailable/ { printf "%d MB", $2 / 1024 }' /proc/meminfo)"
+	fi
 	confirm "Create the $(label "$b") container?" n || die "cancelled"
-	"$DBX" create --yes -n "$(box_name "$b")" -i "$img" || die "creating the container failed"
+	box_storage
+	"$DBX" create --yes -n "$(box_name "$b")" -i "$img" --no-entry --unshare-process || die "creating the container failed (flpkg is not at fault if the network is down; see TROUBLESHOOTING, containers)"
 }
 box_install() { # box_install BACKEND PKG
-	local b=$1 p=$2
+	local b=$1 p=$2 bin
 	box_create "$b" || return 1
+	# a fresh image has no package lists
 	case $b in
-		apt) box_run "$b" sudo apt-get install -y "$p" ;;
-		pacman) box_run "$b" sudo pacman -S --noconfirm "$p" ;;
+		apt) box_run "$b" sudo apt-get update -qq && box_run "$b" sudo apt-get install -y "$p" ;;
+		pacman) box_run "$b" sudo pacman -Sy --noconfirm "$p" ;;
 		dnf) box_run "$b" sudo dnf install -y "$p" ;;
 	esac || return 1
 	# apps into the start menu (a package with a .desktop file), commands into ~/.local/bin
 	box_run "$b" distrobox-export --app "$p" > /dev/null 2>&1 || true
-	box_run "$b" distrobox-export --bin "$(box_run "$b" command -v "$p" 2> /dev/null)" --export-path "${HOME:-/tmp}/.local/bin" > /dev/null 2>&1 || true
+	bin=$(box_run "$b" sh -c "command -v $p" 2> /dev/null | tail -n 1)
+	if [ -n "$bin" ]; then
+		mkdir -p "${HOME:-/tmp}/.local/bin"
+		box_run "$b" distrobox-export --bin "$bin" --export-path "${HOME:-/tmp}/.local/bin" > /dev/null 2>&1 || true
+		mkdir -p "$STATE" 2> /dev/null && printf '%s\n' "$bin" > "$STATE/bin-$(box_name "$b")-$p" 2> /dev/null || true
+	fi
+	return 0
 }
 box_remove() {
-	local b=$1 p=$2
+	local b=$1 p=$2 bin
 	box_run "$b" distrobox-export --app "$p" --delete > /dev/null 2>&1 || true
+	bin=$(cat "$STATE/bin-$(box_name "$b")-$p" 2> /dev/null)
+	[ -n "$bin" ] || bin=$(box_run "$b" sh -c "command -v $p" 2> /dev/null | tail -n 1)
+	if [ -n "$bin" ]; then
+		box_run "$b" distrobox-export --bin "$bin" --export-path "${HOME:-/tmp}/.local/bin" --delete > /dev/null 2>&1 || true
+		rm -f "$STATE/bin-$(box_name "$b")-$p"
+	fi
 	case $b in
 		apt) box_run "$b" sudo apt-get remove -y "$p" ;;
 		pacman) box_run "$b" sudo pacman -R --noconfirm "$p" ;;
 		dnf) box_run "$b" sudo dnf remove -y "$p" ;;
-	esac
+	esac || {
+		box_exists "$b" || { say "the $(label "$b") container is gone, so $p is gone with it; dropping the record"; return 0; }
+		return 1
+	}
 }
 
 # ---- asking --------------------------------------------------------------------------------
@@ -298,7 +331,11 @@ do_install_one() { # do_install_one NAME
 		if [ -n "$lines" ] && ! is_tty; then fast=1; fi
 	fi
 	if [ -z "$fast" ]; then
-		if [ -n "$FROM" ] && [ "$FROM" != freelfs ] && [ "$FROM" != flatpak ] && [ "$FROM" != nix ]; then
+		if [ "$FROM" = nix ]; then
+			# --from=nix: the name as typed (nixpkgs attribute), or the exact match of the cached list when there is one: no download
+			lines=$(NIX_INDEX_NOBUILD=1 search_nix "$name" | awk -F'\t' -v t="$name" 'tolower($2) == tolower(t)')
+			[ -n "$lines" ] || lines=$(printf 'nix\t%s\t\t\n' "$name")
+		elif [ -n "$FROM" ] && [ "$FROM" != freelfs ] && [ "$FROM" != flatpak ]; then
 			# --from=apt|pacman|dnf: the package name as typed, in a box that is created if needed
 			lines=$(printf '%s\t%s\t\t\n' "$FROM" "$name")
 			box_exists "$FROM" && lines=$(search_box "$FROM" "$name" | awk -F'\t' -v t="$name" 'tolower($2) == tolower(t)')
@@ -319,7 +356,7 @@ do_install_one() { # do_install_one NAME
 	fi
 	[ -n "$lines" ] || { say "$name: nothing found${FROM:+ in $(label "$FROM")}"; return 1; }
 	line=$(choose installed "$lines") || return 1
-	IFS=$'\t' read -r b id _ < <(printf '%s\n' "$line")
+	IFS=$'\t' read -r b id _ <<< "$line"
 	say "installing $id from $(label "$b")"
 	case $b in
 		freelfs) native_priv install "$id" ;;
@@ -345,7 +382,7 @@ do_remove_one() {
 		[ -n "$b" ] || continue
 		[ -z "$FROM" ] || [ "$FROM" = "$b" ] || continue
 		cands+=$(printf '%s\t%s\t\t\n' "$b" "$id")$'\n'
-	done < <(record_find "$name")
+	done <<< "$(record_find "$name")"
 	# Flatpak apps installed some other way (the Store): the app whose last name part is NAME
 	if [ -z "$cands" ] && { [ -z "$FROM" ] || [ "$FROM" = flatpak ]; } && fp_ok; then
 		id=$("$FLATPAK" list --user --app --columns=application 2> /dev/null | awk -F. -v n="$name" 'tolower($NF) == tolower(n) { print; exit }')
@@ -354,7 +391,7 @@ do_remove_one() {
 	cands=$(printf '%s' "$cands" | sed '/^$/d' | awk '!seen[$0]++')
 	[ -n "$cands" ] || { say "$name is not installed${FROM:+ from $(label "$FROM")}"; return 1; }
 	line=$(choose removed "$cands") || return 1
-	IFS=$'\t' read -r b id _ < <(printf '%s\n' "$line")
+	IFS=$'\t' read -r b id _ <<< "$line"
 	say "removing $id (installed from $(label "$b"))"
 	case $b in
 		freelfs) native_priv remove "$id" ;;
@@ -382,7 +419,7 @@ do_upgrade() {
 		for b in apt pacman dnf; do
 			box_exists "$b" || continue
 			say "$(label "$b")"
-			"$DBX" upgrade -n "$(box_name "$b")" || rc=1
+			"$DBX" upgrade "$(box_name "$b")" || rc=1
 		done
 	fi
 	return $rc
@@ -409,7 +446,7 @@ do_search() {
 do_list() {
 	"$NATIVE" list
 	if fp_ok; then "$FLATPAK" list --user --app --columns=application,version 2> /dev/null | awk -F'\t' '$1 ~ /\./ { print "flatpak/" $1 " " $2 }'; fi
-	if nix_ok; then nixc profile list 2> /dev/null | awk '/^Name:/ { print "nix/" $2 }'; fi
+	if nix_ok; then nixc profile list 2> /dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/^Name:/ { print "nix/" $2 }'; fi
 	if dbx_ok; then
 		local b
 		for b in apt pacman dnf; do box_exists "$b" && awk -F'\t' -v b="$b" '$1 == b { print b "/" $2 }' "$STATE/sources.list" 2> /dev/null; done

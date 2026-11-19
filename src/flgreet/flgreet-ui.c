@@ -73,6 +73,9 @@ static void load_users(struct G *g)
 	while (g->nusers < MAX_USERS && (p = getpwent())) {
 		if (p->pw_uid < MIN_UID || p->pw_uid > MAX_UID)
 			continue;
+		/* service accounts (Nix build users, uid 30001+) have no login shell: not a person */
+		if (!p->pw_shell || !p->pw_shell[0] || strstr(p->pw_shell, "/false") || strstr(p->pw_shell, "nologin"))
+			continue;
 		struct user *u = &g->users[g->nusers++];
 		snprintf(u->name, sizeof u->name, "%s", p->pw_name);
 		snprintf(u->label, sizeof u->label, "%s", p->pw_name);

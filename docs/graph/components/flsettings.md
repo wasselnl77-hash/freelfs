@@ -78,10 +78,10 @@ Pages behind a sidebar: General (theme, panel labels), Display, Mouse & touchpad
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `d3131d5` Round 19: eject/cwd fix, app icons, server-side decorations, stride fix
 - `18b0ace` Round 17: Bluetooth, printing, display settings, night light, desktop QoL
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 - `2c2183d` Round 14: security updates, kernel 7.3.4 (rolling), WebKit sandbox; Intel/AMD prep
-- `6ebf49f` Workspaces UI: Settings > Workspaces page, pager right-click menu
 
 See also: [src/flsettings/README](../../../src/flsettings/README) · [01-introduction](../../manual/01-introduction.md) · [05-keyboard-shortcuts](../../manual/05-keyboard-shortcuts.md) · [06-apps](../../manual/06-apps.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

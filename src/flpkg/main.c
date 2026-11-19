@@ -136,7 +136,7 @@ static char **translate(int *argc, char **argv)
 static void maybe_sources(const char *cmd, int argc, char **argv, const char *config, const char *root)
 {
 	static const char *const cmds[] = {"install", "remove", "upgrade", "search", "list"};
-	bool hit = false, all = false;
+	bool hit = false, all = false, from = false;
 	for (size_t i = 0; i < sizeof cmds / sizeof *cmds; i++)
 		hit |= !strcmp(cmd, cmds[i]);
 	if (!hit || root || strcmp(config, "/etc/flpkg.conf") || getenv("FLPKG_NO_SOURCES"))
@@ -148,6 +148,8 @@ static void maybe_sources(const char *cmd, int argc, char **argv, const char *co
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--all"))
 			all = true;
+		else if (!strncmp(argv[i], "--from=", 7))
+			from = true; /* a named source (Nix, Flathub...) is the front end's business, even into a pipe */
 		else if (!strcmp(argv[i], "--explicit") || !strcmp(argv[i], "--deps") || !strcmp(argv[i], "--repo"))
 			return; /* native queries */
 		else if (geteuid() == 0 && priv &&
@@ -157,7 +159,7 @@ static void maybe_sources(const char *cmd, int argc, char **argv, const char *co
 			         * which sends it through flpkg-seat (flauth) or says what cannot be done that way */
 	}
 	bool view = !strcmp(cmd, "search") || !strcmp(cmd, "list");
-	if (view && !all && !isatty(1) && !getenv("FLPKG_ASSUME_TTY"))
+	if (view && !all && !from && !isatty(1) && !getenv("FLPKG_ASSUME_TTY"))
 		return;
 	if (!strcmp(cmd, "search") && argc == 2 && !argv[1][0])
 		return; /* the Store lists everything with an empty search */

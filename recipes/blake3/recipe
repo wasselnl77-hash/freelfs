@@ -1,0 +1,24 @@
+# BLAKE3 C library (libblake3, with pkg-config file). Nix needs >= 1.8.2.
+pkgname=blake3
+version=1.8.2
+release=1
+summary="BLAKE3 cryptographic hash function, C library"
+url=https://github.com/BLAKE3-team/BLAKE3
+license=(CC0-1.0 Apache-2.0)
+arch=(x86_64)
+groups=(buildtool)
+makedepends=(cmake ninja)
+source=(https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.8.2.tar.gz)
+sha256=(6b51aefe515969785da02e87befafc7fdc7a065cd3458cf1141f29267749e81f)
+worksrc=BLAKE3-1.8.2
+check() { :; }
+
+build() {
+	cmake -S c -B build -G Ninja -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_BUILD_TYPE=Release \
+		-D BUILD_SHARED_LIBS=ON
+	ninja -C build ${NINJAJOBS:+-j$NINJAJOBS}
+}
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+}

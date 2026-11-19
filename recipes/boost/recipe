@@ -1,0 +1,27 @@
+# Boost, the libraries Nix needs (context, coroutine, iostreams, url, container). Nix requires >= 1.87.
+pkgname=boost
+version=1.90.0
+release=1
+summary="Boost C++ libraries used by Nix (context, coroutine, iostreams, url, container)"
+url=https://www.boost.org/
+license=(BSL-1.0)
+arch=(x86_64)
+groups=(buildtool)
+depends=(glibc zlib)
+source=(https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz)
+sha256=(5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9)
+worksrc=boost_1_90_0
+options=(!strip)
+
+build() {
+	./bootstrap.sh --prefix=/usr --with-libraries=container,context,coroutine,iostreams,url
+	./b2 -j"${NINJAJOBS:-2}" variant=release link=shared runtime-link=shared threading=multi \
+		--layout=system cxxflags=-fPIC
+}
+
+check() { :; }
+
+package() {
+	./b2 install -j"${NINJAJOBS:-2}" variant=release link=shared runtime-link=shared threading=multi \
+		--layout=system --prefix="$pkgdir/usr"
+}

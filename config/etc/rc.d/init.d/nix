@@ -1,0 +1,35 @@
+#!/bin/bash
+# /etc/rc.d/init.d/nix -- Nix (multi-user), on demand. This service only runs flsocketd on the
+# nix-daemon socket. The first connection (nix search, nix profile install, flpkg install --from=nix)
+# starts nix-daemon through nix-daemon-ondemand, which stops it after 60 s without a client, so
+# nothing but flsocketd (about 0.2 MB) stays in RAM when Nix is not used. Does nothing when the
+# nix package is not installed.
+
+. /etc/rc.d/functions
+
+start_nix() {
+	[ -x /usr/lib/nix/nix-daemon-ondemand ] || return 0
+	install -d -m 755 /nix /var/nix /var/nix/daemon-socket /var/nix/profiles /var/nix/gcroots
+	install -d -m 1777 /var/nix/profiles/per-user /var/nix/gcroots/per-user
+	# /nix/store: root owns it, the build users (group nixbld) may write it through the daemon
+	install -d -m 1775 /nix/store
+	chown root:nixbld /nix/store 2> /dev/null || true
+	rm -f /var/nix/daemon-socket/socket
+	setsid /usr/sbin/flsocketd -m 0666 /var/nix/daemon-socket/socket -- /usr/lib/nix/nix-daemon-ondemand \
+		< /dev/null > /dev/null 2>&1 &
+	echo $! > /run/flsocketd-nix.pid
+	sleep 0.2
+	pid_alive /run/flsocketd-nix.pid
+}
+
+stop_nix() {
+	pid_stop /run/flsocketd-nix.pid
+	pkill -x nix-daemon 2> /dev/null
+	return 0
+}
+
+case $1 in
+	stop) step "Stopping Nix (on demand)" stop_nix ;;
+	restart) "$0" stop; "$0" start ;;
+	*) daemon_service "$1" "Nix (on demand)" /run/flsocketd-nix.pid start_nix ;;
+esac

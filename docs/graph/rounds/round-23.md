@@ -1,0 +1,230 @@
+---
+tags: [round]
+---
+# Round 23
+
+#round
+
+Commit `4b7a9cc`: Round 23: security hardening
+
+198 files changed.
+
+## Components touched
+
+- [[docs/graph/components/flauth|flauth]]: 5 files, +443 -53
+  - `src/flauth/Makefile` (+5 -1)
+  - [[docs/graph/files/flauth/flauth-check.h|src/flauth/flauth-check.h]] (+225 -16)
+  - [[docs/graph/files/flauth/flauth.c|src/flauth/flauth.c]] (+55 -36)
+  - `src/flauth/tests/gate-probe.c` (+40 -0)
+  - `src/flauth/tests/policy.sh` (+118 -0)
+- [[docs/graph/components/flgreet|flgreet]]: 1 file, +7 -2
+  - [[docs/graph/files/flgreet/flgreet-ui.c|src/flgreet/flgreet-ui.c]] (+7 -2)
+- [[docs/graph/components/flinstall|flinstall]]: 7 files, +447 -26
+  - `src/flinstall/README` (+10 -2)
+  - [[docs/graph/files/flinstall/common.h|src/flinstall/common.h]] (+5 -11)
+  - [[docs/graph/files/flinstall/flauth-check.h|src/flinstall/flauth-check.h]] (+248 -0)
+  - [[docs/graph/files/flinstall/flinstall.c|src/flinstall/flinstall.c]] (+108 -5)
+  - [[docs/graph/files/flinstall/helper.c|src/flinstall/helper.c]] (+56 -3)
+  - `src/flinstall/tests/image-test.sh` (+17 -2)
+  - `src/flinstall/tests/install.py` (+3 -3)
+- [[docs/graph/components/fllock|fllock]]: 2 files, +13 -3
+  - [[docs/graph/files/fllock/fllock-check.c|src/fllock/fllock-check.c]] (+5 -2)
+  - `src/fllock/tests/check.sh` (+8 -1)
+- [[docs/graph/components/flmount|flmount]]: 3 files, +292 -0
+  - [[docs/graph/files/flmount/flauth-check.h|src/flmount/flauth-check.h]] (+248 -0)
+  - [[docs/graph/files/flmount/flmount.c|src/flmount/flmount.c]] (+32 -0)
+  - [[docs/graph/files/flmount/flpersist.c|src/flmount/flpersist.c]] (+12 -0)
+- [[docs/graph/components/flpackages|flpackages]]: 3 files, +238 -42
+  - `src/flpackages/README` (+2 -1)
+  - [[docs/graph/files/flpackages/flauth-check.h|src/flpackages/flauth-check.h]] (+225 -16)
+  - [[docs/graph/files/flpackages/flpkg-seat.c|src/flpackages/flpkg-seat.c]] (+11 -25)
+- [[docs/graph/components/flsettings|flsettings]]: 3 files, +8 -4
+  - `src/flsettings/README` (+2 -1)
+  - [[docs/graph/files/flsettings/datetime.c|src/flsettings/datetime.c]] (+5 -2)
+  - [[docs/graph/files/flsettings/snapshots.c|src/flsettings/snapshots.c]] (+1 -1)
+- [[docs/graph/components/flsnap|flsnap]]: 3 files, +241 -41
+  - `src/flsnap/README` (+2 -1)
+  - [[docs/graph/files/flsnap/flauth-check.h|src/flsnap/flauth-check.h]] (+225 -16)
+  - [[docs/graph/files/flsnap/flsnap.c|src/flsnap/flsnap.c]] (+14 -24)
+- [[docs/graph/components/flsplash|flsplash]]: 2 files, +235 -31
+  - [[docs/graph/files/flsplash/flauth-check.h|src/flsplash/flauth-check.h]] (+225 -16)
+  - [[docs/graph/files/flsplash/flsplash-set.c|src/flsplash/flsplash-set.c]] (+10 -15)
+- [[docs/graph/components/fltheme|fltheme]]: 1 file, +1 -1
+  - `src/fltheme/README` (+1 -1)
+- [[docs/graph/components/fltime|fltime]]: 3 files, +275 -5
+  - `src/fltime/README` (+3 -1)
+  - [[docs/graph/files/fltime/flauth-check.h|src/fltime/flauth-check.h]] (+248 -0)
+  - [[docs/graph/files/fltime/fltime-set.c|src/fltime/fltime-set.c]] (+24 -4)
+
+## Packages touched
+
+- [[docs/graph/packages/base-files|pkg/base-files]]: `recipes/base-files/recipe`
+- [[docs/graph/packages/cups|pkg/cups]]: `recipes/cups/recipe`
+- [[docs/graph/packages/flauth|pkg/flauth]]: `recipes/flauth/recipe`
+- [[docs/graph/packages/flgreet|pkg/flgreet]]: `recipes/flgreet/recipe`
+- [[docs/graph/packages/flinstall|pkg/flinstall]]: `recipes/flinstall/recipe`
+- [[docs/graph/packages/fllock|pkg/fllock]]: `recipes/fllock/recipe`
+- [[docs/graph/packages/flmount|pkg/flmount]]: `recipes/flmount/recipe`
+- [[docs/graph/packages/flpackages|pkg/flpackages]]: `recipes/flpackages/recipe`
+- [[docs/graph/packages/flsettings|pkg/flsettings]]: `recipes/flsettings/recipe`
+- [[docs/graph/packages/flsnap|pkg/flsnap]]: `recipes/flsnap/recipe`
+- [[docs/graph/packages/flsplash|pkg/flsplash]]: `recipes/flsplash/recipe`
+- [[docs/graph/packages/fltime|pkg/fltime]]: `recipes/fltime/recipe`
+- [[docs/graph/packages/inetutils|pkg/inetutils]]: `recipes/inetutils/recipe`
+- [[docs/graph/packages/initscripts|pkg/initscripts]]: `recipes/initscripts/recipe`
+- [[docs/graph/packages/libmnl|pkg/libmnl]]: `recipes/libmnl/recipe`
+- [[docs/graph/packages/libnftnl|pkg/libnftnl]]: `recipes/libnftnl/recipe`
+- [[docs/graph/packages/linux|pkg/linux]]: `recipes/linux/recipe`
+- [[docs/graph/packages/linux-lts|pkg/linux-lts]]: `recipes/linux-lts/recipe`
+- [[docs/graph/packages/nftables|pkg/nftables]]: `recipes/nftables/recipe`
+- [[docs/graph/packages/shadow|pkg/shadow]]: `recipes/shadow/recipe`
+- [[docs/graph/packages/util-linux|pkg/util-linux]]: `recipes/util-linux/recipe`
+
+## Other files
+
+- `build/40-system-config.sh` (+7 -3)
+- `build/50-image.sh` (+1 -0)
+- `build/53-iso.sh` (+24 -0)
+- `build/60-packages.sh` (+15 -5)
+- `build/lib.sh` (+28 -0)
+- `build/m21-all.sh` (+2 -1)
+- `build/m23-all.sh` (+60 -0)
+- `build/m23-real.py` (+141 -0)
+- `build/m23-static.sh` (+68 -0)
+- `build/m23/sys.cmds` (+42 -0)
+- `build/root-lock.sh` (+28 -0)
+- `config/cups/flcupsd` (+2 -0)
+- `config/etc/nftables.conf` (+43 -0)
+- `config/etc/rc.conf` (+5 -1)
+- `config/etc/rc.d/fl-firewall-mdns` (+13 -0)
+- `config/etc/rc.d/init.d/firewall` (+34 -0)
+- `config/etc/rc.d/rc.sysinit` (+1 -0)
+- `config/etc/securetty` (+10 -0)
+- `config/etc/sysctl.d/10-freelfs-hardening.conf` (+51 -0)
+- `config/kernel/freelfs.config` (+20 -0)
+- `docs/COMMANDS.md` (+13 -12)
+- `docs/PLAN-installer.md` (+8 -0)
+- `docs/ROADMAP-NEXT.md` (+2 -0)
+- `docs/SECURITY.md` (+192 -1)
+- `docs/TROUBLESHOOTING.md` (+36 -0)
+- `docs/bugscan-2026-11-18/security-audit.md` (+303 -0)
+- `docs/graph/.generated` (+6 -0)
+- `docs/graph/AGENT-MAP.md` (+12 -12)
+- `docs/graph/INDEX.md` (+4 -4)
+- `docs/graph/components/flauth.md` (+6 -6)
+- `docs/graph/components/flgreet.md` (+1 -1)
+- `docs/graph/components/flinstall.md` (+5 -4)
+- `docs/graph/components/fllock.md` (+1 -1)
+- `docs/graph/components/flmount.md` (+3 -2)
+- `docs/graph/components/flpackages.md` (+3 -3)
+- `docs/graph/components/flpkg.md` (+1 -1)
+- `docs/graph/components/flsettings.md` (+1 -1)
+- `docs/graph/components/flsnap.md` (+3 -3)
+- `docs/graph/components/flsplash.md` (+3 -3)
+- `docs/graph/components/fltime.md` (+2 -1)
+- `docs/graph/files/flauth/flauth-check.h.md` (+3 -3)
+- `docs/graph/files/flauth/flauth.c.md` (+2 -2)
+- `docs/graph/files/flgreet/flgreet-ui.c.md` (+1 -1)
+- `docs/graph/files/flinstall/common.h.md` (+1 -1)
+- `docs/graph/files/flinstall/flauth-check.h.md` (+19 -0)
+- `docs/graph/files/flinstall/flinstall.c.md` (+3 -3)
+- `docs/graph/files/flinstall/helper.c.md` (+3 -2)
+- `docs/graph/files/fllock/fllock-check.c.md` (+1 -1)
+- `docs/graph/files/flmount/flauth-check.h.md` (+19 -0)
+- `docs/graph/files/flmount/flmount.c.md` (+3 -3)
+- `docs/graph/files/flmount/flpersist.c.md` (+2 -2)
+- `docs/graph/files/flpackages/flauth-check.h.md` (+3 -3)
+- `docs/graph/files/flpackages/flpkg-seat.c.md` (+1 -1)
+- `docs/graph/files/flsettings/datetime.c.md` (+1 -1)
+- `docs/graph/files/flsnap/flauth-check.h.md` (+3 -3)
+- `docs/graph/files/flsnap/flsnap.c.md` (+1 -1)
+- `docs/graph/files/flsplash/flauth-check.h.md` (+3 -3)
+- `docs/graph/files/flsplash/flsplash-set.c.md` (+1 -1)
+- `docs/graph/files/fltime/flauth-check.h.md` (+19 -0)
+- `docs/graph/files/fltime/fltime-set.c.md` (+2 -2)
+- `docs/graph/groups/base.md` (+4 -1)
+- `docs/graph/groups/desktop.md` (+3 -1)
+- `docs/graph/packages/base-files.md` (+1 -1)
+- `docs/graph/packages/cups.md` (+1 -1)
+- `docs/graph/packages/flauth.md` (+1 -1)
+- `docs/graph/packages/flgreet.md` (+1 -1)
+- `docs/graph/packages/flinstall.md` (+2 -2)
+- `docs/graph/packages/fllock.md` (+1 -1)
+- `docs/graph/packages/flmount.md` (+1 -1)
+- `docs/graph/packages/flpackages.md` (+1 -1)
+- `docs/graph/packages/flsettings.md` (+1 -1)
+- `docs/graph/packages/flsnap.md` (+1 -1)
+- `docs/graph/packages/flsplash.md` (+1 -1)
+- `docs/graph/packages/fltime.md` (+1 -1)
+- `docs/graph/packages/inetutils.md` (+1 -1)
+- `docs/graph/packages/initscripts.md` (+2 -2)
+- `docs/graph/packages/libmnl.md` (+17 -0)
+- `docs/graph/packages/libnftnl.md` (+17 -0)
+- `docs/graph/packages/linux-lts.md` (+1 -1)
+- `docs/graph/packages/linux.md` (+1 -1)
+- `docs/graph/packages/nftables.md` (+17 -0)
+- `docs/graph/packages/shadow.md` (+1 -1)
+- `docs/graph/packages/util-linux.md` (+1 -1)
+- `docs/m23/install-account-root-own.png` (+- --)
+- `docs/m23/install-account-root-same.png` (+- --)
+- `docs/m7/m10-accent-blue-settings-1G.png` (+- --)
+- `docs/m7/m10-archive-1G.png` (+- --)
+- `docs/m7/m10-desktop-1G.png` (+- --)
+- `docs/m7/m10-desktop-wallpaper-1G.png` (+- --)
+- `docs/m7/m10-end-1G.png` (+- --)
+- `docs/m7/m10-files-open-png-1G.png` (+- --)
+- `docs/m7/m10-files-open-txt-1G.png` (+- --)
+- `docs/m7/m10-flboot-ask-1G.png` (+- --)
+- `docs/m7/m10-fledit-1G.png` (+- --)
+- `docs/m7/m10-gm-performance-1G.png` (+- --)
+- `docs/m7/m10-gm-processes-1G.png` (+- --)
+- `docs/m7/m10-gm-startup-1G.png` (+- --)
+- `docs/m7/m10-image-1G.png` (+- --)
+- `docs/m7/m10-image-wallpaper-1G.png` (+- --)
+- `docs/m7/m10-install-installed-1-login.png` (+- --)
+- `docs/m7/m10-install-installed-2-desktop.png` (+- --)
+- `docs/m7/m10-install-installed-3-end.png` (+- --)
+- `docs/m7/m10-install-live-1-login.png` (+- --)
+- `docs/m7/m10-install-live-10-installing.png` (+- --)
+- `docs/m7/m10-install-live-11-done.png` (+- --)
+- `docs/m7/m10-install-live-2-menu.png` (+- --)
+- `docs/m7/m10-install-live-3-language.png` (+- --)
+- `docs/m7/m10-install-live-4-keyboard.png` (+- --)
+- `docs/m7/m10-install-live-5-wifi.png` (+- --)
+- `docs/m7/m10-install-live-6-disk.png` (+- --)
+- `docs/m7/m10-install-live-7-account.png` (+- --)
+- `docs/m7/m10-install-live-8-timezone.png` (+- --)
+- `docs/m7/m10-install-live-9-summary.png` (+- --)
+- `docs/m7/m10-music-1G.png` (+- --)
+- `docs/m7/m10-music-mp3-1G.png` (+- --)
+- `docs/m7/m10-overview-1G.png` (+- --)
+- `docs/m7/m10-pdf-1G.png` (+- --)
+- `docs/m7/m10-print-1G.png` (+- --)
+- `docs/m7/m10-snap-desktop-1G.png` (+- --)
+- `docs/m7/m10-snap-gm-1G.png` (+- --)
+- `docs/m7/m10-store-1G.png` (+- --)
+- `docs/m7/m10-store-updates-1G.png` (+- --)
+- `docs/m7/m10-terminal-home-1G.png` (+- --)
+- `docs/m7/m10-themes-dark-1G.png` (+- --)
+- `docs/m7/m10-themes-light-1G.png` (+- --)
+- `docs/m7/m10-themes-reset-1G.png` (+- --)
+- `docs/m7/m10-themes-slide-mid-1G.png` (+- --)
+- `docs/m7/m10-themes-top-compact-1G.png` (+- --)
+- `docs/m7/m10-video-1G.png` (+- --)
+- `docs/m7/m10-ws1-back-1G.png` (+- --)
+- `docs/m7/m10-ws1-files-1G.png` (+- --)
+- `docs/m7/m10-ws2-empty-1G.png` (+- --)
+- `docs/m7/m11-x11-desktop-1G.png` (+- --)
+- `docs/m7/m11-x11-xclient-1G.png` (+- --)
+- `docs/m7/m11-x11-xclient-snapped-1G.png` (+- --)
+- `docs/m7/m12-sandbox-download-1G-default.png` (+- --)
+- `docs/m7/m12-sandbox-https-1G-default.png` (+- --)
+- `docs/m7/m12-sandbox-start-1G-default.png` (+- --)
+- `docs/manual/03-installing.md` (+11 -4)
+- `docs/manual/06-apps.md` (+1 -1)
+- `docs/manual/07-files-drives-usb.md` (+1 -1)
+- `docs/manual/15-users-security.md` (+70 -31)
+- `sources.list` (+4 -0)
+- `sources.lock` (+3 -0)
+
+See also: [INDEX](../INDEX.md) · [Round 22](round-22.md)

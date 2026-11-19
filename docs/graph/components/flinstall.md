@@ -12,7 +12,7 @@ Two programs, C17, MIT.
 - [[docs/graph/files/flinstall/common.h|src/flinstall/common.h]] -- 154 lines -- 8 fn
 - [[docs/graph/files/flinstall/flauth-check.h|src/flinstall/flauth-check.h]] -- 248 lines -- 12 fn
 - [[docs/graph/files/flinstall/flinstall.c|src/flinstall/flinstall.c]] -- 2032 lines -- 61 fn
-- [[docs/graph/files/flinstall/helper.c|src/flinstall/helper.c]] -- 2484 lines -- 72 fn
+- [[docs/graph/files/flinstall/helper.c|src/flinstall/helper.c]] -- 2490 lines -- 72 fn
 
 ## Uses
 
@@ -47,10 +47,10 @@ Two programs, C17, MIT.
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `d3131d5` Round 19: eject/cwd fix, app icons, server-side decorations, stride fix
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 - `c9604b6` Round 15: folder layout (/usr real, /sysflfs alias, homes in /home); hardware build
 - `2c2183d` Round 14: security updates, kernel 7.3.4 (rolling), WebKit sandbox; Intel/AMD prep
-- `6a1e3de` Round 12: RAM trim, live store, desktop icons, small fixes, security ops
 
 See also: [src/flinstall/README](../../../src/flinstall/README) · [06-apps](../../manual/06-apps.md) · [10-architecture](../../manual/10-architecture.md) · [11-boot-process](../../manual/11-boot-process.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

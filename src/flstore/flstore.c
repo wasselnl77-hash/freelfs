@@ -558,6 +558,14 @@ void rview(const struct St *s, struct ref r, struct rview *v)
 		v->state = upd_has(s, f->id) ? ST_OLDER : ST_INST;
 		break;
 	}
+	case SRC_NX: {
+		const struct pk *p = &s->nixres[r.idx];
+		v->id = v->name = p->name;
+		v->sum = p->sum ? p->sum : "";
+		v->ver = p->ver;
+		v->state = ST_AVAIL;
+		break;
+	}
 	case SRC_PR:
 	case SRC_PI: {
 		const struct pk *p = r.src == SRC_PR ? &s->pkrepo[r.idx] : &s->pkinst[r.idx];
@@ -1078,6 +1086,26 @@ static void pk_push(struct pk **v, size_t *n, const char *name, size_t nl, const
 	(*v)[(*n)++] = (struct pk){strndup(name, nl), strndup(ver, vl), strndup(sum, sl), state};
 }
 
+/* flpkg search --from=nix: "nix/ATTR VERSION DESCRIPTION" per line (sources.sh) */
+static void nix_parse(struct St *s, const char *buf)
+{
+	for (const char *p = buf; *p;) {
+		const char *e = strchr(p, '\n');
+		size_t len = e ? (size_t)(e - p) : strlen(p);
+		if (len > 4 && !strncmp(p, "nix/", 4)) {
+			const char *end = p + len;
+			const char *sp = memchr(p + 4, ' ', len - 4);
+			size_t nl = sp ? (size_t)(sp - (p + 4)) : len - 4;
+			const char *ver = sp ? sp + 1 : end;
+			const char *vend = ver < end ? memchr(ver, ' ', (size_t)(end - ver)) : NULL;
+			size_t vl = vend ? (size_t)(vend - ver) : (size_t)(end - ver);
+			const char *sum = vend ? vend + 1 : end;
+			pk_push(&s->nixres, &s->nnixres, p + 4, nl, ver, vl, sum, (size_t)(end - sum), ST_AVAIL);
+		}
+		p += len + (e ? 1 : 0);
+	}
+}
+
 static int cmp_pk(const void *a, const void *b)
 {
 	return strcmp(((const struct pk *)a)->name, ((const struct pk *)b)->name);
@@ -1292,14 +1320,14 @@ static void build_search(struct St *s, const char *query)
 		words[nw++] = w;
 	if (!nw)
 		return;
-	s->list = malloc((s->db.n + s->npkrepo + 1) * sizeof *s->list);
+	s->list = malloc((s->db.n + s->npkrepo + s->nnixres + 1) * sizeof *s->list);
 	int *scores = calloc(s->db.n + 1, sizeof *scores);
 	if (!s->list || !scores) {
 		free(scores);
 		list_free(s);
 		return;
 	}
-	for (size_t i = 0; i < s->db.n; i++) {
+	for (size_t i = 0; i < s->db.n && (s->src_filter == 0 || s->src_filter == 2); i++) {
 		const struct app *a = &s->db.a[i];
 		int total = 0, ok = 1;
 		for (int w = 0; w < nw && ok; w++) {
@@ -1313,12 +1341,19 @@ static void build_search(struct St *s, const char *query)
 			s->list[s->nlist++] = (struct ref){SRC_FH, (int)i};
 		}
 	}
-	for (size_t i = 0; i < s->npkrepo; i++) {
+	for (size_t i = 0; i < s->npkrepo && (s->src_filter == 0 || s->src_filter == 1); i++) {
 		int ok = 1;
 		for (int w = 0; w < nw && ok; w++)
 			ok = find_ci(s->pkrepo[i].name, words[w]) || find_ci(s->pkrepo[i].sum, words[w]);
 		if (ok)
 			s->list[s->nlist++] = (struct ref){SRC_PR, (int)i};
+	}
+	for (size_t i = 0; i < s->nnixres && (s->src_filter == 0 || s->src_filter == 3); i++) {
+		int ok = 1;
+		for (int w = 0; w < nw && ok; w++)
+			ok = find_ci(s->nixres[i].name, words[w]) || find_ci(s->nixres[i].sum, words[w]);
+		if (ok)
+			s->list[s->nlist++] = (struct ref){SRC_NX, (int)i};
 	}
 	score_buf = scores;
 	sort_db = &s->db;
@@ -1569,7 +1604,7 @@ static void chg_add(struct St *s, int kind, const char *id, const char *name)
 
 static int chg_is_flatpak(int kind)
 {
-	return kind != CK_PKINSTALL && kind != CK_PKREMOVE;
+	return kind != CK_PKINSTALL && kind != CK_PKREMOVE && kind != CK_NIXINSTALL;
 }
 
 static void chg_pump(struct St *s)
@@ -1588,6 +1623,8 @@ static void chg_pump(struct St *s)
 			return;
 		}
 		argv[n++] = (char *)s->flatpak;
+	} else if (c.kind == CK_NIXINSTALL) {
+		argv[n++] = (char *)s->flpkg; /* as the person: nix needs no root, the daemon does the work */
 	} else {
 		argv[n++] = (char *)s->seat;
 	}
@@ -1623,6 +1660,12 @@ static void chg_pump(struct St *s)
 		ADD("install");
 		argv[n++] = c.id;
 		what = "Installing";
+		break;
+	case CK_NIXINSTALL:
+		/* --yes: the Store asked already (install_request warns first on a live system without persistence) */
+		ADD("install", "--from=nix", "--yes");
+		argv[n++] = c.id;
+		what = "Installing from Nix";
 		break;
 	case CK_PKREMOVE:
 		ADD("remove");
@@ -1766,6 +1809,14 @@ static void job_done(struct St *s, struct job *j)
 			info_load(s, 0);
 		}
 		break;
+	case J_NIX:
+		pk_free(&s->nixres, &s->nnixres);
+		if (j->status == 0)
+			nix_parse(s, out);
+		if (s->cur.page == PG_SEARCH)
+			view_rebuild(s);
+		data_changed(s);
+		break;
 	case J_PKLIST:
 		if (j->status == 0)
 			pk_parse_list(s, out);
@@ -1894,6 +1945,7 @@ static void search_run(struct St *s)
 	s->cur.pg = 0;
 	s->scroll = 0;
 	view_rebuild(s);
+	run_flpkg(s, J_NIX, "search", "--from=nix", s->query);
 }
 
 /* The install itself: flpkg or flatpak through the change queue (CK_*). act is A_INSTALL or A_UPDATE. */
@@ -1903,6 +1955,8 @@ static void install_now(struct St *s, int act)
 	rview(s, s->cur.app, &v);
 	if (v.src == SRC_FH || v.src == SRC_FI)
 		chg_add(s, act == A_UPDATE || v.state == ST_OLDER ? CK_FUPDATE : CK_FINSTALL, v.id, v.name);
+	else if (v.src == SRC_NX && valid_name(v.id))
+		chg_add(s, CK_NIXINSTALL, v.id, v.name);
 	else if (valid_name(v.id))
 		chg_add(s, CK_PKINSTALL, v.id, v.name);
 }
@@ -1977,7 +2031,7 @@ static void run_action(struct St *s)
 			struct rview v;
 			rview(s, s->cur.app, &v);
 			snprintf(s->cur.app_id, sizeof s->cur.app_id, "%s", v.id);
-			s->cur.app_pkg = v.src == SRC_PR || v.src == SRC_PI;
+			s->cur.app_pkg = v.src == SRC_PR || v.src == SRC_PI || v.src == SRC_NX;
 		}
 		s->cur.shot = 0;
 		s->scroll = 0;
@@ -2040,6 +2094,12 @@ static void run_action(struct St *s)
 	case A_SHOT:
 		if (s->det.nshot > 0)
 			s->cur.shot = (s->cur.shot + arg + s->det.nshot) % s->det.nshot;
+		break;
+	case A_SRCFILTER:
+		s->src_filter = arg;
+		s->cur.pg = 0;
+		s->scroll = 0;
+		view_rebuild(s);
 		break;
 	case A_CHIP:
 		if (s->cur.inst_mode != arg) {

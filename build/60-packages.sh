@@ -74,7 +74,7 @@ build_one() {
 	# The base system is the build system itself; from M6 on, desktop packages
 	# build on each other, so each one goes into it too (and so do the live ISO
 	# tools, group "live": build/53-iso.sh runs them in the chroot).
-	if recipe_list "$1" groups | grep -Eqx "desktop|live"; then
+	if recipe_list "$1" groups | grep -Eqx "desktop|live|buildtool"; then
 		flpkg install -y --nodeps --unsigned "$OUT/$1"-[0-9]*.flpkg
 	fi
 }
@@ -88,7 +88,7 @@ root_step() {
 	rm -rf "$ROOT"
 	mkdir -p "$ROOT"
 	flpkg --root "$ROOT" sync
-	flpkg --root "$ROOT" install -y base desktop
+	flpkg --root "$ROOT" install -y base desktop nix # nix: the multi-user Nix, on demand (round 24b)
 }
 
 # What the installer will do (M9): shadow files, time zone, keys; root is locked (FLFS_DEV_ROOT=1: no password).

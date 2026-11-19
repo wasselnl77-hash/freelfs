@@ -1,0 +1,25 @@
+#!/bin/sh
+# nix-daemon for flsocketd (rc service "nix"). flsocketd listens on the daemon socket and starts
+# this at the first connection, with the listening socket as fd 3 and UPSTART_FDS=3. nix-daemon
+# takes the socket from LISTEN_FDS (systemd socket activation), so this wrapper passes it on.
+# It stops nix-daemon after NIX_DAEMON_IDLE seconds (default 60) with no client connected, so
+# nothing stays in RAM when Nix is not used. flsocketd listens again when this exits.
+IDLE=${NIX_DAEMON_IDLE:-60}
+daemon=/usr/bin/nix-daemon
+
+sh -c 'LISTEN_FDS=1; LISTEN_PID=$$; export LISTEN_FDS LISTEN_PID; exec '"$daemon"' --daemon' &
+pid=$!
+trap 'kill "$pid" 2>/dev/null; exit 0' TERM INT
+
+quiet=0
+while kill -0 "$pid" 2>/dev/null; do
+	sleep 10 & wait $!
+	if cat /proc/"$pid"/task/*/children 2>/dev/null | grep -q .; then
+		quiet=0
+	else
+		quiet=$((quiet + 10))
+		[ "$quiet" -ge "$IDLE" ] && { kill -TERM "$pid" 2>/dev/null; break; }
+	fi
+done
+wait "$pid" 2>/dev/null
+exit 0

@@ -1,0 +1,22 @@
+# libsodium: Nix checks the signatures of binary caches with it.
+pkgname=libsodium
+version=1.0.21
+release=1
+summary="Modern, easy-to-use cryptography library (NaCl fork)"
+url=https://libsodium.org
+license=(ISC)
+arch=(x86_64)
+groups=(buildtool)
+depends=(glibc)
+source=(https://download.libsodium.org/libsodium/releases/libsodium-1.0.21.tar.gz)
+sha256=(9e4285c7a419e82dedb0be63a72eea357d6943bc3e28e6735bf600dd4883feaf)
+check() { :; }
+
+build() {
+	./configure --prefix=/usr --disable-static
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}

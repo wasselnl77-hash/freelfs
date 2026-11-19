@@ -20,6 +20,11 @@ kernel_fs() {
 	mountpoint -q /run || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
 	mountpoint -q /dev || mount -n -t devtmpfs devtmpfs /dev -o mode=0755,nosuid
 	mkdir -p /dev/pts /dev/shm /run/lock
+	# round 24a: bash process substitution (<(...)) and /dev/stdin need these (LFS mountvirtfs does the same)
+	[ -e /dev/fd ] || ln -sfn /proc/self/fd /dev/fd
+	[ -e /dev/stdin ] || ln -sfn /proc/self/fd/0 /dev/stdin
+	[ -e /dev/stdout ] || ln -sfn /proc/self/fd/1 /dev/stdout
+	[ -e /dev/stderr ] || ln -sfn /proc/self/fd/2 /dev/stderr
 	chmod 1777 /run/lock
 	mountpoint -q /dev/pts || mount -n -t devpts devpts /dev/pts -o gid=5,mode=620
 	mountpoint -q /dev/shm || mount -n -t tmpfs tmpfs /dev/shm -o nosuid,nodev

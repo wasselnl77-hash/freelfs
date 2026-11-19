@@ -1,0 +1,24 @@
+# passt and pasta: the user-space network for rootless containers (C, no Rust, no root, no daemon).
+# podman 5 uses pasta for rootless networking by default.
+pkgname=passt
+version=2026_10_02
+release=1
+summary="User-space networking for rootless containers (pasta, passt)"
+url=https://passt.top/
+license=(GPL-2.0-or-later BSD-3-Clause)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+source=(passt-$version.tar.xz::https://passt.top/passt/snapshot/passt-2026_10_02.cba3570.tar.xz)
+sha256=(aa75616cc43925f0bd6c05bcfbbaecd77397c03d7bd23591b34ef535be5dfcdc)
+
+build() {
+	cd "$srcdir"/passt-*/
+	make prefix=/usr
+}
+check() { :; }
+package() {
+	cd "$srcdir"/passt-*/
+	make install prefix=/usr DESTDIR="$pkgdir"
+	rm -rf "$pkgdir/usr/share/man"
+}

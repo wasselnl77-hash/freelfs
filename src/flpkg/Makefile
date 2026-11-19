@@ -34,6 +34,7 @@ install: flpkg
 	install -Dm755 flpkg $(DESTDIR)$(PREFIX)/bin/flpkg
 	install -Dm755 recipe.sh $(DESTDIR)$(PREFIX)/lib/flpkg/recipe.sh
 	install -Dm755 sources.sh $(DESTDIR)$(PREFIX)/lib/flpkg/sources.sh
+	install -Dm755 sources-nix.sh $(DESTDIR)$(PREFIX)/lib/flpkg/sources-nix.sh
 	install -Dm644 triggers $(DESTDIR)$(PREFIX)/lib/flpkg/triggers
 
 clean:

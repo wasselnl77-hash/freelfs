@@ -42,6 +42,7 @@ Two small programs for Settings > Date & time. C17, MIT.
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `071cf4c` FreeLFS: import current tree (M10 + hardware fixes + XWayland, ISO 49c5df24)
 
 See also: [src/fltime/README](../../../src/fltime/README) · [10-architecture](../../manual/10-architecture.md) · [12-filesystem-layout](../../manual/12-filesystem-layout.md) · [14-services-init](../../manual/14-services-init.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

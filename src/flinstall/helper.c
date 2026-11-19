@@ -1616,6 +1616,12 @@ static int customise(void)
 			return err("cannot edit /etc/group"), -1;
 		if (edit_accounts("/etc/gshadow", NULL, NULL, 1) < 0)
 			return err("cannot edit /etc/gshadow"), -1;
+		/* round 24a: sub-ID ranges for rootless containers (podman, Distrobox): 65536 IDs per person, none shared */
+		unsigned sub_first = 100000u + ((unsigned)new_uid - 1000u) * 65536u;
+		snprintf(line, sizeof line, "%s:%u:65536\n", cfg.user, sub_first);
+		/* not fatal: a root without the files just has no containers for this person until they are made */
+		if (edit_accounts("/etc/subuid", line, NULL, 0) < 0 || edit_accounts("/etc/subgid", line, NULL, 0) < 0)
+			logline("warning: /etc/subuid or /etc/subgid could not be edited; rootless containers need a range there");
 	}
 	explicit_bzero(hash, sizeof hash);
 	explicit_bzero(rhash, sizeof rhash);

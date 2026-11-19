@@ -2,17 +2,20 @@
 # the installer creates them with pwconv and grpconv.
 pkgname=shadow
 version=4.20.2
-release=3
+release=4
 summary="Password and account management (login, passwd, useradd, ...)"
 url=https://github.com/shadow-maint/shadow
 license=(BSD-3-Clause)
 arch=(x86_64)
 groups=(base)
 depends=(glibc acl attr libxcrypt)
-# round 23: su stays setuid but is for group wheel only (SU_WHEEL_ONLY above). newuidmap and newgidmap lose
-# setuid: /etc/subuid and /etc/subgid are empty and no rootless container tool is shipped. Put the setuid bit
-# back (chmod 4755) when one is installed. login honours /etc/securetty (CONSOLE, base-files) for root.
-owner=("/usr/bin/newuidmap 0 0 0755" "/usr/bin/newgidmap 0 0 0755")
+# round 23: su stays setuid but is for group wheel only (SU_WHEEL_ONLY above). round 24a: newuidmap and newgidmap are
+# setuid root again (4755): rootless podman (Distrobox, flpkg install --from=apt|pacman|dnf) maps a range of
+# sub-IDs from /etc/subuid and /etc/subgid into its user namespace, and only these two helpers may write such a
+# map for an unprivileged person. They only act on the ranges that /etc/subuid and /etc/subgid grant the caller
+# (nothing is granted until the installer or the live boot adds a range). See docs/SECURITY.md.
+# login honours /etc/securetty (CONSOLE, base-files) for root.
+owner=("/usr/bin/newuidmap 0 0 4755" "/usr/bin/newgidmap 0 0 4755")
 source=(https://github.com/shadow-maint/shadow/releases/download/$version/shadow-$version.tar.xz)
 sha256=(b89f432b75ae55a2d852b446d0365484795fdf533ab97d550e325fa15594a224)
 

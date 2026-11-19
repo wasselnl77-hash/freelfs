@@ -28,6 +28,12 @@ if [ "${1:-}" = --image-hook ]; then
 	[ -n "$grp" ] || die "no group users"
 	echo "tester:x:1000:$grp:Tester:/home/tester:/usr/bin/flsh" >> "$w/passwd"
 	echo "tester::20454:0:99999:7:::" >> "$w/shadow"
+	# round 24a: sub-IDs for rootless containers
+	for f in subuid subgid; do
+		cp -p "$settings/$f" "$w/$f" 2> /dev/null || : > "$w/$f"
+		chmod u+w "$w/$f"
+		echo "tester:100000:65536" >> "$w/$f"
+	done
 	# the groups a new user gets from /etc/default/useradd
 	python3 -I - "$w/group" "$w/gshadow" <<'PY'
 import sys
@@ -66,6 +72,9 @@ c.commit()
 c.close()
 PY
 	for f in passwd shadow group gshadow; do
+		mount --bind "$w/$f" "$settings/$f"
+	done
+	for f in subuid subgid; do
 		mount --bind "$w/$f" "$settings/$f"
 	done
 	mount --bind "$w/db.sqlite" "$data/lib/flpkg/db.sqlite"

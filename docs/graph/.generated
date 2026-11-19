@@ -322,7 +322,7 @@ files/snappel/img.c.md
 files/snappel/img.h.md
 files/snappel/snappel.c.md
 groups/base.md
-groups/containers.md
+groups/buildtool.md
 groups/deferred.md
 groups/desktop.md
 groups/live.md
@@ -340,14 +340,18 @@ packages/bash.md
 packages/bc.md
 packages/binutils.md
 packages/bison.md
+packages/blake3.md
 packages/bluez.md
+packages/boost.md
 packages/brotli.md
 packages/btrfs-progs.md
 packages/bubblewrap.md
 packages/bzip2.md
 packages/ca-certificates.md
 packages/cmake.md
+packages/conmon.md
 packages/coreutils.md
+packages/crun.md
 packages/cups.md
 packages/curl.md
 packages/dbus.md
@@ -362,6 +366,7 @@ packages/efibootmgr.md
 packages/efivar.md
 packages/expat.md
 packages/expect.md
+packages/fastfetch.md
 packages/ffmpeg.md
 packages/file.md
 packages/findutils.md
@@ -409,6 +414,7 @@ packages/fontconfig.md
 packages/freebws.md
 packages/freetype.md
 packages/fribidi.md
+packages/fuse-overlayfs.md
 packages/fuse3.md
 packages/gaming-config.md
 packages/gawk.md
@@ -423,6 +429,7 @@ packages/glslang.md
 packages/gmmlib.md
 packages/gmp.md
 packages/gnupg.md
+packages/go.md
 packages/gperf.md
 packages/gpgme.md
 packages/grep.md
@@ -443,6 +450,7 @@ packages/intel-media-driver.md
 packages/iproute2.md
 packages/iwd.md
 packages/jinja2.md
+packages/json-c.md
 packages/json-glib.md
 packages/kbd.md
 packages/kmod.md
@@ -479,6 +487,7 @@ packages/libffi.md
 packages/libfontenc.md
 packages/libfyaml.md
 packages/libgcrypt.md
+packages/libgit2.md
 packages/libgpg-error.md
 packages/libinput.md
 packages/libisoburn.md
@@ -493,6 +502,7 @@ packages/libplacebo.md
 packages/libpng.md
 packages/libpsl.md
 packages/libseccomp.md
+packages/libsodium.md
 packages/libsoup.md
 packages/libtasn1.md
 packages/libtool.md
@@ -537,9 +547,12 @@ packages/mtools.md
 packages/mupdf.md
 packages/nasm.md
 packages/ncurses.md
+packages/netavark.md
 packages/nftables.md
 packages/nghttp2.md
 packages/ninja.md
+packages/nix.md
+packages/nlohmann_json.md
 packages/npth.md
 packages/openssl.md
 packages/opus.md
@@ -547,6 +560,7 @@ packages/orc.md
 packages/ostree.md
 packages/packaging.md
 packages/papirus-icon-theme.md
+packages/passt.md
 packages/patch.md
 packages/pciutils.md
 packages/pcre2.md
@@ -554,6 +568,7 @@ packages/perl.md
 packages/pipewire.md
 packages/pixman.md
 packages/pkgconf.md
+packages/podman.md
 packages/procps-ng.md
 packages/psmisc.md
 packages/pyparsing.md
@@ -579,6 +594,7 @@ packages/sysvinit.md
 packages/tar.md
 packages/tcl.md
 packages/texinfo.md
+packages/toml11.md
 packages/tzdata.md
 packages/udev.md
 packages/unifdef.md
@@ -622,3 +638,4 @@ rounds/round-19.md
 rounds/round-20.md
 rounds/round-21.md
 rounds/round-22.md
+rounds/round-23.md

@@ -486,6 +486,7 @@ After this round (list checked by `build/m23/sys.cmds` against the booted system
 | File | Mode, owner | Why it stays |
 |---|---|---|
 | `/usr/bin/passwd`, `chage`, `chfn`, `chsh`, `gpasswd`, `newgrp` | 4755 root | shadow-utils: a user changes their own password and groups |
+| `/usr/bin/newuidmap`, `newgidmap` | 4755 root | sub-ID maps for rootless containers (podman, round 24a); only for ranges in /etc/subuid and /etc/subgid |
 | `/usr/bin/su` | 4755 root | `su` for group `wheel` only (`SU_WHEEL_ONLY yes`): the terminal way to become root on an installed system |
 | `/usr/bin/fusermount3` | 4755 root | FUSE mounts for users (`user_allow_other` stays off) |
 | `/usr/bin/traceroute` | 4750 root:seat | needs raw sockets and `flpkg` has no file capabilities (xattrs) yet; only group seat can run it |
@@ -493,8 +494,18 @@ After this round (list checked by `build/m23/sys.cmds` against the booted system
 | `/usr/libexec/dbus-daemon-launch-helper` | 4750 root:messagebus | system bus service activation |
 | `/usr/bin/wall`, `write` | 2755 root:tty (setgid) | writing to terminals |
 
-**Removed** this round: `ping`, `ping6` (now 0755; `net.ipv4.ping_group_range`), `mount`, `umount` (0755; `flmount` mounts for group seat),
-`newuidmap`, `newgidmap` (0755: `/etc/subuid` and `/etc/subgid` are empty and no rootless container tool is shipped; put the bit back, `chmod 4755`, when one is).
+**Removed** in round 23: `ping`, `ping6` (now 0755; `net.ipv4.ping_group_range`), `mount`, `umount` (0755; `flmount` mounts for group seat).
+
+**Back in round 24a:** `/usr/bin/newuidmap` and `/usr/bin/newgidmap` are setuid root (4755) again. Round 23 had trimmed them because
+no rootless container tool was shipped. Round 24a ships podman, which `flpkg install --from=apt|pacman|dnf` (Distrobox) needs, and a
+rootless container maps a range of IDs (apt inside an Ubuntu container runs as the user `_apt`, files belong to many IDs). Only these two
+helpers may write such a user-namespace map for an unprivileged person; without them podman falls back to one single ID and Ubuntu, Arch and
+Fedora containers do not work. Why this is a small risk: both programs only act on the ranges that `/etc/subuid` and `/etc/subgid` grant the
+calling user (they refuse any other ID), and nothing is granted by default: the installer adds one range of 65536 IDs for the created user,
+the live boot adds one for `tester`; root-run programs, services and system users get none. A range holds only IDs that no real account
+uses (100000 and up). They are small programs from the same shadow package as `passwd`, and they have the shadow project's usual CVE history
+(none known open in shadow 4.20.2). Podman itself is not setuid and starts nothing at boot. To turn the feature off: `chmod 0755
+/usr/bin/newuidmap /usr/bin/newgidmap` and empty `/etc/subuid` and `/etc/subgid` (podman then stops working for the user).
 
 ### 6.6 Package trust
 

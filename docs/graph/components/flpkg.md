@@ -16,7 +16,7 @@ the FreeLFS package manager
 - [[docs/graph/files/flpkg/db.h|src/flpkg/db.h]] -- 54 lines
 - [[docs/graph/files/flpkg/flpkg.h|src/flpkg/flpkg.h]] -- 292 lines
 - [[docs/graph/files/flpkg/hash.c|src/flpkg/hash.c]] -- 89 lines -- 7 fn
-- [[docs/graph/files/flpkg/main.c|src/flpkg/main.c]] -- 251 lines -- 7 fn
+- [[docs/graph/files/flpkg/main.c|src/flpkg/main.c]] -- 253 lines -- 7 fn
 - [[docs/graph/files/flpkg/pack.c|src/flpkg/pack.c]] -- 256 lines -- 5 fn
 - [[docs/graph/files/flpkg/pkgfile.c|src/flpkg/pkgfile.c]] -- 84 lines -- 4 fn
 - [[docs/graph/files/flpkg/pkginfo.c|src/flpkg/pkginfo.c]] -- 366 lines -- 17 fn

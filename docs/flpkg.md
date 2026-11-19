@@ -198,12 +198,23 @@ may be trusted, and a new key can be introduced by the old one (`flpkg key intro
 
 `flpkg install|remove|upgrade|search|list`, typed by a person, goes through `/usr/lib/flpkg/sources.sh` (source:
 `src/flpkg/sources.sh`), which uses the commands above for the FreeLFS repo and adds three more sources, in this order:
-FreeLFS repo, Flathub (`flatpak --user`, no root), Nix (package `nix`, scaffold) and Distrobox containers (Ubuntu apt,
-Arch pacman, Fedora dnf; package `distrobox` plus podman, scaffold).
+FreeLFS repo, Flathub (`flatpak --user`, no root), Nix (package `nix`) and Distrobox containers (Ubuntu apt,
+Arch pacman, Fedora dnf; packages `distrobox` and `podman`, real since round 24a: see below).
 
 - `flpkg install NAME`: every source that has NAME is listed ("1) FreeLFS repository (preselected) 2) Flathub ..."); Enter
   takes the FreeLFS one. `--from=freelfs|flatpak|nix|apt|pacman|dnf` skips the question. Nothing found in the first three:
   it offers to try apt, pacman or dnf, and creating a container always asks first (with the download size).
+- Containers (round 24a). `flpkg install --from=apt|pacman|dnf NAME` asks, then runs `distrobox create --yes -n freelfs-BACKEND
+  -i IMAGE --no-entry --unshare-process` (rootless podman; images `docker.io/library/ubuntu:24.04`, `archlinux:latest`,
+  `fedora:45`), refreshes the package lists in the box, installs NAME with the box's own package manager, then exports it:
+  `distrobox-export --app NAME` (menu entry `freelfs-BACKEND-NAME.desktop` in `~/.local/share/applications`) and
+  `--bin` into `~/.local/bin` (the command has the same name). `flpkg remove NAME` removes the export and the package;
+  `flpkg upgrade` runs `distrobox upgrade` for every box. The question names the download and disk size and, on a live system
+  without persistence, warns that the container lives in RAM and shows the free RAM. On a live system the home is overlayfs,
+  which the kernel cannot stack, so flpkg writes `~/.config/containers/storage.conf` with `mount_program` fuse-overlayfs; on an
+  installed system podman uses the kernel overlay. Containers run without their own cgroup (no systemd, nobody delegates one);
+  hence `--unshare-process`. Container traffic is the host's: the firewall's inbound rules apply to it unchanged.
+
 - On a live system without persistence a Flatpak install warns that it goes into RAM, with its size, and asks.
 - `flpkg remove NAME` uses the source that installed it (FreeLFS: flpkg's database; the others:
   `~/.local/state/flpkg/sources.list`, plus Flatpak apps found by name).
@@ -213,6 +224,30 @@ Arch pacman, Fedora dnf; package `distrobox` plus podman, scaffold).
   `--unsigned`, `--overwrite GLOB`) are passed on to the FreeLFS source (as root; the password-free route for a person,
   `flpkg-seat`, takes names only, so a person is told to use root); unknown options are an error. Root with `-y`, `--nodeps`,
   `--unsigned` or a package file (flpkg-seat, build scripts), `--root`, `--config` or `FLPKG_NO_SOURCES=1` run the native commands.
+
+### Nix (round 24b)
+
+`flpkg install --from=nix NAME` installs from nixpkgs, through the real `nix` client (package `nix`, recipes/nix: Nix 2.35.6 built from the
+official source tag, multi-user). The backend is `src/flpkg/sources-nix.sh`, which `sources.sh` sources with one line. It searches with
+`nix search nixpkgs TEXT --json`, installs with `nix profile install nixpkgs#ATTR`, and removes, lists and upgrades with `nix profile`.
+
+- **Search (round 24a fix).** `nix search nixpkgs` evaluates all of nixpkgs: it needs about 3.3 GB of RAM (the kernel killed it in a
+  3.5 GB guest), so flpkg does not use it. Search reads a cached list built once from the channel's `packages.json.br` (10 MB download,
+  streamed through python, about 9 MB result, kept in `~/.cache/flpkg/nix-index.tsv` for a week; on a live system that is RAM).
+  `--from=nix NAME` uses the name as typed (or the exact entry of the list when it exists) and needs no list.
+- **State directory.** Nix is built with `localstatedir=/var`, so its state and the daemon socket are in `/var/nix` (the store stays
+  `/nix/store`). `nix` prints ANSI codes even into a pipe: flpkg sets `NO_COLOR=1` for it.
+- **Live RAM.** `nix profile install hello` took about 115 MB of RAM on the live system (43 MB store, 70 MB `~/.cache/nix`): files, not
+  processes. At idle only `flsocketd` (1.6 MB) stays; the daemon exits 60 s after the last client.
+- **Service.** Nix is a client; `nix-daemon` does the work. The rc service `nix` (config/etc/rc.d/init.d/nix) runs flsocketd on
+  `/var/nix/daemon-socket/socket`, and the first connection starts nix-daemon through `/usr/lib/nix/nix-daemon-ondemand`,
+  which stops it after 60 s with no client. Idle RAM is flsocketd only (about 0.2 MB).
+- **Store.** `/nix/store` is group `nixbld`, mode 1775. Build users `nixbld1`..`nixbld8` (uids 30001-30008) and group `nixbld`
+  (30000) come from the recipe's `sysusers`/`sysgroups`. `/etc/nix/nix.conf` sets experimental features (nix-command, flakes),
+  sandbox, two build jobs, and the CA bundle. `~/.nix-profile/bin` is on PATH through the profile script.
+- **Live system without persistence.** `/nix` lives in RAM. The first install asks first and gives the size nix predicts
+  (`nix build --dry-run`). `--yes` (the Store asks itself) skips the question.
+- **Not in the base.** Nix is not part of any group, so it is not installed by default.
 
 ### Publishing on GitHub Releases (round 22)
 

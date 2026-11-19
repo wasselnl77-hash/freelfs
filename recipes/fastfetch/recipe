@@ -1,0 +1,39 @@
+pkgname=fastfetch
+version=2.71.0
+release=2
+summary="Fast system information tool, with the FreeLFS logo"
+url=https://github.com/fastfetch-cli/fastfetch
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc zlib dbus sqlite wayland libxcb libXrandr libdrm vulkan-loader mesa glib libelf lua)
+makedepends=(cmake ninja pkgconf)
+source=(https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/$version.tar.gz)
+sha256=(e71d93de41e8e4b2554c36d2ae51758112a21ecf3a8c98605a2c689251e62987)
+build_style=cmake
+worksrc=fastfetch-$version
+check() { :; }
+
+# No network at build time. Optional features whose libraries are not in the
+# base system are switched off: image logos (ImageMagick, chafa), rpm, OpenCL,
+# dconf, eet, vdpau, VA-API, libzfs. flashfetch is not packaged.
+configure_args=(
+	-D ENABLE_IMAGE_LOGO=OFF
+	-D ENABLE_RPM=OFF
+	-D ENABLE_OPENCL=OFF
+	-D ENABLE_DCONF=OFF
+	-D ENABLE_EET=OFF
+	-D ENABLE_VDPAU=OFF
+	-D ENABLE_VADRM=OFF
+	-D ENABLE_VAX11=OFF
+	-D ENABLE_LIBZFS=OFF
+	-D BUILD_FLASHFETCH=OFF
+)
+
+package() {
+	DESTDIR="$pkgdir" ninja -C build install
+	local c=$startdir/../../config/fastfetch
+	install -Dm644 "$c/config.jsonc" "$pkgdir/etc/fastfetch/config.jsonc"
+	install -Dm644 "$c/freelfs-blocks.txt" "$pkgdir/etc/fastfetch/freelfs-blocks.txt"
+	install -Dm644 "$c/freelfs-braille.txt" "$pkgdir/etc/fastfetch/freelfs-braille.txt"
+}

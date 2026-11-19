@@ -1,0 +1,21 @@
+# fuse-overlayfs: overlayfs in user space. Rootless podman needs it where the kernel's own overlayfs cannot be
+# stacked: on the live system the home directory is itself on overlayfs (squashfs + RAM), and overlay on overlay
+# is refused. flpkg writes ~/.config/containers/storage.conf with mount_program for that case only; on an
+# installed system (btrfs home) podman uses the kernel overlay and this is not started.
+pkgname=fuse-overlayfs
+version=1.18
+release=1
+summary="FUSE implementation of overlayfs (rootless containers on overlayfs)"
+url=https://github.com/containers/fuse-overlayfs
+license=(GPL-3.0-or-later)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc fuse3)
+makedepends=(autoconf automake pkgconf)
+source=(fuse-overlayfs-$version.tar.gz::https://github.com/containers/fuse-overlayfs/archive/refs/tags/v$version.tar.gz)
+sha256=(fdd1896c8de35a15eb14444d7880be81d635fcbbc4ad162d8bc3ccf5627aa8c7)
+
+prepare() { ./autogen.sh; }
+build_style=autotools
+configure_args=(--disable-static)
+check() { :; }

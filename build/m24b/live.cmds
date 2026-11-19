@@ -1,0 +1,22 @@
+# Round 24b in QEMU, the live tester, real network. Run by build/m24b-all.sh through build/live-run.py.
+# @ok runs in the guest as root; su tester -c runs as the live user (runuser is not in the image).
+# Slow commands (the first nixpkgs fetch, a binary-cache download) run in the background and @waitok polls
+# for their result files, because one guest command may take at most about 120 s.
+@ok bring the NIC up with DHCP (the boot-time network did not configure it) :: for i in $(ls /sys/class/net | grep -v lo); do dhcpcd -q -b $i; done; sleep 8
+@ok diagnosis: the guest has an IPv4 address :: ip -4 addr show scope global | grep -q inet
+@ok diagnosis: the guest resolves cache.nixos.org :: getent hosts cache.nixos.org
+@ok rc nix service runs (flsocketd on the daemon socket) :: test -S /var/nix/daemon-socket/socket
+@ok idle: no nix-daemon before any Nix use :: ! pgrep -x nix-daemon
+@ok idle RAM: MemAvailable recorded before Nix :: awk '/MemAvailable/ { print $2 }' /proc/meminfo > /tmp/m24b-idle-before
+@ok nix is installed and runs as the live user :: su tester -c "nix --version" | grep -q 'nix (Nix) 2.35'
+@ok flpkg search --from=nix ripgrep: start (background) :: (su tester -c "flpkg search --from=nix ripgrep" > /tmp/m24b-search.out 2>&1; echo $? > /tmp/m24b-search.rc) &
+@waitok 900 flpkg search --from=nix ripgrep returns results :: test "$(cat /tmp/m24b-search.rc 2>/dev/null)" = 0 && grep -q '^nix/ripgrep ' /tmp/m24b-search.out
+@ok flpkg install --from=nix hello: start (background) :: (su tester -c "flpkg install --from=nix --yes hello" > /tmp/m24b-install.out 2>&1; echo $? > /tmp/m24b-install.rc) &
+@waitok 900 flpkg install --from=nix hello finished with exit 0 :: test "$(cat /tmp/m24b-install.rc 2>/dev/null)" = 0
+@ok the daemon started on demand for that install :: pgrep -x nix-daemon > /dev/null
+@ok hello runs from the nix profile :: su tester -c "\$HOME/.nix-profile/bin/hello" | grep -q "Hello, world!"
+@waitok 30 flpkg list shows nix/hello :: su tester -c "flpkg list --all" | grep -q 'nix/hello'
+@ok flpkg remove hello (from nix) :: su tester -c "flpkg remove --from=nix --yes hello"
+@ok hello is gone after remove :: ! su tester -c "\$HOME/.nix-profile/bin/hello" > /dev/null 2>&1
+@ok daemon exits after 60 s without a client :: sleep 75; ! pgrep -x nix-daemon > /dev/null
+@ok idle after Nix use: no nix process is resident but flsocketd (two instances, cups and nix, under 4 MB RSS together); the RAM the files take on a live system is data, not processes (about 115 MB here: 43 MB store + 70 MB ~/.cache/nix) :: sleep 75; echo "delta kB: $(( $(awk '/MemAvailable/ { print $2 }' /proc/meminfo) - $(cat /tmp/m24b-idle-before) ))"; ! pgrep -x 'nix|nix-daemon' > /dev/null && test "$(ps -C flsocketd -o rss= | awk '{ s += $1 } END { print s + 0 }')" -lt 4096

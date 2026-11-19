@@ -58,10 +58,10 @@ for line in open(sys.argv[1], errors="replace"):
         path = None
 print(" ".join(sorted(out)))
 PY
-want="/usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/flauth /usr/bin/flmount /usr/bin/flpersist /usr/bin/flpkg-seat /usr/bin/flpower /usr/bin/flsnap /usr/bin/flsplash-set /usr/bin/fltime-set /usr/bin/fusermount3 /usr/bin/gpasswd /usr/bin/newgrp /usr/bin/passwd /usr/bin/su /usr/bin/traceroute /usr/libexec/dbus-daemon-launch-helper /usr/libexec/flinstall-helper /usr/libexec/fllock-check"
+want="/usr/bin/chage /usr/bin/chfn /usr/bin/chsh /usr/bin/flauth /usr/bin/flmount /usr/bin/flpersist /usr/bin/flpkg-seat /usr/bin/flpower /usr/bin/flsnap /usr/bin/flsplash-set /usr/bin/fltime-set /usr/bin/fusermount3 /usr/bin/gpasswd /usr/bin/newgidmap /usr/bin/newgrp /usr/bin/newuidmap /usr/bin/passwd /usr/bin/su /usr/bin/traceroute /usr/libexec/dbus-daemon-launch-helper /usr/libexec/flinstall-helper /usr/libexec/fllock-check"
 have=$(cat "$w/suid.txt")
 if [ "$have" = "$want" ]; then ok "the setuid files are exactly the documented list"; else bad "setuid list differs: have [$have]"; fi
-for f in ping ping6 mount umount newuidmap newgidmap; do
+for f in ping ping6 mount umount; do
 	case " $have " in *" /usr/bin/$f "*) bad "$f is still setuid" ;; *) ok "$f is not setuid" ;; esac
 done
 echo "RESULT: $([ $fails = 0 ] && echo PASS || echo "FAIL ($fails)")"

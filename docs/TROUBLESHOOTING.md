@@ -1102,13 +1102,29 @@ flpkg list
   tested against stand-in programs. **It was never run against real Nix** (round 22).
 - **Not verified.** Do not rely on it.
 
-### Distrobox (Ubuntu, Arch, Fedora containers)
+### Distrobox and Podman (Ubuntu, Arch, Fedora containers)
 
-- `flpkg --from=apt`, `--from=pacman` and `--from=dnf` create a container with Distrobox
-  when `distrobox` is installed. The recipe for Distrobox builds.
-- The front end was tested against stand-ins. It was **never run against real Distrobox
-  or Podman** (round 22). The Nix and Podman recipes are **plans** only (`recipes-wip/`).
-- **Not verified.**
+`flpkg install --from=apt|pacman|dnf NAME` uses rootless Podman through Distrobox (round 24a, run against the real
+registries; the round report has the test table). Problems and what they mean:
+
+- **"creating the container failed" / pull errors**: no network or no DNS in the guest, or Docker Hub's anonymous rate limit
+  (wait, try later). Test with `podman pull docker.io/library/debian:stable-slim`.
+- **`newuidmap` / "there might not be enough IDs available"**: your account has no range in `/etc/subuid` and `/etc/subgid`
+  (`grep $USER /etc/subuid`) or `/usr/bin/newuidmap` is not setuid (`ls -l /usr/bin/newuidmap` must show `-rwsr-xr-x`).
+  The installer adds a range for the user it creates and the live boot one for `tester`; for an account made by hand, as root:
+  `echo NAME:200000:65536 >> /etc/subuid` and the same for `/etc/subgid`.
+- **"overlay is not supported over overlayfs"**: the home is on overlayfs (live system). `flpkg` writes `~/.config/containers/storage.conf`
+  for you; for a hand-made `podman` call, create it with `mount_program = "/usr/bin/fuse-overlayfs"` under `[storage.options.overlay]`.
+- **"containers not creating Cgroups must create a private PID namespace"**: you ran `distrobox create` by hand. FreeLFS has no
+  systemd, so containers have no cgroup (`cgroups = "disabled"`); add `--unshare-process`.
+- **Out of space or RAM**: on a live system without persistence `~/.local/share/containers` is RAM. `distrobox rm -f freelfs-apt` and
+  `podman rmi -af` give it back. Size on disk: Ubuntu about 150 MB, Arch 450 MB, Fedora 250 MB, plus what you install.
+- **First start is slow**: the first `distrobox enter` installs a few helper packages in the new box.
+- **Nothing in the menu**: only packages with a `.desktop` file get a menu entry; every other command is in `~/.local/bin`
+  (is it in your PATH?).
+- **Not shipped**: `aardvark-dns` and user-defined bridge networks (rootless containers use pasta; Distrobox uses the host network),
+  Podman's systemd units, `podman-remote`, Docker compatibility sockets. `netavark` is upstream's prebuilt binary, not built from
+  source (the build system has no Rust).
 
 ### What is not in FreeLFS
 
@@ -1254,7 +1270,7 @@ No. It tells you when updates are available. Install them with `flpkg upgrade`, 
 the Store's Updates tab.
 
 **Can I run Windows programs?**
-Not in the notes. Use Flathub apps, or a Distrobox container (not verified).
+Not in the notes. Use Flathub apps, or a Distrobox container (`flpkg install --from=apt NAME`).
 
 **Can I play games? Does Steam work?**
 Steam was **not tested**. The notes say Xwayland (for X11 programs) is there. Test on a
@@ -1314,3 +1330,21 @@ Start the program under gdb/strace, or run the tool as root.
 
 **`ping` or `traceroute` fails for a user.** `ping` uses an ICMP datagram socket (`net.ipv4.ping_group_range`). `traceroute` is
 setuid for group `seat` only. Both work for the installed user and for `tester`.
+
+## 12. Nix (round 24b)
+
+### 12.1 `flpkg install --from=nix` says "the Nix service is not running"
+The rc service `nix` is not running. As root: `rc nix start`. It is started at boot when the `nix` package is installed (config/etc/rc.conf, SERVICES). Check that `/var/nix/daemon-socket/socket` exists.
+
+### 12.2 "cannot connect to daemon" or "single-user mode" errors
+nix found no daemon socket and tried to use /nix as a single user. Start the service (12.1). Only root can write the store through the daemon.
+
+### 12.3 The first search is slow
+nix downloads the nixpkgs flake (from the registry) the first time, and evaluates it. After that the search is quick. A search needs network.
+
+### 12.4 `hello` (or another Nix program) is not found after an install
+`~/.nix-profile/bin` must be on PATH. Log in again, or run `. /etc/profile.d/nix.sh`.
+
+### 12.5 Nix takes RAM on a live system
+Nix's store is in RAM (no persistence): the install warning gives the size. nix-daemon stops 60 s after the last Nix command; `rc nix stop` stops it at once.
+

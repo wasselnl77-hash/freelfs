@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 4.20.2, release 3. Password and account management (login, passwd, useradd, ...)
+Version 4.20.2, release 4. Password and account management (login, passwd, useradd, ...)
 
 - License: BSD-3-Clause; URL: https://github.com/shadow-maint/shadow
 - Groups: [[docs/graph/groups/base|base]]

@@ -1,0 +1,16 @@
+# nlohmann/json, header-only. Nix uses it for its JSON interfaces.
+pkgname=nlohmann_json
+version=3.12.0
+release=1
+summary="JSON for Modern C++ (header-only)"
+url=https://github.com/nlohmann/json
+license=(MIT)
+arch=(x86_64)
+groups=(buildtool)
+makedepends=(cmake ninja)
+source=(https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz)
+sha256=(4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187)
+worksrc=json-3.12.0
+build_style=cmake
+configure_args=(-D JSON_BuildTests=OFF -D JSON_Install=ON)
+check() { :; }

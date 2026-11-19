@@ -9,12 +9,12 @@ One window: Explore (home with featured apps, recently updated apps, eight categ
 
 ## Source files
 
-- [[docs/graph/files/flstore/flstore.c|src/flstore/flstore.c]] -- 2324 lines -- 102 fn
-- [[docs/graph/files/flstore/flstore.h|src/flstore/flstore.h]] -- 218 lines
+- [[docs/graph/files/flstore/flstore.c|src/flstore/flstore.c]] -- 2384 lines -- 103 fn
+- [[docs/graph/files/flstore/flstore.h|src/flstore/flstore.h]] -- 222 lines
 - [[docs/graph/files/flstore/img.c|src/flstore/img.c]] -- 312 lines -- 9 fn
 - [[docs/graph/files/flstore/index.c|src/flstore/index.c]] -- 690 lines -- 22 fn
 - [[docs/graph/files/flstore/store.h|src/flstore/store.h]] -- 67 lines
-- [[docs/graph/files/flstore/views.c|src/flstore/views.c]] -- 1109 lines -- 36 fn
+- [[docs/graph/files/flstore/views.c|src/flstore/views.c]] -- 1128 lines -- 36 fn
 
 ## Uses
 

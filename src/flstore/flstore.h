@@ -12,7 +12,7 @@
 
 enum { PG_HOME, PG_CAT, PG_SEARCH, PG_PKGS, PG_APP, PG_INST, PG_UPD };
 enum { TAB_EXPLORE, TAB_INST, TAB_UPD };
-enum { SRC_FH, SRC_FI, SRC_PR, SRC_PI }; /* Flathub app (in the catalog), Flatpak app not in it, repo package, installed package */
+enum { SRC_FH, SRC_FI, SRC_PR, SRC_PI, SRC_NX }; /* Flathub app (in the catalog), Flatpak app not in it, repo package, installed package, Nix package (nixpkgs, round 24b) */
 enum { ST_AVAIL, ST_INST, ST_OLDER };
 enum { IDX_NONE, IDX_FETCH, IDX_BUILD, IDX_READY, IDX_ERR };
 
@@ -23,6 +23,7 @@ enum {
 	ID_BAR_DETAILS, ID_BAR_CLOSE, ID_BAR_CANCEL, ID_UNUSED, ID_ILIST, ID_ULIST, ID_SCROLL, ID_CONFIRM, ID_CANCEL,
 	ID_LIVE_INSTALL, ID_LIVE_TRY, ID_LIVE_GO, ID_LIVE_STOP,
 	ID_SIDE = 100, /* + row */
+	ID_SRC = 130, /* + source filter chip (0 all, 1 FreeLFS, 2 Flathub, 3 Nix) */
 	ID_CARD = 200, /* + card */
 };
 
@@ -65,10 +66,10 @@ struct chg {
 	char id[96], name[96];
 };
 
-enum { CK_FINSTALL, CK_FUPDATE, CK_FREMOVE, CK_FUPDATE_ALL, CK_FUNUSED, CK_PKINSTALL, CK_PKREMOVE, CK_ADDREMOTE };
+enum { CK_FINSTALL, CK_FUPDATE, CK_FREMOVE, CK_FUPDATE_ALL, CK_FUNUSED, CK_PKINSTALL, CK_PKREMOVE, CK_ADDREMOTE, CK_NIXINSTALL };
 
 /* child processes: one slot per kind */
-enum { J_FETCH, J_BUILD, J_FINST, J_FUPD, J_REMOTE, J_INFO, J_PKLIST, J_PKREPO, J_PKUPD, J_SYNC, J_CHANGE, J_IMG0, J_IMGN = 3,
+enum { J_FETCH, J_BUILD, J_FINST, J_FUPD, J_REMOTE, J_INFO, J_PKLIST, J_PKREPO, J_PKUPD, J_SYNC, J_CHANGE, J_NIX, J_IMG0, J_IMGN = 3,
        J_COUNT = J_IMG0 + J_IMGN };
 
 struct St;
@@ -121,6 +122,9 @@ struct St {
 	/* flpkg */
 	struct pk *pkinst, *pkrepo, *pkup;
 	size_t npkinst, npkrepo, npkupd, npkup;
+	struct pk *nixres; /* nixpkgs results of the last search (flpkg search --from=nix) */
+	size_t nnixres;
+	int src_filter; /* search results: 0 all, 1 FreeLFS, 2 Flathub, 3 Nix */
 	int pkinst_loaded, pkrepo_loaded, repo_cfg;
 
 	/* where we are */
@@ -212,7 +216,7 @@ long free_mb_home(void); /* flstore.c: free megabytes in the home folder (memory
 enum {
 	A_NONE, A_TAB, A_HOME, A_CAT, A_PKGS, A_OPEN_REF, A_BACK, A_SEARCH, A_PAGE, A_INSTALL, A_UPDATE, A_ASK_REMOVE,
 	A_REMOVE, A_CANCEL, A_OPEN_APP, A_SHOT, A_CHIP, A_UPDATE_ALL, A_CHECK, A_RETRY, A_ADD_REMOTE, A_BAR_CLOSE,
-	A_BAR_LOG, A_BAR_CANCEL, A_UNUSED, A_LIVE_INSTALL, A_LIVE_TRY, A_LIVE_GO, A_LIVE_STOP,
+	A_BAR_LOG, A_BAR_CANCEL, A_UNUSED, A_LIVE_INSTALL, A_LIVE_TRY, A_LIVE_GO, A_LIVE_STOP, A_SRCFILTER,
 };
 
 #endif

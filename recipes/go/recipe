@@ -1,0 +1,26 @@
+# Go toolchain: a BUILD-ONLY dependency (round 24a), needed to build podman. Upstream's official release
+# binary (go.dev/dl, sha256 as published there), not built from source: building Go needs a Go to start with.
+# Group "buildtool": it goes into the build system (build/60-packages.sh) but never into an image.
+pkgname=go
+version=1.27.4
+release=1
+summary="Go compiler and tools (build-only, upstream binary release)"
+url=https://go.dev/
+license=(BSD-3-Clause)
+arch=(x86_64)
+groups=(buildtool)
+depends=(glibc)
+options=(!strip)
+source=(go$version.linux-amd64.tar.gz::https://go.dev/dl/go$version.linux-amd64.tar.gz)
+sha256=(7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840)
+
+build() { :; }
+check() { :; }
+
+package() {
+	install -d "$pkgdir/usr/lib" "$pkgdir/usr/bin"
+	cp -a "$srcdir/go" "$pkgdir/usr/lib/go"
+	rm -rf "$pkgdir/usr/lib/go/test" "$pkgdir/usr/lib/go/doc" "$pkgdir/usr/lib/go/misc"
+	ln -s ../lib/go/bin/go "$pkgdir/usr/bin/go"
+	ln -s ../lib/go/bin/gofmt "$pkgdir/usr/bin/gofmt"
+}

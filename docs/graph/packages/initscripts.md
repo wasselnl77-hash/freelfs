@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 15. FreeLFS boot scripts: rc.sysinit, rc, rc.shutdown and services
+Version 0.1, release 17. FreeLFS boot scripts: rc.sysinit, rc, rc.shutdown and services
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/base|base]]

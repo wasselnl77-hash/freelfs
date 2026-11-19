@@ -47,6 +47,7 @@ A big clock, the date, your name and a password field on a plain screen. Super+L
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `6a1e3de` Round 12: RAM trim, live store, desktop icons, small fixes, security ops
 - `071cf4c` FreeLFS: import current tree (M10 + hardware fixes + XWayland, ISO 49c5df24)
 

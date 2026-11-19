@@ -109,6 +109,11 @@ squash_step() {
 		[ -n "$grp" ] || { echo "no group users" >&2; exit 1; }
 		echo "tester:x:1000:$grp:Tester:/home/tester:/usr/bin/flsh" >> "$settings/passwd"
 		echo "tester::20454:0:99999:7:::" >> "$settings/shadow"
+		# round 24a: sub-IDs for rootless containers (podman, Distrobox): the live tester gets 65536
+		for f in subuid subgid; do
+			sed -i "/^tester:/d" "$settings/$f" 2> /dev/null || true
+			echo "tester:100000:65536" >> "$settings/$f"
+		done
 		# round 23: the root account. Release: locked ("!"), bootstrap.pub dropped (only the repo key is trusted).
 		# Dev (FLFS_DEV_ROOT=1): empty, for the serial-console test harnesses. The build FAILS on an empty root
 		# hash unless it is the dev build, whatever the root underneath said.

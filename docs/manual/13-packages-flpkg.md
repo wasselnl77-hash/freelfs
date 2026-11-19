@@ -256,6 +256,18 @@ In the desktop, the Store's **Updates** tab does this through `flpkg-seat`, afte
 - On the live system the Store does not download the catalog. It offers "Install FreeLFS" (the installer) and, as a second choice, "Try one small app anyway", which loads the catalog and shows the free memory first.
 - Portals: Flatpak apps reach the desktop through xdg-desktop-portal and the FreeLFS backend flportal (see [15](15-users-security.md)). Not yet tried with a real Flatpak app (`docs/INTEGRATION-TODO.md`).
 
+### Software from other distributions (containers)
+
+`flpkg install --from=apt|pacman|dnf NAME` installs NAME from Ubuntu, Arch or Fedora. flpkg creates a container
+(Distrobox on rootless Podman) the first time, after asking and telling you the download and disk size, installs the package inside, and
+adds it to the start menu (and to `~/.local/bin` as a command). `flpkg remove NAME` takes it out again and `flpkg upgrade`
+updates the containers with everything else. Nothing runs in the background: there is no container service.
+
+On the live system the container lives in RAM and is gone at shutdown; flpkg shows the size and the free RAM first. Give
+the live system 2 GB or more for a container (an Ubuntu box with one app is about 200 MB, Arch about 500 MB, Fedora about 300 MB).
+The first creation downloads the image from the official registry (docker.io) and then installs a few helper packages in the
+container, which takes a few minutes. See TROUBLESHOOTING section 11 when something fails.
+
 ## 13.12 The rolling release
 
 FreeLFS follows upstream without numbered releases:

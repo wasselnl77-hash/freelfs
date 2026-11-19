@@ -9,8 +9,8 @@ inittab runs /usr/sbin/flgreet on tty1 instead of agetty.
 
 ## Source files
 
-- [[docs/graph/files/flgreet/flgreet-ui.c|src/flgreet/flgreet-ui.c]] -- 683 lines -- 20 fn
-- [[docs/graph/files/flgreet/flgreet.c|src/flgreet/flgreet.c]] -- 234 lines -- 8 fn
+- [[docs/graph/files/flgreet/flgreet-ui.c|src/flgreet/flgreet-ui.c]] -- 686 lines -- 20 fn
+- [[docs/graph/files/flgreet/flgreet.c|src/flgreet/flgreet.c]] -- 235 lines -- 8 fn
 
 ## Uses
 
@@ -47,6 +47,7 @@ inittab runs /usr/sbin/flgreet on tty1 instead of agetty.
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `27f10f9` Round 20: Wi-Fi drivers, NVIDIA phase 1, flat splash, FreeBWS watchdogs, fixes
 - `1e1c899` Round 18: shutdown hardening, visible launch errors, honest tests, manual, website
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL

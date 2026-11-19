@@ -113,7 +113,7 @@ static void draw_icon(fl_ui *ui, struct St *s, const struct rview *v, int x, int
 
 static const char *source_name(int src)
 {
-	return src == SRC_PR || src == SRC_PI ? "FreeLFS package" : "Flathub";
+	return src == SRC_NX ? "Nix (nixpkgs)" : src == SRC_PR || src == SRC_PI ? "FreeLFS package" : "Flathub";
 }
 
 /* ---- cards ----------------------------------------------------------------------------------------- */
@@ -142,6 +142,8 @@ static void draw_card(fl_ui *ui, struct St *s, fl_rect r, struct ref ref, int id
 	char foot[200];
 	if (v.src == SRC_PR || v.src == SRC_PI)
 		snprintf(foot, sizeof foot, "FreeLFS package  %s", v.ver);
+	else if (v.src == SRC_NX)
+		snprintf(foot, sizeof foot, "Nix (nixpkgs)  %s", v.ver);
 	else
 		snprintf(foot, sizeof foot, "%s", v.app && v.app->dev[0] ? v.app->dev : source_name(v.src));
 	text_fit(ui, s->tiny, tx, r.y + r.h - 24, tw, fl_th.dim, foot);
@@ -372,6 +374,23 @@ static void draw_list_page(fl_ui *ui, struct St *s, fl_rect body)
 	y += fl_font_height(s->title) + 6;
 	fl_text(&ui->cv, s->small, c.x, y, fl_th.dim, sub, -1);
 	y += fl_font_height(s->small) + 22;
+	if (page == PG_SEARCH) {
+		static const char *const names[] = {"All", "FreeLFS", "Flathub", "Nix"};
+		int cx = c.x;
+		for (int i = 0; i < 4; i++) {
+			int tw = fl_text_width(s->small, names[i], -1) + 24;
+			fl_rect r = fl_r(cx, y, tw, 26);
+			int res = fl_widget(ui, (uint32_t)(ID_SRC + i), r, 0);
+			int on = s->src_filter == i;
+			fl_fill_rect(&ui->cv, r, on ? fl_th.accent : (res & FL_HOVER) ? fl_th.raised : fl_th.panel);
+			fl_stroke_rect(&ui->cv, r, 1, on ? fl_th.accent : fl_th.line);
+			fl_text(&ui->cv, s->small, cx + 12, y + 6, on ? fl_th.strong : fl_th.dim, names[i], -1);
+			if (res & FL_CLICK)
+				queue(s, A_SRCFILTER, i);
+			cx += tw + 8;
+		}
+		y += 26 + 16;
+	}
 	if (s->nlist == 0) {
 		if (page == PG_PKGS && !s->repo_cfg)
 			notice(ui, s, c.x, y, w, "No package repository is configured.",
@@ -468,7 +487,7 @@ static void draw_app_header(fl_ui *ui, struct St *s, fl_rect hdr)
 	text_fit(ui, s->title, tx, y - 4, tw, fl_th.strong, v.name);
 	char meta[300];
 	const char *ver = v.ver[0] ? v.ver : kv_get(s, "Version", NULL) ? kv_get(s, "Version", NULL) : "";
-	const char *who = v.app && v.app->dev[0] ? v.app->dev : v.src == SRC_PR || v.src == SRC_PI ? "FreeLFS" : "";
+	const char *who = v.app && v.app->dev[0] ? v.app->dev : v.src == SRC_PR || v.src == SRC_PI ? "FreeLFS" : v.src == SRC_NX ? "Nix" : "";
 	snprintf(meta, sizeof meta, "%s%s%s%s%s", who, who[0] && ver[0] ? "   " : "", ver[0] ? "Version " : "", ver,
 	         v.state != ST_AVAIL ? (who[0] || ver[0] ? "   " : "") : "");
 	int mw = fl_text_width(s->small, meta, -1);

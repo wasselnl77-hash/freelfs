@@ -288,3 +288,23 @@ https://github.com/89luca89/distrobox/archive/refs/tags/1.8.2.5.tar.gz
 https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2
 https://www.netfilter.org/pub/libnftnl/libnftnl-1.3.2.tar.xz
 https://www.netfilter.org/pub/nftables/nftables-1.1.7.tar.xz
+
+# Round 24b: Nix (multi-user) and the libraries it needs (recipes/nix, boost, nlohmann_json, toml11, blake3, libsodium, libgit2)
+https://github.com/NixOS/nix/archive/refs/tags/2.35.6.tar.gz
+https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz
+https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz
+https://github.com/ToruNiina/toml11/archive/refs/tags/v4.4.0.tar.gz
+https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.8.2.tar.gz
+https://download.libsodium.org/libsodium/releases/libsodium-1.0.21.tar.gz
+https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.2.tar.gz
+
+# Round 24a: rootless containers (podman + crun + conmon + passt/pasta + netavark) and the Go toolchain to build podman
+https://github.com/containers/podman/archive/refs/tags/v5.8.10.tar.gz
+https://github.com/containers/crun/releases/download/1.31/crun-1.31.tar.gz
+https://github.com/containers/conmon/archive/refs/tags/v2.2.1.tar.gz
+https://passt.top/passt/snapshot/passt-2026_10_02.cba3570.tar.xz
+https://github.com/containers/netavark/releases/download/v2.1.0/netavark.gz
+https://go.dev/dl/go1.27.4.linux-amd64.tar.gz
+https://s3.amazonaws.com/json-c_releases/releases/json-c-0.18.tar.gz
+https://github.com/containers/fuse-overlayfs/archive/refs/tags/v1.18.tar.gz
+https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/2.71.0.tar.gz

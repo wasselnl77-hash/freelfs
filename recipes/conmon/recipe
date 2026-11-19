@@ -1,0 +1,23 @@
+# conmon: the small per-container monitor process podman starts (C). Nothing runs without a container.
+pkgname=conmon
+version=2.2.1
+release=1
+summary="OCI container monitor (podman)"
+url=https://github.com/containers/conmon
+license=(Apache-2.0)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc glib libseccomp)
+makedepends=(pkgconf)
+source=(conmon-$version.tar.gz::https://github.com/containers/conmon/archive/refs/tags/v$version.tar.gz)
+sha256=(814fb5979a3a4b8576b1f901e606b482bebb41cb7e57926e6d5765ee786b96d3)
+
+build() {
+	cd "$srcdir/conmon-$version"
+	make bin/conmon
+}
+check() { :; }
+package() {
+	cd "$srcdir/conmon-$version"
+	install -Dm755 bin/conmon "$pkgdir/usr/libexec/podman/conmon"
+}

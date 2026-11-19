@@ -1,0 +1,16 @@
+# json-c: JSON parser library; crun (the container runtime of podman) needs it for the OCI config.
+pkgname=json-c
+version=0.18
+release=1
+summary="JSON implementation in C"
+url=https://github.com/json-c/json-c
+license=(MIT)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc)
+makedepends=(cmake ninja)
+source=(https://s3.amazonaws.com/json-c_releases/releases/json-c-$version.tar.gz)
+sha256=(876ab046479166b869afc6896d288183bbc0e5843f141200c677b3e8dfb11724)
+build_style=cmake
+configure_args=(-DBUILD_STATIC_LIBS=OFF -DBUILD_TESTING=OFF -DDISABLE_WERROR=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
+check() { :; }

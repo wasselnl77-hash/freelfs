@@ -1,0 +1,25 @@
+# netavark: podman 5 refuses to start without its network helper binary (even when containers only use
+# pasta or the host network), so FreeLFS ships it. It is upstream's PREBUILT release binary (netavark.gz,
+# sha256 as in the release's sha256sum file), not built from source: building it needs a Rust toolchain
+# and the build system has none. aardvark-dns (DNS for user-defined bridge networks) is not shipped:
+# rootless containers use pasta, distrobox uses the host network.
+pkgname=netavark
+version=2.1.0
+release=1
+summary="Container network helper for podman (upstream prebuilt binary)"
+url=https://github.com/containers/netavark
+license=(Apache-2.0)
+arch=(x86_64)
+groups=(desktop)
+depends=(glibc gcc-libs)
+options=(!strip)
+source=(netavark-$version.gz::https://github.com/containers/netavark/releases/download/v$version/netavark.gz)
+sha256=(39fb540daf7578a793510b27b592b10f17b5d9aa3b07bc5c3f40881f12d590bd)
+
+build() { :; }
+check() { :; }
+package() {
+	install -d "$pkgdir/usr/libexec/podman"
+	gzip -dc "$srcdir/netavark-$version.gz" > "$pkgdir/usr/libexec/podman/netavark"
+	chmod 755 "$pkgdir/usr/libexec/podman/netavark"
+}

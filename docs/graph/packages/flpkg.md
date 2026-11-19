@@ -5,7 +5,7 @@ tags: [package]
 
 #package
 
-Version 0.1, release 8. The FreeLFS package manager
+Version 0.1, release 12. The FreeLFS package manager
 
 - License: MIT; URL: none
 - Groups: [[docs/graph/groups/base|base]]

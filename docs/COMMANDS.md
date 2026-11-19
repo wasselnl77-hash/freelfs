@@ -42,7 +42,8 @@ Facts were checked against the source tree (`src/`, `recipes/`, `config/`, `buil
 Containers of other distributions (Ubuntu, Arch, Fedora) with their apps exported to the start menu. FreeLFS ships it as a set of shell scripts. Normally you do not run it by hand: `flpkg install --from=apt|pacman|dnf NAME` creates the container and installs the package for you.
 
 - **Usage:** upstream distrobox usage (`distrobox --help`). FreeLFS uses these subcommands itself: `create`, `enter`, `list`, `upgrade`, `export`.
-- **Needs:** Nothing. Needs `podman` for containers (see the note under [Containers](#containers) in section 8). Without podman the scripts say so.
+- **Needs:** `podman` (package dependency, round 24a: podman, crun, conmon, passt/pasta, netavark, fuse-overlayfs). Nothing runs in the background.
+- **Create by hand:** use `distrobox create --unshare-process ...`. FreeLFS has no systemd, so containers run without their own cgroup (`cgroups = "disabled"` in `/etc/containers/containers.conf`) and Distrobox's default `--pid host` is refused; `flpkg` adds `--unshare-process` itself.
 - **Examples:**
   ```
   distrobox list
@@ -120,10 +121,10 @@ There are two layers. The command you type is `flpkg`. For most names it first a
 |---|---|---|
 | FreeLFS repository | `freelfs` | the native flpkg (needs the password for changes) |
 | Flathub | `flatpak` (or `flathub`) | apps, installed per user with `flatpak --user` (no root) |
-| Nix | `nix` | nixpkgs, only if the `nix` package is installed (not shipped in this round; `recipes-wip/nix` exists) |
-| Ubuntu | `apt` | apt inside a distrobox container named `freelfs-apt` (about 80 MB) |
-| Arch | `pacman` | pacman inside `freelfs-pacman` (about 150 MB) |
-| Fedora | `dnf` | dnf inside `freelfs-dnf` (about 200 MB) |
+| Nix | `nix` | nixpkgs, when the `nix` package is installed (`flpkg install nix`, recipes/nix) and its service runs: `flpkg search --from=nix TEXT`, `flpkg install --from=nix NAME`, remove, list, upgrade. The daemon starts on the first use and stops after 60 s idle (rc service `nix`). |
+| Ubuntu | `apt` | apt inside a distrobox container named `freelfs-apt` (image `docker.io/library/ubuntu:24.04`, about 30 MB download, 150 MB on disk) |
+| Arch | `pacman` | pacman inside `freelfs-pacman` (`docker.io/library/archlinux`, about 135 MB download, 450 MB on disk) |
+| Fedora | `dnf` | dnf inside `freelfs-dnf` (`docker.io/library/fedora:45`, about 75 MB download, 250 MB on disk) |
 
 The order when no `--from=` is given is: FreeLFS, Flathub, Nix, Ubuntu, Arch, Fedora. When several sources have the name, you are asked which one to use (you can type a number, or press Enter for the first). With `--yes` no question is asked. Creating a container is asked first (it downloads an image), unless `--yes` is given.
 
@@ -1377,7 +1378,7 @@ For most things `flpkg install --from=flatpak NAME` does the same. The Store is 
 ### Containers
 
 - **`distrobox`**: see [section 1](#distrobox). Containers are named `freelfs-apt`, `freelfs-pacman` and `freelfs-dnf`. `distrobox enter -n freelfs-apt` gives a shell inside Ubuntu.
-- **`podman`**: not shipped in this round (`recipes-wip/podman` exists). Distrobox needs it. `flpkg install distrobox` says it is missing when podman is not there.
+- **`podman`**: shipped since round 24a (5.8.10, rootless, daemonless, nothing at boot). Runtime crun, monitor conmon, rootless network pasta (package passt), `netavark` (prebuilt upstream binary; podman refuses to start without it), `fuse-overlayfs` (used only when the home is itself on overlayfs, i.e. the live system; flpkg writes `~/.config/containers/storage.conf` then). Needs `/etc/subuid` and `/etc/subgid` (the installer adds a range for the created user, the live boot one for `tester`) and the setuid `newuidmap`/`newgidmap` (docs/SECURITY.md 6.5). Images and containers live in `~/.local/share/containers`; on a live system without persistence that is RAM, and flpkg warns with the size before it creates a container. Try: `podman run --rm docker.io/library/debian:stable-slim cat /etc/os-release`.
 - **`nix`**: not shipped in this round (`recipes-wip/nix` has no recipe file yet). `flpkg install --from=nix` says so.
 
 ### Power and session
@@ -1648,6 +1649,6 @@ Notes:
 | Login records and system logs | `/var/log/` (`dmesg.log`, `iwd.log`, `bluetooth.log`, `cups/`) |
 | Bug report archive | `~/freelfs-report-*.tar.gz` (made by `flreport`) |
 | Flatpak apps (per person) | `~/.local/share/flatpak` |
-| Distrobox containers | set up inside your home (exact location not yet verified) |
+| Podman images and Distrobox containers (per person) | `~/.local/share/containers` (RAM on a live system without persistence); exports in `~/.local/bin` and `~/.local/share/applications` |
 
 For more detail, see the manual: [12 filesystem layout](manual/12-filesystem-layout.md), [15 users and security](manual/15-users-security.md), [19 admin reference](manual/19-admin-reference.md), [29 glossary](manual/29-glossary.md).

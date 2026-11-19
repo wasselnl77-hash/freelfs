@@ -217,7 +217,8 @@ int main(void)
 		if (r == 0)
 			continue;
 		struct passwd *pw = getpwnam(name);
-		if (!pw || strcmp(pw->pw_name, name) || pw->pw_uid < MIN_UID || pw->pw_uid > MAX_UID) {
+		if (!pw || strcmp(pw->pw_name, name) || pw->pw_uid < MIN_UID || pw->pw_uid > MAX_UID ||
+		    !pw->pw_shell || strstr(pw->pw_shell, "/false") || strstr(pw->pw_shell, "nologin")) {
 			say("refusing that user name");
 			continue;
 		}

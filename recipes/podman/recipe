@@ -1,0 +1,46 @@
+# Podman: rootless, daemonless containers (round 24a). `flpkg install --from=apt|pacman|dnf` uses it through
+# Distrobox. Nothing runs at boot: podman is started by the person's command, there is no service, no socket,
+# no idle RAM.
+#   - Go, built with the vendor directory of the release tarball: no downloads while building (the Go
+#     toolchain is the build-only package "go")
+#   - build tags: seccomp (libseccomp), containers_image_openpgp (pure Go signature checks: no gpgme),
+#     libsqlite3 (the system sqlite instead of a bundled copy), no btrfs/devicemapper/systemd/apparmor
+#   - helpers go to /usr/libexec/podman: conmon, netavark (own packages), rootlessport (here)
+#   - /etc/containers: policy.json, registries.conf, storage.conf, containers.conf (FreeLFS defaults)
+#   - runtime: crun; network: pasta from passt (rootless), netavark only has to exist
+#   - rootless needs newuidmap/newgidmap setuid (package shadow) and /etc/subuid, /etc/subgid
+# Not shipped: podman-remote, the systemd units and generators, the docs/man pages.
+pkgname=podman
+version=5.8.10
+release=1
+summary="Daemonless, rootless container engine"
+url=https://podman.io/
+license=(Apache-2.0)
+arch=(x86_64)
+groups=(desktop)
+jobs=heavy
+depends=(glibc libseccomp sqlite crun conmon passt netavark shadow fuse-overlayfs)
+makedepends=(go gcc pkgconf sqlite libseccomp)
+source=(podman-$version.tar.gz::https://github.com/containers/podman/archive/refs/tags/v$version.tar.gz)
+sha256=(8d047cd9a0e17b4a7a1c5ddd054c8f0d0e28667ef20144afd3a16b65975de10a)
+
+build() {
+	cd "$srcdir/podman-$version"
+	export GOROOT=/usr/lib/go GOPATH="$srcdir/gopath" GOCACHE="$srcdir/gocache" GOFLAGS=-mod=vendor \
+		GOTOOLCHAIN=local CGO_ENABLED=1 GO111MODULE=on
+	local tags="grpcnotrace seccomp libsqlite3 containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper"
+	local p=${NINJAJOBS:-2}
+	go build -p "$p" -trimpath -tags "$tags" -ldflags "-s -w" -o bin/podman ./cmd/podman
+	go build -p "$p" -trimpath -tags "$tags" -ldflags "-s -w" -o bin/rootlessport ./cmd/rootlessport
+}
+
+check() { :; }
+
+package() {
+	cd "$srcdir/podman-$version"
+	install -Dm755 bin/podman "$pkgdir/usr/bin/podman"
+	install -Dm755 bin/rootlessport "$pkgdir/usr/libexec/podman/rootlessport"
+	for f in policy.json registries.conf storage.conf containers.conf; do
+		install -Dm644 "$startdir/$f" "$pkgdir/etc/containers/$f"
+	done
+}

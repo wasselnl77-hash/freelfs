@@ -45,6 +45,7 @@ the password prompt for root actions (setuid helper + flui dialog)
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 
 See also: [03-installing](../../manual/03-installing.md) · [06-apps](../../manual/06-apps.md) · [07-files-drives-usb](../../manual/07-files-drives-usb.md) · [AGENT-MAP](../AGENT-MAP.md) · [INDEX](../INDEX.md)

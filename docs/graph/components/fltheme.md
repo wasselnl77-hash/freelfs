@@ -48,6 +48,7 @@ One window for everything about how the desktop looks. Each control writes ~/.co
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `27f10f9` Round 20: Wi-Fi drivers, NVIDIA phase 1, flat splash, FreeBWS watchdogs, fixes
 - `d3131d5` Round 19: eject/cwd fix, app icons, server-side decorations, stride fix
 - `1e1c899` Round 18: shutdown hardening, visible launch errors, honest tests, manual, website

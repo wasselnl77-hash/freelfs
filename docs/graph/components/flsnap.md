@@ -47,6 +47,7 @@ flsnap keeps read-only snapshots of @ (the root subvolume) in @snapshots, which 
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `1e1c899` Round 18: shutdown hardening, visible launch errors, honest tests, manual, website
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
 - `6a1e3de` Round 12: RAM trim, live store, desktop icons, small fixes, security ops

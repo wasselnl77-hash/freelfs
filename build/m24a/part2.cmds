@@ -1,0 +1,13 @@
+@waitok 90 the network is up (DHCP) :: ip -4 route | grep -q default
+su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=apt htop; echo DONE \$?" > /tmp/apt.log 2>&1 &' ; sleep 1
+@waitok 900 apt done :: grep -q '^DONE 0' /tmp/apt.log
+su -s /bin/sh tester -c 'cd; flpkg remove --yes htop' 2>&1 | tail -n 8
+ls -la /home/tester/.local/bin /home/tester/.local/share/applications; cat /home/tester/.local/state/flpkg/sources.list
+su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-apt -- sh -c "command -v htop; echo rc=\$?"'
+su -s /bin/sh tester -c 'cd; flpkg upgrade < /dev/null 2>&1 | tail -n 12'
+su -s /bin/sh tester -c 'cd; distrobox rm -f freelfs-apt; podman rmi -af' > /dev/null 2>&1
+su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=dnf htop; echo DONE \$?" > /tmp/dnf.log 2>&1 &' ; sleep 1
+@waitok 1500 the dnf install finished :: grep -q '^DONE' /tmp/dnf.log
+@ok the dnf install succeeded :: tail -n 12 /tmp/dnf.log; grep -q '^DONE 0' /tmp/dnf.log
+@ok the Fedora container is Fedora and htop is exported and runs :: su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-dnf -- cat /etc/os-release' | grep -q 'Fedora' && test -x /home/tester/.local/bin/htop && su -s /bin/sh tester -c 'cd; /home/tester/.local/bin/htop --version' | grep -q '^htop' && ls /home/tester/.local/share/applications | grep -q 'freelfs-dnf-htop.desktop'
+@ok flpkg remove htop (dnf) :: su -s /bin/sh tester -c 'cd; flpkg remove --yes htop' > /tmp/rm3.log 2>&1; tail -n 3 /tmp/rm3.log; grep -q 'installed from Fedora (dnf)' /tmp/rm3.log && ! test -e /home/tester/.local/bin/htop

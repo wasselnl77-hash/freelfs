@@ -1,0 +1,59 @@
+# Round 24a: real rootless containers. Podman + Distrobox + the real flpkg front end, as the live user tester, in QEMU with a real
+# (user-mode NAT) network. Images come from docker.io. Long commands run in the background and are polled.
+@waitok 90 the network is up (DHCP) :: ip -4 route | grep -q default
+@ok wired DHCP is on by itself (rc network, NETWORK empty): the NIC has a dynamic address and dhcpcd wrote resolv.conf :: ip -4 addr show | grep -q 'dynamic' && grep -q 'dhcpcd' /etc/resolv.conf
+@waitok 30 name resolution works :: getent hosts registry-1.docker.io
+# ---- what is installed
+@ok podman, crun, conmon, pasta, netavark, fuse-overlayfs, distrobox are in the image :: for f in /usr/bin/podman /usr/bin/crun /usr/libexec/podman/conmon /usr/bin/pasta /usr/libexec/podman/netavark /usr/bin/fuse-overlayfs /usr/bin/distrobox; do test -x $f || { echo missing $f; exit 1; }; done
+@ok the Go toolchain is NOT in the image :: ! test -e /usr/bin/go && ! test -e /usr/lib/go
+@ok newuidmap and newgidmap are setuid, the live tester has sub-IDs :: test -u /usr/bin/newuidmap && test -u /usr/bin/newgidmap && grep -q '^tester:100000:65536$' /etc/subuid && grep -q '^tester:100000:65536$' /etc/subgid
+@ok /etc/containers has the four FreeLFS files :: for f in policy.json registries.conf storage.conf containers.conf; do test -s /etc/containers/$f || exit 1; done
+@ok podman is daemonless: no podman/conmon/crun process is running :: ! pgrep -x 'podman|conmon|crun|netavark|pasta' > /dev/null
+@ok podman runs as tester (version) :: su -s /bin/sh tester -c 'cd; podman --version' | grep -q 'podman version 5.8.10'
+# ---- a plain container first: pull from docker.io, run, outbound networking and DNS through pasta
+@ok the container asks first (no terminal answer: default is no) and creates nothing :: su -s /bin/sh tester -c 'cd; flpkg install --from=apt htop < /dev/null' > /tmp/ask.log 2>&1; ! test $? = 0 && grep -q 'Creating one downloads' /tmp/ask.log && grep -q 'live system without persistence' /tmp/ask.log && grep -q 'cancelled' /tmp/ask.log && ! su -s /bin/sh tester -c 'cd; distrobox list' 2>/dev/null | grep -q freelfs-apt
+# ---- apt (Ubuntu)
+@ok start: flpkg install --yes --from=apt htop (background) :: su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=apt htop; echo DONE \$?" > /tmp/apt.log 2>&1 &' ; sleep 1
+@waitok 1500 the apt install finished :: grep -q '^DONE' /tmp/apt.log
+@ok the apt install succeeded (DONE 0) :: tail -n 3 /tmp/apt.log; grep -q '^DONE 0' /tmp/apt.log
+@ok storage on the live home goes through fuse-overlayfs (home is overlayfs) :: grep -q fuse-overlayfs /home/tester/.config/containers/storage.conf
+@ok the Ubuntu container exists and is Ubuntu :: su -s /bin/sh tester -c 'cd; distrobox list' | grep -q freelfs-apt && su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-apt -- cat /etc/os-release' | grep -q Ubuntu
+@ok htop is exported: command in ~/.local/bin and a menu entry :: test -x /home/tester/.local/bin/htop && ls /home/tester/.local/share/applications | grep -q 'freelfs-apt-htop.desktop'
+@ok the exported htop runs (from the container) :: su -s /bin/sh tester -c 'cd; /home/tester/.local/bin/htop --version' | grep -q '^htop'
+@ok flpkg list names it, and the record says apt :: su -s /bin/sh tester -c 'cd; flpkg list --all' | grep -q 'apt/htop' && grep -q '^apt.htop' /home/tester/.local/state/flpkg/sources.list
+@ok containers do not change idle processes: no daemon even with a container running :: ! pgrep -x 'podman|dockerd|containerd' > /dev/null
+# ---- the firewall still drops inbound with containers around (namespace pair; the same test as m23)
+@ok a test network: two namespaces joined by a veth pair :: ip netns add fw1 && ip link add fwa type veth peer name fwb && ip link set fwb netns fw1 && ip addr add 10.99.0.1/24 dev fwa && ip link set fwa up && ip netns exec fw1 sh -c 'ip addr add 10.99.0.2/24 dev fwb; ip link set fwb up; ip link set lo up'
+@ok a listener on this side :: mkdir -p /tmp/www && echo hi > /tmp/www/index.html && (cd /tmp/www && setsid python3 -m http.server 8000 --bind 10.99.0.1 > /tmp/h8000.log 2>&1 < /dev/null &) && sleep 2
+@ok INBOUND connection is DROPPED (times out) while the container is up :: ip netns exec fw1 curl -sS -m 5 http://10.99.0.1:8000/ > /tmp/in1.out 2>&1; rc=$?; echo "curl rc $rc"; test $rc = 28
+@ok control: with the firewall stopped the same connection works :: /etc/rc.d/init.d/firewall stop > /dev/null 2>&1; ip netns exec fw1 curl -sf -m 8 http://10.99.0.1:8000/ | grep -q hi
+@ok firewall started again drops it again :: /etc/rc.d/init.d/firewall start > /dev/null 2>&1; ip netns exec fw1 curl -sS -m 5 http://10.99.0.1:8000/ > /dev/null 2>&1; test $? = 28
+@ok the container's outbound traffic still works with the firewall running (apt-get update) :: su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-apt -- sudo apt-get update -qq' > /tmp/out.log 2>&1; tail -n 2 /tmp/out.log; test $? = 0
+# ---- upgrade and remove
+@ok flpkg upgrade runs the Ubuntu box update (background) :: su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg upgrade < /dev/null; echo DONE \$?" > /tmp/up.log 2>&1 &'; sleep 1
+@waitok 900 upgrade finished :: grep -q '^DONE' /tmp/up.log
+@ok upgrade mentioned the Ubuntu container and distrobox ran apt inside it :: tail -n 6 /tmp/up.log; grep -q 'Ubuntu (apt)' /tmp/up.log && grep -qE 'Hit:|Get:|Reading package lists|upgraded,|Building dependency tree|Fetched' /tmp/up.log && ! grep -q 'distrobox-upgrade --all' /tmp/up.log
+@ok flpkg remove htop uses the apt source :: su -s /bin/sh tester -c 'cd; flpkg remove --yes htop' > /tmp/rm.log 2>&1; cat /tmp/rm.log | tail -n 5; grep -q 'installed from Ubuntu (apt)' /tmp/rm.log
+@ok htop is gone: export removed, record removed, not in the box :: ! test -e /home/tester/.local/bin/htop && ! ls /home/tester/.local/share/applications | grep -q freelfs-apt-htop && ! grep -q 'htop' /home/tester/.local/state/flpkg/sources.list && ! su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-apt -- sh -c "command -v htop"' 2>/dev/null | grep -q htop
+@ok free RAM: remove the Ubuntu box and image :: su -s /bin/sh tester -c 'cd; distrobox rm -f freelfs-apt; podman rmi -af' > /dev/null 2>&1; free -m | head -2
+# ---- pacman (Arch)
+@ok start: flpkg install --yes --from=pacman htop (background) :: su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=pacman htop; echo DONE \$?" > /tmp/pac.log 2>&1 &' ; sleep 1
+@waitok 1500 the pacman install finished :: grep -q '^DONE' /tmp/pac.log
+@ok the pacman install succeeded :: tail -n 4 /tmp/pac.log; grep -q '^DONE 0' /tmp/pac.log
+@ok the Arch container is Arch and htop is exported and runs :: su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-pacman -- cat /etc/os-release' | grep -q 'Arch' && test -x /home/tester/.local/bin/htop && su -s /bin/sh tester -c 'cd; /home/tester/.local/bin/htop --version' | grep -q '^htop' && ls /home/tester/.local/share/applications | grep -q 'freelfs-pacman-htop.desktop'
+@ok flpkg remove htop (pacman) :: su -s /bin/sh tester -c 'cd; flpkg remove --yes htop' > /tmp/rm2.log 2>&1; tail -n 3 /tmp/rm2.log; grep -q 'installed from Arch (pacman)' /tmp/rm2.log && ! test -e /home/tester/.local/bin/htop
+@ok free RAM: remove the Arch box and image :: su -s /bin/sh tester -c 'cd; distrobox rm -f freelfs-pacman; podman rmi -af' > /dev/null 2>&1; free -m | head -2
+# ---- dnf (Fedora)
+@ok start: flpkg install --yes --from=dnf htop (background) :: su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=dnf htop; echo DONE \$?" > /tmp/dnf.log 2>&1 &' ; sleep 1
+@waitok 1800 the dnf install finished :: grep -q '^DONE' /tmp/dnf.log
+@ok the dnf install succeeded :: tail -n 4 /tmp/dnf.log; grep -q '^DONE 0' /tmp/dnf.log
+@ok the Fedora container is Fedora and htop is exported and runs :: su -s /bin/sh tester -c 'cd; distrobox enter -n freelfs-dnf -- cat /etc/os-release' | grep -q 'Fedora' && test -x /home/tester/.local/bin/htop && su -s /bin/sh tester -c 'cd; /home/tester/.local/bin/htop --version' | grep -q '^htop'
+@ok flpkg remove htop (dnf) :: su -s /bin/sh tester -c 'cd; flpkg remove --yes htop' > /tmp/rm3.log 2>&1; tail -n 3 /tmp/rm3.log; grep -q 'installed from Fedora (dnf)' /tmp/rm3.log && ! test -e /home/tester/.local/bin/htop
+# ---- Nix (round 24b fixed here: state dir /var/nix, search from a cached list instead of evaluating nixpkgs)
+@ok the nix daemon is on demand: only flsocketd now :: ! pgrep -x nix-daemon > /dev/null && pgrep -x flsocketd > /dev/null
+@ok flpkg search --all finds ripgrep in Nix from the cached list (no 3 GB evaluation) :: su -s /bin/sh tester -c 'cd; flpkg search --all ripgrep < /dev/null' > /tmp/ns.log 2>&1; tail -n 4 /tmp/ns.log; grep -q '^nix/ripgrep ' /tmp/ns.log
+@ok start: flpkg install --yes --from=nix hello (background) :: su -s /bin/sh tester -c 'cd; nohup sh -c "flpkg install --yes --from=nix hello; echo DONE \$?" > /tmp/nix.log 2>&1 &'; sleep 1
+@waitok 600 the nix install finished :: grep -q '^DONE' /tmp/nix.log
+@ok nix hello installed and runs :: tail -n 3 /tmp/nix.log; grep -q '^DONE 0' /tmp/nix.log && su -s /bin/sh tester -c 'cd; ~/.nix-profile/bin/hello' | grep -q 'Hello, world'
+@waitok 120 the daemon exits after 60 s idle (only flsocketd stays) :: ! pgrep -x nix-daemon > /dev/null
+@ok flpkg remove hello (nix) :: su -s /bin/sh tester -c 'cd; flpkg remove --yes hello' > /tmp/nrm.log 2>&1; tail -n 3 /tmp/nrm.log; grep -q 'installed from Nix' /tmp/nrm.log && ! test -e /home/tester/.nix-profile/bin/hello

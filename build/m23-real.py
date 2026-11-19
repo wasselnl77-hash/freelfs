@@ -114,7 +114,7 @@ with open(LOG, "w") as log:
         ok("ping is not setuid", "test ! -u /usr/bin/ping && test ! -u /usr/bin/ping6")
         ok("ping works for the user (ICMP datagram socket)", "ping -c 1 -W 3 127.0.0.1")
         ok("mount and umount are not setuid", "test ! -u /usr/bin/mount && test ! -u /usr/bin/umount")
-        ok("newuidmap and newgidmap are not setuid", "test ! -u /usr/bin/newuidmap && test ! -u /usr/bin/newgidmap")
+        ok("newuidmap and newgidmap are setuid (rootless containers, round 24a)", "test -u /usr/bin/newuidmap && test -u /usr/bin/newgidmap")
         ok("su is still setuid but wheel only", "test -u /usr/bin/su && grep -q '^SU_WHEEL_ONLY.*yes' /etc/login.defs")
         ok("traceroute is setuid only for its group", "stat -c '%a' /usr/bin/traceroute | grep -qx 4750")
         rc, out = run("su refused", "script -qec 'su -c id root' /dev/null < /dev/null; true")

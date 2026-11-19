@@ -5,7 +5,7 @@ tags: [source]
 
 #source
 
-Component: [[docs/graph/components/flgreet|flgreet]] -- 683 lines
+Component: [[docs/graph/components/flgreet|flgreet]] -- 686 lines
 
 ## Includes
 

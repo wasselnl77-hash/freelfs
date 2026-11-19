@@ -108,7 +108,7 @@ F
 run '' upgrade
 check "FreeLFS: flpkg-seat upgrade" 'grep -qx "seat upgrade" "$LOG"'
 check "Flathub: flatpak update" 'grep -q "^flatpak update --user -y --noninteractive" "$LOG"'
-check "Distrobox: upgrade of the existing box" 'grep -q "^distrobox upgrade -n freelfs-apt" "$LOG"'
+check "Distrobox: upgrade of the existing box" 'grep -q "^distrobox upgrade freelfs-apt" "$LOG"'
 
 echo "live system without persistence"
 reset; mkdir -p "$d/live"; export FLPKG_LIVE_DIR=$d/live

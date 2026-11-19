@@ -45,6 +45,7 @@ A window like flfiles: Installed and Available tabs, a search field, the package
 
 ## Recent changes
 
+- `4b7a9cc` Round 23: security hardening
 - `b469866` Round 22: flpkg one command for every source, signed online repo, fixes, new docs
 - `d3131d5` Round 19: eject/cwd fix, app icons, server-side decorations, stride fix
 - `ebb6a28` Round 16: laptop-test fixes, security, USB drives, persistence, desktop QoL
